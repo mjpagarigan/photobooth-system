@@ -149,3 +149,70 @@ It covers booth allow-listing and ownership, direct-access denial, concurrent cr
 signed uploads, malformed content, atomic confirmation, exact expiry, CORS and route restrictions,
 controlled image/download responses, expired-token equivalence, and repeated cleanup. The test
 creates only randomized local identities and refuses hosted targets.
+
+## UPDATED how to deploy backend (Supabase + Cloudflare R2)
+
+## Part A — Supabase (database + auth)
+
+1. **Create the project** at supabase.com — the repo's docs lock production to the **Singapore** region; pick that unless you have a reason not to.
+2. **Link and push migrations:**
+   ```powershell
+   pnpm exec supabase link --project-ref <project-ref> --workdir supabase
+   pnpm exec supabase db push --workdir supabase
+   ```
+3. **Create a dedicated Auth user per physical booth** (not a human admin account), then enroll it:
+   ```sql
+   insert into public.booth_devices (user_id, device_name)
+   values ('<booth-auth-user-uuid>', 'Main booth');
+   ```
+4. You can skip `supabase seed buckets --linked` — that materializes the Supabase Storage `photos` bucket, which becomes dead weight once R2 is configured (the code never touches it in R2 mode). Harmless either way, just unnecessary.
+
+## Part B — Cloudflare R2 (photo storage)
+
+1. In the Cloudflare dashboard → R2 → **Create bucket** (e.g. `grace-booth-photos`). Keep it private — nothing here needs public bucket access, since photos are always served through the Supabase Edge Function proxy, never a direct R2 URL.
+2. **R2 → Manage API tokens → Create API token**, scoped to that bucket, with Object Read & Write. Save the **Access Key ID** and **Secret Access Key** — shown once.
+3. Note your **Cloudflare Account ID** (right sidebar of the R2 dashboard).
+
+## Part C — Wire R2 into the Supabase Edge Functions
+
+These are server-only secrets, set on the Supabase project (never in the kiosk or public app):
+
+```text
+R2_ACCOUNT_ID=<your-cloudflare-account-id>
+R2_ACCESS_KEY_ID=<from-the-api-token>
+R2_SECRET_ACCESS_KEY=<from-the-api-token>
+R2_BUCKET_NAME=grace-booth-photos
+```
+
+Plus the existing required secrets from `SETUP.md` §9:
+```text
+PUBLIC_TOKEN_DERIVATION_KEY=<32+ random bytes, base64 or hex>
+PUBLIC_PAGE_ORIGIN=https://photos.example.org
+PHOTO_BUCKET=photos
+CLEANUP_SECRET=<32+ random characters>
+```
+
+**Hosted project:**
+```powershell
+pnpm exec supabase secrets set --workdir supabase `
+  R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET_NAME=grace-booth-photos `
+  PUBLIC_TOKEN_DERIVATION_KEY=... PUBLIC_PAGE_ORIGIN=https://photos.example.org PHOTO_BUCKET=photos CLEANUP_SECRET=...
+pnpm exec supabase functions deploy --workdir supabase
+```
+
+**Local dev** — put the same names in the gitignored `supabase/.env.local`, then `pnpm functions:serve`.
+
+Also still create the two Vault secrets the cron cleanup job reads (unchanged by the R2 switch):
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co', 'grace_booth_project_url');
+select vault.create_secret('<same-value-as-CLEANUP_SECRET>', 'grace_booth_cleanup_secret');
+```
+
+## Verify
+
+```powershell
+pnpm functions:check
+pnpm functions:lint
+pnpm test:functions
+```
+Then run a full mock session end-to-end (`SETUP.md` §6) and confirm in the Cloudflare R2 bucket that an object lands under `<year>/<month>/<sessionId>.jpg` after "Use these photos."
