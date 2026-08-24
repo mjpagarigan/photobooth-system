@@ -158,11 +158,6 @@ function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin 
         fileName: '_headers',
         source: renderCloudflarePagesHeaders(environment),
       });
-      this.emitFile({
-        type: 'asset',
-        fileName: '_redirects',
-        source: '/* /index.html 200\n',
-      });
     },
   };
 }
