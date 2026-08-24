@@ -69,11 +69,12 @@ The public page has separate, renderer-safe Vite build values. Vite may read the
 ```text
 VITE_PUBLIC_PHOTO_API_URL=https://<project-ref>.supabase.co/functions/v1/photo
 VITE_PUBLIC_PAGE_ORIGIN=https://photos.example.org
+VITE_PUBLIC_R2_ORIGIN=https://<bucket>.<account-id>.r2.cloudflarestorage.com
 ```
 
 `VITE_PUBLIC_PAGE_ORIGIN` and the Function secret `PUBLIC_PAGE_ORIGIN` must be the same exact origin. Do not include a path or trailing slash.
 
-When these public values are absent, `pnpm build` deliberately emits an inert `.invalid` page so local workspace verification remains deterministic and no accidental endpoint is contacted. Never deploy that inert output; an approved release must supply both values and generate the exact Vercel CSP in section 10.
+When these public values are absent, `pnpm build` deliberately emits an inert `.invalid` page so local workspace verification remains deterministic and no accidental endpoint is contacted. Never deploy that inert output; an approved release must supply all three values so the build can generate the exact Cloudflare Pages CSP in section 10.
 
 ## 4. Run locally
 
@@ -173,7 +174,7 @@ The checked-in Supabase project contains:
 
 - Forced-RLS `booth_devices` and `photo_sessions` tables.
 - Hash-only public tokens and opaque private object paths.
-- A private `photos` bucket limited to JPEG and 12 MiB.
+- A private legacy `photos` bucket restricted to JPEG; new production objects use private R2.
 - Authenticated `create-upload` and `confirm-upload` Functions.
 - Public POST-only `/photo/resolve`, `/photo/image`, and `/photo/download` routes.
 - Secret-authenticated, leased, idempotent cleanup.
@@ -230,23 +231,42 @@ select vault.create_secret(
 
 Then deploy the Functions through the approved release workflow. Do not change `verify_jwt` or expose direct table or Storage policies to anonymous or authenticated clients.
 
-## 10. Prepare the Vercel public page after deployment approval
+The Functions additionally read the private R2 settings `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET_NAME`; all four or none must be set. The private bucket must also carry the exact browser CORS policy documented in [docs/SECURITY_AND_RETENTION.md](./docs/SECURITY_AND_RETENTION.md) - without it the guest browser cannot follow the `303 See Other` to the presigned URL. Apply the checked-in policy after deployment approval:
 
-Create a Vercel project whose Root Directory is exactly `apps/public`. Configure:
-
-```text
-VITE_PUBLIC_PHOTO_API_URL=https://<project-ref>.supabase.co/functions/v1/photo
-VITE_PUBLIC_PAGE_ORIGIN=https://photos.example.org
+```powershell
+$env:R2_BUCKET_NAME = '<private-photo-bucket>'
+$env:PUBLIC_PAGE_ORIGIN = 'https://photos.example.org'
+$env:CLOUDFLARE_ACCOUNT_ID = '<cloudflare-account-id>'
+$env:CLOUDFLARE_API_TOKEN = '<token-permitted-to-edit-r2-cors>'
+pnpm r2:cors:apply
 ```
 
-Vercel does not interpolate environment variables into `vercel.json` response headers. Generate the exact `connect-src` origin before deployment:
+`pnpm r2:cors:apply` substitutes the exact production photo origin from `PUBLIC_PAGE_ORIGIN` into `infra/r2-cors.json` and applies it through `npx wrangler r2 bucket cors apply`. Origins are never hardcoded in the repository. Re-run the command if the approved origin or bucket ever changes, then confirm the full chain with `pnpm smoke:photo` against a valid token.
+
+## 10. Prepare the Cloudflare Pages public page after deployment approval
+
+Create or select the Cloudflare Pages project and configure it to build from the repository root:
+
+```text
+Build command: pnpm build
+Build output directory: apps/public/dist
+VITE_PUBLIC_PHOTO_API_URL=https://<project-ref>.supabase.co/functions/v1/photo
+VITE_PUBLIC_PAGE_ORIGIN=https://photos.example.org
+VITE_PUBLIC_R2_ORIGIN=https://<bucket>.<account-id>.r2.cloudflarestorage.com
+```
+
+The production Vite build validates all three origins and emits Cloudflare Pages `_headers` and
+`_redirects` files into `dist`. Review the generated files before deploying through the approved
+Cloudflare workflow:
 
 ```powershell
 $env:VITE_PUBLIC_PHOTO_API_URL = 'https://<project-ref>.supabase.co/functions/v1/photo'
-pnpm --filter @grace-booth/public configure:vercel
+$env:VITE_PUBLIC_PAGE_ORIGIN = 'https://photos.example.org'
+$env:VITE_PUBLIC_R2_ORIGIN = 'https://<bucket>.<account-id>.r2.cloudflarestorage.com'
+pnpm --filter @grace-booth/public build
 ```
 
-Review the generated non-secret `apps/public/vercel.json`, then build through the approved deployment workflow. The checked-in example fails closed against a non-project endpoint until this step is performed.
+Do not deploy a build containing `.invalid` origins or unresolved placeholders.
 
 Use a single approved production photo origin. Supabase CORS rejects preview origins by design. The guest QR is:
 

@@ -1,6 +1,4 @@
-import { PHOTO_API_BASE_URL } from './config';
-
-const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
+import { PHOTO_API_BASE_URL, PUBLIC_R2_ORIGIN } from './config';
 
 export type ResolvedPhoto = {
   status: 'ready';
@@ -49,7 +47,7 @@ async function post(route: 'resolve' | 'image' | 'download', token: string, sign
     mode: 'cors',
     credentials: 'omit',
     cache: 'no-store',
-    redirect: 'error',
+    redirect: 'follow',
     referrerPolicy: 'no-referrer',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token }),
@@ -94,16 +92,46 @@ async function fetchPhotoBlob(
   signal?: AbortSignal,
 ): Promise<Blob> {
   const response = await post(route, token, signal);
+  let responseOrigin: string;
+  try {
+    responseOrigin = new URL(response.url).origin;
+  } catch {
+    throw new PhotoApiError('We could not load this photo right now.', true);
+  }
+  const expectedOrigin = response.redirected
+    ? PUBLIC_R2_ORIGIN
+    : new URL(PHOTO_API_BASE_URL).origin;
+  if (responseOrigin !== expectedOrigin) {
+    throw new PhotoApiError('We could not load this photo right now.', true);
+  }
   const type = response.headers.get('content-type')?.split(';', 1)[0]?.toLowerCase();
-  const declaredLength = Number(response.headers.get('content-length'));
+  const contentLength = response.headers.get('content-length');
+  const declaredLength = contentLength === null ? null : Number(contentLength);
   if (
     type !== 'image/jpeg' ||
-    (Number.isFinite(declaredLength) && declaredLength > MAX_PHOTO_BYTES)
+    (declaredLength !== null && (!Number.isSafeInteger(declaredLength) || declaredLength < 1))
   ) {
     throw new PhotoApiError('We could not load this photo right now.', true);
   }
   const blob = await response.blob();
-  if (blob.size < 1 || blob.size > MAX_PHOTO_BYTES) {
+  if (blob.size < 1) {
+    throw new PhotoApiError('We could not load this photo right now.', true);
+  }
+  const [prefix, suffix] = await Promise.all([
+    blob.slice(0, 3).arrayBuffer(),
+    blob.slice(Math.max(0, blob.size - 2)).arrayBuffer(),
+  ]);
+  const leadingBytes = new Uint8Array(prefix);
+  const trailingBytes = new Uint8Array(suffix);
+  if (
+    leadingBytes.length !== 3 ||
+    leadingBytes[0] !== 0xff ||
+    leadingBytes[1] !== 0xd8 ||
+    leadingBytes[2] !== 0xff ||
+    trailingBytes.length !== 2 ||
+    trailingBytes[0] !== 0xff ||
+    trailingBytes[1] !== 0xd9
+  ) {
     throw new PhotoApiError('We could not load this photo right now.', true);
   }
   return blob;

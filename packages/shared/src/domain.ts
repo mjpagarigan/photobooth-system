@@ -141,9 +141,10 @@ export const AdminSettingsSchema = z
     cloudRetentionDays: z.literal(30),
     lan: LanSettingsSchema,
     activeFrame: FrameSummarySchema,
-    frames: z.tuple([FrameSummarySchema, FrameSummarySchema]).optional(),
+    frames: z.array(FrameSummarySchema).optional(),
     cameraAdapter: z.enum(['mock', 'sony', 'webcam', 'internal_webcam']).default('webcam'),
     cameraDeviceId: z.string().nullable().default(null),
+    cameraResolution: z.enum(['720p', '1080p']).default('1080p'),
     supabaseUrl: z.url().max(500).nullable().default(null),
     supabasePublishableKey: z.string().max(1_000).nullable().default(null),
     revision: z.number().int().nonnegative(),
@@ -177,7 +178,7 @@ export const BoothMediaSchema = z
     captureUrls: z.array(z.string().min(1)).max(3),
     collageUrl: z.string().min(1).nullable(),
     frame: FrameSummarySchema.nullable().optional(),
-    frames: z.tuple([FrameSummarySchema, FrameSummarySchema]).optional(),
+    frames: z.array(FrameSummarySchema).optional(),
     qrImageUrl: z.string().min(1).nullable(),
   })
   .strict();
@@ -210,6 +211,30 @@ export const UploadJobStateSchema = z.enum([
   'cancelled',
 ]);
 export type UploadJobState = z.infer<typeof UploadJobStateSchema>;
+
+export const GalleryUploadStatusSchema = z.enum(['pending', 'uploaded', 'failed', 'local-receipt']);
+export type GalleryUploadStatus = z.infer<typeof GalleryUploadStatusSchema>;
+
+export const GalleryItemMetadataSchema = z
+  .object({
+    capturedAt: UtcMillisSchema,
+    photoCount: z.number().int().min(0).max(3),
+    frameName: z.string().max(120).nullable(),
+    uploadStatus: GalleryUploadStatusSchema,
+    cloudExpiresAt: UtcMillisSchema.nullable(),
+  })
+  .strict();
+export type GalleryItemMetadata = z.infer<typeof GalleryItemMetadataSchema>;
+
+export const GalleryItemSchema = z
+  .object({
+    sessionId: OpaqueIdSchema,
+    previewDataUrl: z.string().min(1).max(2_000_000),
+    qrDataUrl: z.string().min(1).max(100_000).nullable(),
+    metadata: GalleryItemMetadataSchema,
+  })
+  .strict();
+export type GalleryItem = z.infer<typeof GalleryItemSchema>;
 
 export const UploadJobSummarySchema = z
   .object({

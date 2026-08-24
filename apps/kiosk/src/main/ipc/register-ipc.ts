@@ -27,6 +27,7 @@ import type { DynamicCameraAdapter } from '../camera/dynamic-camera-adapter.js';
 import type { RendererFrameBroker } from '../camera/renderer-frame-broker.js';
 import type { DeliveryClient } from '../cloud/delivery-client.js';
 import type { UploadQueue } from '../cloud/upload-queue.js';
+import type { RecentGalleryService } from '../gallery/recent-gallery-service.js';
 import type { LocalRepository, StoredUploadJob } from '../database/repositories.js';
 import { AppError } from '../errors.js';
 import type { FrameService } from '../frame/frame-service.js';
@@ -47,6 +48,7 @@ export type IpcDependencies = {
   delivery: DeliveryClient;
   uploadQueue: UploadQueue;
   cameraFrames: RendererFrameBroker;
+  recentGallery: RecentGalleryService;
   rendererOrigin: string;
   onNetworkSettingsChanged(): void;
 };
@@ -81,29 +83,36 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   });
   register('booth:retake-all', () => dependencies.workflow.retakeAll());
   register('booth:accept-photos', (_event, input) =>
-    dependencies.workflow.acceptPhotos(input?.selectedOption ?? 1),
+    dependencies.workflow.acceptPhotos(input.frameId),
   );
   register('booth:retry-upload', () => dependencies.workflow.retryUpload());
   register('booth:finish-offline', () => dependencies.workflow.finishOffline());
   register('booth:done', () => dependencies.workflow.done());
+  register('booth:cancel-session', () => dependencies.workflow.cancelSession());
   register('booth:get-cameras', async () => {
-    const settings = dependencies.repository.getSettings();
     const status = await dependencies.camera.getStatus();
+    const settings = dependencies.repository.getSettings();
     return {
-      adapter: settings.cameraAdapter,
-      deviceId: settings.cameraDeviceId,
+      adapter: dependencies.camera.getActiveAdapterKind(),
+      deviceId: dependencies.camera.getDeviceId(),
+      resolution: settings.cameraResolution,
       status,
     };
   });
   register('booth:set-camera', async (_event, input) => {
     const status = await dependencies.camera.switchAdapter(input.adapter, input.deviceId ?? null);
-    dependencies.repository.setCameraSettings(input.adapter, input.deviceId ?? null);
+    dependencies.repository.setCameraSettings(
+      input.adapter,
+      input.deviceId ?? null,
+      input.resolution,
+    );
     dependencies.workflow.setCameraPreviewEnabled(
       input.adapter === 'webcam' || input.adapter === 'internal_webcam',
     );
     return {
       adapter: input.adapter,
       deviceId: input.deviceId ?? null,
+      resolution: input.resolution,
       status,
     };
   });
@@ -111,6 +120,10 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     dependencies.cameraFrames.submitFrame(input.captureId, Buffer.from(input.jpegBase64, 'base64'));
     return {};
   });
+
+  register('gallery:get-recent', (_event, input) =>
+    dependencies.recentGallery.getRecent(input.limit),
+  );
 
   register('admin:get-auth-status', (event) => ({
     configured: dependencies.passcodes.isConfigured(),
@@ -160,7 +173,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     dependencies.onNetworkSettingsChanged();
     return adminSettings(dependencies.repository, dependencies.frameService);
   });
-  register('admin:choose-frame', async (event, input) => {
+  register('admin:list-frames', () => dependencies.frameService.getFrameSummaries());
+  register('admin:add-frame', async (event) => {
     requireAdmin(event);
     const owner = BrowserWindow.fromWebContents(event.sender);
     const dialogOptions: OpenDialogOptions = {
@@ -173,19 +187,30 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       : await dialog.showOpenDialog(dialogOptions);
     const selected = result.filePaths[0];
     if (result.canceled || !selected) return null;
-    const optionIndex = input?.optionIndex ?? 1;
-    const frame = await dependencies.frameService.importFrameForOption(
-      optionIndex,
+    const frame = await dependencies.frameService.importFrame(
       basename(selected, '.png'),
       await readFile(selected),
     );
     return dependencies.frameService.toSummary(frame);
   });
-  register('admin:save-frame-layout', (event, input) => {
+  register('admin:update-frame-layout', (event, input) => {
     requireAdmin(event);
     return dependencies.frameService.toSummary(
-      dependencies.frameService.updateLayout(input.frameId, input.slots, input.expectedRevision),
+      dependencies.frameService.updateLayout(
+        input.frameId,
+        input.name,
+        input.slots,
+        input.expectedRevision,
+      ),
     );
+  });
+  register('admin:delete-frame', (event, input) => {
+    requireAdmin(event);
+    return dependencies.frameService.deleteFrame(input.frameId);
+  });
+  register('admin:move-frame', (event, input) => {
+    requireAdmin(event);
+    return dependencies.frameService.moveFrame(input.frameId, input.direction);
   });
   register('admin:choose-lan-certificate', async (event, input) => {
     requireAdmin(event);
@@ -267,7 +292,12 @@ async function adminSettings(
   frames: FrameService,
 ): Promise<AdminSettings> {
   const settings = repository.getSettings();
-  const { option1, option2 } = await frames.ensureDefaultFrames();
+  await frames.ensureDefaultFrames();
+  const library = frames.getFrameSummaries();
+  const activeFrame = library.find((frame) => frame.id === settings.activeFrameId) ?? library[0];
+  if (!activeFrame) {
+    throw new AppError('frame_missing', 'No photo frames are configured for this booth.');
+  }
   return {
     googleFormsUrl: settings.googleFormsUrl,
     localRetentionDays: 60,
@@ -279,10 +309,11 @@ async function adminSettings(
       tlsConfigured: settings.lanTlsSecretRef !== null,
       certificateFingerprint: settings.lanCertificateFingerprint,
     },
-    activeFrame: frames.toSummary(option1),
-    frames: [frames.toSummary(option1), frames.toSummary(option2)],
+    activeFrame,
+    frames: library,
     cameraAdapter: settings.cameraAdapter,
     cameraDeviceId: settings.cameraDeviceId,
+    cameraResolution: settings.cameraResolution,
     supabaseUrl: settings.supabaseUrl,
     supabasePublishableKey: settings.supabasePublishableKey,
     revision: settings.revision,

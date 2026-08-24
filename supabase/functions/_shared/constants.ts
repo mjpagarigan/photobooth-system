@@ -1,9 +1,9 @@
-export const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
-export const MIN_LONG_EDGE_PIXELS = 2500;
-export const MAX_EDGE_PIXELS = 3000;
+export const MIN_LONG_EDGE_PIXELS = 2400;
+export const MAX_EDGE_PIXELS = 6000;
 export const PUBLIC_TOKEN_BYTES = 32;
 export const PUBLIC_TOKEN_LENGTH = 43;
 export const SIGNED_UPLOAD_VALID_FOR_SECONDS = 7200 as const;
+export const SIGNED_DOWNLOAD_VALID_FOR_SECONDS = 300 as const;
 export const PENDING_SESSION_RETENTION_HOURS = 24;
 export const JSON_BODY_LIMIT_BYTES = 16 * 1024;
 export const CLEANUP_BATCH_SIZE = 50;

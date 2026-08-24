@@ -9,15 +9,13 @@ export const CreateUploadRequestSchema = z
     action: z.literal('create'),
     clientSessionId: OpaqueIdSchema,
     contentType: z.literal('image/jpeg'),
-    byteSize: z
-      .number()
-      .int()
-      .positive()
-      .max(12 * 1_024 * 1_024),
+    byteSize: z.number().int().positive(),
     sha256: Sha256HexSchema,
-    width: z.number().int().min(1).max(3_000),
-    height: z.number().int().min(1).max(3_000),
+    width: z.number().int().min(1).max(6_000),
+    height: z.number().int().min(1).max(6_000),
     googleFormsUrl: OptionalGoogleFormsUrlSchema,
+    /** ISO-8601 capture instant used to derive the human-readable cloud object name. */
+    capturedAt: z.iso.datetime({ offset: true }).optional(),
   })
   .strict();
 export type CreateUploadRequest = z.infer<typeof CreateUploadRequestSchema>;
@@ -34,7 +32,7 @@ export const UploadAuthorizationSchema = z
   .object({
     storagePath: z.string().min(1).max(500),
     signedUploadToken: z.string().min(1).max(8_192),
-    uploadUrl: z.string().url().optional(),
+    uploadUrl: z.url().optional(),
     validForSeconds: z.literal(7_200),
   })
   .strict();

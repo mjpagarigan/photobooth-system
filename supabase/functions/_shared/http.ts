@@ -99,20 +99,7 @@ export function publicCorsHeaders(origin: string): HeadersInit {
 }
 
 export function isAllowedOrigin(origin: string | null, allowedOrigin: string): boolean {
-  if (!origin) return false;
-  if (origin === allowedOrigin) return true;
-  try {
-    const url = new URL(origin);
-    if (
-      url.protocol === 'https:' &&
-      (url.hostname.endsWith('.pages.dev') || url.hostname.endsWith('.workers.dev'))
-    ) {
-      return true;
-    }
-  } catch {
-    return false;
-  }
-  return false;
+  return origin === allowedOrigin;
 }
 
 export function assertExactOrigin(request: Request, allowedOrigin: string): void {

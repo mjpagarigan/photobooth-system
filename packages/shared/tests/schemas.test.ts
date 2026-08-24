@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConfirmUploadResponseSchema,
+  CreateUploadRequestSchema,
   FrameLayoutSchema,
   IpcContracts,
   OptionalGoogleFormsUrlSchema,
@@ -18,6 +19,24 @@ const slots = [1, 2, 3].map((slotIndex) => ({
 }));
 
 describe('shared boundary schemas', () => {
+  it('accepts valid CreateUploadRequest with 1200x3600 strip dimensions', () => {
+    const valid = {
+      action: 'create' as const,
+      clientSessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
+      contentType: 'image/jpeg' as const,
+      byteSize: 1_500_000,
+      sha256: 'a'.repeat(64),
+      width: 1200,
+      height: 3600,
+      googleFormsUrl: null,
+      capturedAt: '2026-08-24T12:00:00.000Z',
+    };
+    expect(CreateUploadRequestSchema.parse(valid)).toEqual(valid);
+    expect(CreateUploadRequestSchema.parse({ ...valid, byteSize: 20_000_000 }).byteSize).toBe(
+      20_000_000,
+    );
+  });
+
   it('accepts exactly three normalized slots', () => {
     expect(FrameLayoutSchema.parse(slots)).toHaveLength(3);
     expect(() => FrameLayoutSchema.parse([...slots.slice(0, 2), slots[0]])).toThrow();
@@ -60,19 +79,37 @@ describe('shared boundary schemas', () => {
     ).toThrow();
   });
 
-  it('validates collage option parameters for accept-photos and choose-frame', () => {
-    expect(IpcContracts['booth:accept-photos'].request.parse({})).toEqual({ selectedOption: 1 });
-    expect(IpcContracts['booth:accept-photos'].request.parse({ selectedOption: 2 })).toEqual({
-      selectedOption: 2,
-    });
+  it('validates frame identifiers for accept-photos and the admin frame library', () => {
+    const frameId = 'cda39163-9036-4acd-ae10-0c08fdb39022';
+    expect(IpcContracts['booth:accept-photos'].request.parse({ frameId })).toEqual({ frameId });
+    expect(() => IpcContracts['booth:accept-photos'].request.parse({})).toThrow();
     expect(() =>
-      IpcContracts['booth:accept-photos'].request.parse({ selectedOption: 3 }),
+      IpcContracts['booth:accept-photos'].request.parse({ frameId: 'not-a-uuid' }),
     ).toThrow();
 
-    expect(IpcContracts['admin:choose-frame'].request.parse({})).toEqual({ optionIndex: 1 });
-    expect(IpcContracts['admin:choose-frame'].request.parse({ optionIndex: 2 })).toEqual({
-      optionIndex: 2,
+    expect(IpcContracts['admin:list-frames'].request.parse({})).toEqual({});
+    expect(IpcContracts['admin:add-frame'].request.parse({})).toEqual({});
+    expect(
+      IpcContracts['admin:update-frame-layout'].request.parse({
+        frameId,
+        name: 'New name',
+        slots,
+        expectedRevision: 3,
+      }),
+    ).toMatchObject({ frameId, expectedRevision: 3 });
+    expect(IpcContracts['admin:delete-frame'].request.parse({ frameId })).toEqual({ frameId });
+    expect(IpcContracts['admin:move-frame'].request.parse({ frameId, direction: 'up' })).toEqual({
+      frameId,
+      direction: 'up',
     });
-    expect(() => IpcContracts['admin:choose-frame'].request.parse({ optionIndex: 0 })).toThrow();
+    expect(() =>
+      IpcContracts['admin:move-frame'].request.parse({ frameId, direction: 'sideways' }),
+    ).toThrow();
+  });
+
+  it('validates recent-gallery limits', () => {
+    expect(IpcContracts['gallery:get-recent'].request.parse({ limit: 5 })).toEqual({ limit: 5 });
+    expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 0 })).toThrow();
+    expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 51 })).toThrow();
   });
 });

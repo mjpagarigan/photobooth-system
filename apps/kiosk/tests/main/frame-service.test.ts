@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -61,6 +62,23 @@ describe('frame import contract', () => {
     }
   });
 
+  it('rejects near-1:3 frames instead of stretching them into production output', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      UNUSED_PACKAGED_FRAMES,
+      fakeProcessor(1_200, 3_599),
+    );
+    try {
+      await expect(
+        service.importFrame('near aspect', Buffer.from('png'), DEFAULT_FRAME_SLOTS),
+      ).rejects.toThrow(/exact 1:3 vertical/);
+    } finally {
+      store.close();
+    }
+  });
+
   it('validates exactly three slots before persisting an accepted strip frame', async () => {
     const store = createTestStore();
     const service = new FrameService(
@@ -96,7 +114,7 @@ describe('frame import contract', () => {
     }
   });
 
-  it('supports two independently configurable collage options', async () => {
+  it('stores every imported frame as an independent ordered library entry', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -105,34 +123,90 @@ describe('frame import contract', () => {
       fakeProcessor(1_200, 3_600),
     );
     try {
-      const frame1 = await service.importFrameForOption(1, 'Collage 1', Buffer.from('png1'));
-      const frame2 = await service.importFrameForOption(2, 'Collage 2', Buffer.from('png2'));
+      const frame1 = await service.importFrame('Library A', Buffer.from('png1'));
+      const frame2 = await service.importFrame(
+        'Library B',
+        Buffer.from('png2'),
+        ANNIVERSARY_FRAME_SLOTS,
+      );
 
       expect(frame1.id).not.toBe(frame2.id);
-      expect(frame1.name).toBe('Collage 1');
-      expect(frame2.name).toBe('Collage 2');
-
-      const options = service.getFrameOptions();
-      expect(options[0]?.id).toBe(frame1.id);
-      expect(options[1]?.id).toBe(frame2.id);
+      const listed = service.listFrames();
+      expect(listed.map((frame) => frame.id)).toEqual([frame1.id, frame2.id]);
 
       const slot0 = DEFAULT_FRAME_SLOTS[0]!;
       const slot1 = DEFAULT_FRAME_SLOTS[1]!;
       const slot2 = DEFAULT_FRAME_SLOTS[2]!;
       const updatedSlots = [{ ...slot0, x: 0.2 }, slot1, slot2];
-      service.updateLayout(frame2.id, updatedSlots, frame2.revision);
+      service.updateLayout(frame2.id, 'Renamed B', updatedSlots, frame2.revision);
 
-      const reloadedFrame1 = store.repository.getFrame(frame1.id);
-      const reloadedFrame2 = store.repository.getFrame(frame2.id);
-
-      expect(reloadedFrame1?.slots[0]?.x).toBe(slot0.x);
-      expect(reloadedFrame2?.slots[0]?.x).toBe(0.2);
+      const reloaded = store.repository.getFrame(frame2.id);
+      expect(reloaded?.name).toBe('Renamed B');
+      expect(reloaded?.slots[0]?.x).toBe(0.2);
     } finally {
       store.close();
     }
   });
 
-  it('initializes fresh installations with the two packaged anniversary frames', async () => {
+  it('moves frames up and down within the library ordering', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      UNUSED_PACKAGED_FRAMES,
+      fakeProcessor(1_200, 3_600),
+    );
+    try {
+      const first = await service.importFrame('First', Buffer.from('png1'));
+      const second = await service.importFrame('Second', Buffer.from('png2'));
+      const third = await service.importFrame('Third', Buffer.from('png3'));
+
+      const movedDown = service.moveFrame(first.id, 'down');
+      expect(movedDown.map((frame) => frame.id)).toEqual([second.id, first.id, third.id]);
+
+      const movedUp = service.moveFrame(first.id, 'up');
+      expect(movedUp.map((frame) => frame.id)).toEqual([first.id, second.id, third.id]);
+
+      // Boundary moves are no-ops that keep the library intact.
+      expect(service.moveFrame(third.id, 'down')).toHaveLength(3);
+      expect(service.moveFrame(first.id, 'up')).toHaveLength(3);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('deletes unused library entries but refuses frames used by recorded sessions', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      UNUSED_PACKAGED_FRAMES,
+      fakeProcessor(1_200, 3_600),
+    );
+    try {
+      const disposable = await service.importFrame('Disposable', Buffer.from('png1'));
+      const used = await service.importFrame('Used', Buffer.from('png2'));
+
+      const sessionId = randomUUID();
+      store.repository.createSession(sessionId, 1_000);
+      store.database.raw
+        .prepare("UPDATE sessions SET state = 'final', selected_frame_id = ? WHERE id = ?")
+        .run(used.id, sessionId);
+
+      expect(() => service.deleteFrame(used.id)).toThrow(/used by saved photo sessions/i);
+      expect(store.repository.getFrame(used.id)).not.toBeNull();
+
+      const remaining = service.deleteFrame(disposable.id);
+      expect(remaining.map((frame) => frame.id)).toEqual([used.id]);
+      expect(store.repository.getFrame(disposable.id)).toBeNull();
+    } finally {
+      store.close();
+    }
+  });
+});
+
+describe('packaged frame seeding', () => {
+  it('seeds fresh installations with exactly the two packaged anniversary frames', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -148,6 +222,12 @@ describe('frame import contract', () => {
       expect(defaults.option2.name).toBe(ANNIVERSARY_FRAME_NAME);
       expect(defaults.option2.slots).toEqual(ANNIVERSARY_FRAME_SLOTS);
       expect(defaults.option1.sha256).not.toBe(defaults.option2.sha256);
+
+      const library = service.listFrames();
+      expect(library).toHaveLength(2);
+      expect(library[0]?.id).toBe(defaults.option1.id);
+      expect(library[1]?.id).toBe(defaults.option2.id);
+      expect(store.repository.getActiveFrame()?.id).toBe(defaults.option1.id);
     } finally {
       store.close();
     }
@@ -159,15 +239,15 @@ describe('frame import contract', () => {
     const service = new FrameService(store.repository, store.vault, PACKAGED_FRAMES, processor);
     try {
       const legacyBytes = readFileSync(LEGACY_FRAME_PATH);
-      const legacy1 = await service.importFrameForOption(
-        1,
+      const legacy1 = await service.importFrame(
         'CCF Alabang Ministry Fair Strip',
         legacyBytes,
+        DEFAULT_FRAME_SLOTS,
       );
-      const legacy2 = await service.importFrameForOption(
-        2,
+      const legacy2 = await service.importFrame(
         'CCF Alabang Ministry Fair Strip (Collage 2)',
         legacyBytes,
+        DEFAULT_FRAME_SLOTS,
       );
 
       const defaults = await service.ensureDefaultFrames();
@@ -176,6 +256,7 @@ describe('frame import contract', () => {
       expect(defaults.option2.id).not.toBe(legacy2.id);
       expect(defaults.option1.name).toBe(MAT_FRAME_NAME);
       expect(defaults.option2.name).toBe(ANNIVERSARY_FRAME_NAME);
+      expect(service.listFrames()).toHaveLength(2);
     } finally {
       store.close();
     }
@@ -190,13 +271,12 @@ describe('frame import contract', () => {
       passthroughProcessor(),
     );
     try {
-      const custom1 = await service.importFrameForOption(
-        1,
+      const custom1 = await service.importFrame(
         'CCF Alabang Ministry Fair Strip',
         Buffer.from('operator artwork one'),
+        DEFAULT_FRAME_SLOTS,
       );
-      const custom2 = await service.importFrameForOption(
-        2,
+      const custom2 = await service.importFrame(
         'Operator anniversary artwork',
         Buffer.from('operator artwork two'),
         ANNIVERSARY_FRAME_SLOTS,
@@ -220,15 +300,15 @@ describe('frame import contract', () => {
       passthroughProcessor(),
     );
     try {
-      const legacy = await service.importFrameForOption(
-        1,
+      const legacy = await service.importFrame(
         'CCF Alabang Ministry Fair Strip',
         readFileSync(LEGACY_FRAME_PATH),
+        DEFAULT_FRAME_SLOTS,
       );
       const editedSlots = legacy.slots.map((slot, index) =>
         index === 0 ? { ...slot, x: slot.x + 0.01 } : slot,
       );
-      const edited = service.updateLayout(legacy.id, editedSlots, legacy.revision);
+      const edited = service.updateLayout(legacy.id, legacy.name, editedSlots, legacy.revision);
 
       const defaults = await service.ensureDefaultFrames();
 
@@ -248,6 +328,7 @@ function fakeProcessor(width: number, height: number): ImageProcessor {
     validateSourceJpeg: () => Promise.reject(new Error('not used')),
     normalizeFramePng: () =>
       Promise.resolve({ bytes: Buffer.from('normalized transparent PNG'), width, height }),
+    createThumbnail: () => Promise.reject(new Error('not used')),
     close: () => Promise.resolve(),
   };
 }
@@ -258,6 +339,7 @@ function passthroughProcessor(): ImageProcessor {
     validateSourceJpeg: () => Promise.reject(new Error('not used')),
     normalizeFramePng: (bytes) =>
       Promise.resolve({ bytes: Buffer.from(bytes), width: 1_200, height: 3_600 }),
+    createThumbnail: () => Promise.reject(new Error('not used')),
     close: () => Promise.resolve(),
   };
 }

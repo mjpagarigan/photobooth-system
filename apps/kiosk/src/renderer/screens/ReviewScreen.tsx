@@ -1,22 +1,25 @@
 import {
   ArrowCounterClockwiseIcon as ArrowCounterClockwise,
   ArrowRightIcon as ArrowRight,
+  CaretLeftIcon as CaretLeft,
+  CaretRightIcon as CaretRight,
   CheckCircleIcon as CheckCircle,
 } from '@phosphor-icons/react';
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import type { FrameSummary } from '@grace-booth/shared';
 
 import { Button } from '../components/Button';
-import { Photostrip, type PhotostripFrame } from '../components/Photostrip';
-import { ANNIVERSARY_FRAME_PREVIEW, DEFAULT_FRAME_PREVIEW } from '../local-fixtures';
+import { Photostrip } from '../components/Photostrip';
+import { DEFAULT_FRAME_PREVIEW } from '../local-fixtures';
 
 type ReviewScreenProps = {
   busy?: boolean;
   canAccept: boolean;
   canRetake: boolean;
   captureUrls: string[];
-  frame?: PhotostripFrame | null | undefined;
-  frames?: [PhotostripFrame, PhotostripFrame] | undefined;
-  onAccept: (selectedOption: 1 | 2) => void;
+  frames?: FrameSummary[] | undefined;
+  onAccept: (frameId: string) => void;
   onRetake: () => void;
 };
 
@@ -25,93 +28,215 @@ export function ReviewScreen({
   canAccept,
   canRetake,
   captureUrls,
-  frame,
   frames,
   onAccept,
   onRetake,
 }: ReviewScreenProps) {
-  const [selectedOption, setSelectedOption] = useState<1 | 2>(1);
+  const fallbackFrames = useMemo(() => [DEFAULT_FRAME_PREVIEW], []);
+  const options = frames && frames.length > 0 ? frames : fallbackFrames;
+  const [selectedRawId, setSelectedRawId] = useState<string | null>(null);
+  const selectedId =
+    selectedRawId !== null && options.some((option) => option.id === selectedRawId)
+      ? selectedRawId
+      : options[0]?.id;
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
+  }, []);
 
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    updateScrollState();
+    const el = stageRef.current;
+    if (!el) return;
+    const handleResize = () => updateScrollState();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [options.length, updateScrollState]);
+
   const handleRetake = () => {
-    setSelectedOption(1);
+    setSelectedRawId(null);
     onRetake();
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>, option: 1 | 2) => {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      setSelectedOption(option);
+  const moveSelection = (step: 1 | -1) => {
+    const index = Math.max(
+      0,
+      Math.min(options.length - 1, currentIndex(options, selectedId) + step),
+    );
+    const next = options[index];
+    if (next) {
+      setSelectedRawId(next.id);
+      const target = document.querySelector<HTMLElement>(`[data-collage-option="${next.id}"]`);
+      target?.focus();
     }
   };
 
-  const frame1 = frames?.[0] ?? frame ?? DEFAULT_FRAME_PREVIEW;
-  const frame2 = frames?.[1] ?? ANNIVERSARY_FRAME_PREVIEW;
+  useEffect(() => {
+    if (!selectedId) return;
+    const element = document.querySelector<HTMLElement>(`[data-collage-option="${selectedId}"]`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, [selectedId]);
+
+  const scrollContainer = (direction: 'left' | 'right') => {
+    const el = stageRef.current;
+    if (!el) return;
+    const scrollAmount = el.clientWidth * 0.6;
+    el.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const el = stageRef.current;
+    if (!el) return;
+    isDraggingRef.current = true;
+    hasMovedRef.current = false;
+    startXRef.current = e.pageX - el.offsetLeft;
+    scrollLeftRef.current = el.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    const el = stageRef.current;
+    if (!el) return;
+    e.preventDefault();
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    if (Math.abs(walk) > 6) {
+      hasMovedRef.current = true;
+    }
+    el.scrollLeft = scrollLeftRef.current - walk;
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
+  const handleCardClick = (optionId: string) => {
+    if (hasMovedRef.current) {
+      return;
+    }
+    setSelectedRawId(optionId);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (Math.abs(e.deltaX) > 0) return;
+    if (el.scrollWidth > el.clientWidth) {
+      el.scrollLeft += e.deltaY;
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>, option: FrameSummary) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      setSelectedRawId(option.id);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveSelection(1);
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveSelection(-1);
+    }
+  };
 
   return (
     <main className="screen screen--review" data-testid="review-screen">
       <div className="review-layout">
-        <section className="review-options-stage" role="radiogroup" aria-label="Collage options">
-          <div
-            className={`review-option-card ${selectedOption === 1 ? 'is-selected' : ''}`}
-            role="radio"
-            aria-checked={selectedOption === 1}
-            tabIndex={0}
-            onClick={() => setSelectedOption(1)}
-            onKeyDown={(e) => handleKeyDown(e, 1)}
-            data-testid="collage-option-1"
-            aria-label="Collage Option 1"
-          >
-            <div className="review-option-badge">
-              <span className="review-option-title">Collage 1</span>
-              {selectedOption === 1 && (
-                <span className="selected-indicator" aria-hidden="true">
-                  <CheckCircle weight="fill" /> Selected
-                </span>
-              )}
-            </div>
-            <div className="review-option-preview">
-              <Photostrip
-                captureUrls={captureUrls}
-                frame={frame1}
-                label="Preview in Collage Option 1"
-                variant="preview"
-              />
-            </div>
-          </div>
+        <div className="review-carousel-container">
+          {options.length > 2 && (
+            <button
+              type="button"
+              className="review-carousel-arrow review-carousel-arrow--left"
+              onClick={() => scrollContainer('left')}
+              disabled={!canScrollLeft}
+              aria-label="Previous collage layouts"
+            >
+              <CaretLeft aria-hidden="true" weight="bold" />
+            </button>
+          )}
 
-          <div
-            className={`review-option-card ${selectedOption === 2 ? 'is-selected' : ''}`}
-            role="radio"
-            aria-checked={selectedOption === 2}
-            tabIndex={0}
-            onClick={() => setSelectedOption(2)}
-            onKeyDown={(e) => handleKeyDown(e, 2)}
-            data-testid="collage-option-2"
-            aria-label="Collage Option 2"
+          <section
+            className="review-options-stage"
+            role="radiogroup"
+            aria-label="Collage options"
+            ref={stageRef}
+            onScroll={updateScrollState}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
           >
-            <div className="review-option-badge">
-              <span className="review-option-title">Collage 2</span>
-              {selectedOption === 2 && (
-                <span className="selected-indicator" aria-hidden="true">
-                  <CheckCircle weight="fill" /> Selected
-                </span>
-              )}
-            </div>
-            <div className="review-option-preview">
-              <Photostrip
-                captureUrls={captureUrls}
-                frame={frame2}
-                label="Preview in Collage Option 2"
-                variant="preview"
-              />
-            </div>
-          </div>
-        </section>
+            {options.map((option, index) => (
+              <div
+                className={`review-option-card ${selectedId === option.id ? 'is-selected' : ''}`}
+                role="radio"
+                aria-checked={selectedId === option.id}
+                tabIndex={selectedId === option.id ? 0 : -1}
+                key={option.id}
+                onClick={() => handleCardClick(option.id)}
+                onKeyDown={(e) => handleKeyDown(e, option)}
+                data-testid={`collage-option-${index + 1}`}
+                data-collage-option={option.id}
+                aria-label={`Collage Option ${index + 1}: ${option.name}`}
+              >
+                <div className="review-option-badge">
+                  <span className="review-option-title">Collage {index + 1}</span>
+                  {selectedId === option.id && (
+                    <span className="selected-indicator" aria-hidden="true">
+                      <CheckCircle weight="fill" /> Selected
+                    </span>
+                  )}
+                </div>
+                <div className="review-option-preview">
+                  <Photostrip
+                    captureUrls={captureUrls}
+                    frame={option}
+                    label={`Preview in Collage Option ${index + 1}`}
+                    variant="preview"
+                  />
+                </div>
+              </div>
+            ))}
+          </section>
+
+          {options.length > 2 && (
+            <button
+              type="button"
+              className="review-carousel-arrow review-carousel-arrow--right"
+              onClick={() => scrollContainer('right')}
+              disabled={!canScrollRight}
+              aria-label="Next collage layouts"
+            >
+              <CaretRight aria-hidden="true" weight="bold" />
+            </button>
+          )}
+        </div>
 
         <section className="review-decision-panel" aria-label="Review decisions">
           <div className="review-decision-card">
@@ -144,7 +269,9 @@ export function ReviewScreen({
                 disabled={!canAccept}
                 iconAfter={<ArrowRight aria-hidden="true" weight="bold" />}
                 loading={busy}
-                onClick={() => onAccept(selectedOption)}
+                onClick={() => {
+                  if (selectedId !== undefined) onAccept(selectedId);
+                }}
               >
                 <span className="button__two-line">
                   <span className="button__line">Use these</span>
@@ -157,4 +284,10 @@ export function ReviewScreen({
       </div>
     </main>
   );
+}
+
+function currentIndex(options: FrameSummary[], id: string | undefined): number {
+  if (id === undefined) return 0;
+  const index = options.findIndex((option) => option.id === id);
+  return index === -1 ? 0 : index;
 }

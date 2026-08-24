@@ -52,6 +52,8 @@ describe('public photo page', () => {
     );
     expect(ministryLink).toHaveAttribute('target', '_blank');
     expect(ministryLink).toHaveAttribute('rel', 'noopener noreferrer external');
+    expect(api.resolvePhoto).toHaveBeenCalledTimes(1);
+    expect(api.fetchPhotoImage).toHaveBeenCalledTimes(1);
   });
 
   it('downloads through the POST client without placing the token in the DOM', async () => {
@@ -62,8 +64,24 @@ describe('public photo page', () => {
     const button = await screen.findByRole('button', { name: 'Download photo' });
     expect(container.textContent).not.toContain(token);
     fireEvent.click(button);
-    await waitFor(() => expect(api.fetchPhotoDownload).toHaveBeenCalledWith(token));
-    expect(click).toHaveBeenCalledOnce();
+    await waitFor(() => expect(api.fetchPhotoDownload).toHaveBeenCalledTimes(1));
+    fireEvent.click(button);
+    await waitFor(() => expect(api.fetchPhotoDownload).toHaveBeenCalledTimes(2));
+    expect(api.fetchPhotoDownload).toHaveBeenNthCalledWith(1, token);
+    expect(api.fetchPhotoDownload).toHaveBeenNthCalledWith(2, token);
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes one fresh authenticated image POST for each explicit page retry', async () => {
+    vi.mocked(api.fetchPhotoImage)
+      .mockRejectedValueOnce(new api.PhotoApiError('Temporary failure.', true))
+      .mockResolvedValueOnce(jpeg);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /try again/i }));
+    expect(await screen.findByRole('img', { name: /finished event collage/i })).toBeVisible();
+    expect(api.resolvePhoto).toHaveBeenCalledTimes(2);
+    expect(api.fetchPhotoImage).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed without a well-shaped fragment token', async () => {

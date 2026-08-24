@@ -251,6 +251,9 @@ export function AdminSettings({
                   <small>Device ID: {settings.cameraDeviceId}</small>
                 </div>
               )}
+              <div className="camera-device-id-text">
+                <small>Resolution: {settings.cameraResolution}</small>
+              </div>
             </div>
             {onOpenCameras && (
               <Button

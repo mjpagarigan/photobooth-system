@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "configure:vercel": "node scripts/configure-vercel.mjs",
     "dev": "vite",
     "build": "node -e \"const fs=require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', {recursive:true, force:true});\" && tsc --noEmit -p tsconfig.json && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",

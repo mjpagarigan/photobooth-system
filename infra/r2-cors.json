@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": [],
+    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
+    "MaxAgeSeconds": 300
+  }
+]

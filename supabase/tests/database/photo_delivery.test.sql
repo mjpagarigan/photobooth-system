@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(60);
+select plan(69);
 
 set local timezone = 'America/Denver';
 
@@ -11,6 +11,7 @@ select has_table('public', 'photo_sessions', 'photo session table exists');
 select has_column('public', 'photo_sessions', 'owner_user_id', 'owner is stored');
 select has_column('public', 'photo_sessions', 'public_token_hash', 'token hash is stored');
 select has_column('public', 'photo_sessions', 'storage_object_path', 'private path is stored');
+select has_column('public', 'photo_sessions', 'storage_backend', 'storage provider is stored');
 select has_column('public', 'photo_sessions', 'status', 'status is stored');
 select has_column(
   'public',
@@ -85,26 +86,24 @@ select ok(
   ),
   'photo sessions force RLS'
 );
-select hasnt_table_privilege('anon', 'public', 'photo_sessions', 'SELECT', 'anon cannot read photos');
-select hasnt_table_privilege(
-  'authenticated',
-  'public',
-  'photo_sessions',
-  'SELECT',
+select ok(
+  not has_table_privilege('anon', 'public.photo_sessions', 'SELECT'),
+  'anon cannot read photos'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.photo_sessions', 'SELECT'),
   'authenticated users cannot read photos directly'
 );
-select hasnt_table_privilege(
-  'anon',
-  'public',
-  'booth_devices',
-  'SELECT',
+select ok(
+  not has_table_privilege('anon', 'public.booth_devices', 'SELECT'),
   'anon cannot read booth identities'
 );
 select has_function(
   'public',
   'create_or_get_photo_session',
   array[
-    'uuid', 'uuid', 'uuid', 'text', 'text', 'text', 'bigint', 'text', 'integer', 'integer', 'text'
+    'uuid', 'uuid', 'uuid', 'text', 'text', 'text', 'text', 'bigint', 'text', 'integer',
+    'integer', 'text'
   ],
   'atomic stable create replay exists'
 );
@@ -212,6 +211,84 @@ select lives_ok(
 
 select is(
   (
+    select storage_backend
+    from public.photo_sessions
+    where id = '22222222-2222-4222-8222-222222222222'
+  ),
+  'supabase',
+  'existing and omitted-provider rows default to Supabase Storage'
+);
+
+select lives_ok(
+  $$
+    update public.photo_sessions
+    set byte_size = 20000000
+    where id = '22222222-2222-4222-8222-222222222222'
+  $$,
+  'photo metadata accepts sizes above the former 12 MiB ceiling'
+);
+
+update public.photo_sessions
+set byte_size = 1000000
+where id = '22222222-2222-4222-8222-222222222222';
+
+select lives_ok(
+  $$
+    select *
+    from public.create_or_get_photo_session(
+      'aaaaaaaa-1111-4111-8111-111111111111',
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-2222-4222-8222-222222222222',
+      repeat('de', 32),
+      '08-24-2026/08-24-2026-07-19-44.jpg',
+      'r2',
+      'image/jpeg',
+      1000000,
+      repeat('ef', 32),
+      1200,
+      3600,
+      null
+    )
+  $$,
+  'date-based object paths are accepted through the create RPC'
+);
+
+select is(
+  (
+    select storage_backend
+    from public.photo_sessions
+    where id = 'aaaaaaaa-1111-4111-8111-111111111111'
+  ),
+  'r2',
+  'the create RPC persists R2 as the selected backend'
+);
+
+select throws_ok(
+  $$
+    insert into public.photo_sessions (
+      id, owner_user_id, client_session_id, public_token_hash, storage_object_path,
+      storage_backend, content_type, byte_size, content_sha256, image_width, image_height
+    ) values (
+      'bbbbbbbb-1111-4111-8111-111111111111',
+      '11111111-1111-4111-8111-111111111111',
+      'bbbbbbbb-2222-4222-8222-222222222222',
+      decode(repeat('aa', 32), 'hex'),
+      '08-24-2026/08-24-2026-07-19-45.jpg',
+      'r2',
+      'image/jpeg',
+      1000000,
+      decode(repeat('bb', 32), 'hex'),
+      1200,
+      6001
+    )
+  $$,
+  '23514',
+  'new row for relation "photo_sessions" violates check constraint "photo_sessions_image_dimensions"',
+  'dimensions above 6000 pixels remain rejected'
+);
+
+select is(
+  (
     select id
     from public.create_or_get_photo_session(
       '77777777-7777-4777-8777-777777777777',
@@ -219,6 +296,7 @@ select is(
       '33333333-3333-4333-8333-333333333333',
       repeat('ab', 32),
       '2026/08/77777777-7777-4777-8777-777777777777.jpg',
+      'supabase',
       'image/jpeg',
       1000000,
       repeat('cd', 32),
@@ -311,6 +389,7 @@ select throws_ok(
       '33333333-3333-4333-8333-333333333333',
       repeat('bb', 32),
       '2026/08/77777777-7777-4777-8777-777777777777.jpg',
+      'supabase',
       'image/jpeg',
       999999,
       repeat('cd', 32),
@@ -399,6 +478,15 @@ select is(
   'a ready unexpired photo resolves'
 );
 
+select is(
+  (
+    select storage_backend
+    from public.resolve_photo_session(repeat('ab', 32))
+  ),
+  'supabase',
+  'photo resolution preserves the session storage backend'
+);
+
 select throws_ok(
   $$
     select *
@@ -408,6 +496,7 @@ select throws_ok(
       '33333333-3333-4333-8333-333333333333',
       repeat('ab', 32),
       '2026/08/77777777-7777-4777-8777-777777777777.jpg',
+      'supabase',
       'image/jpeg',
       1000000,
       repeat('cd', 32),
@@ -606,6 +695,20 @@ select is(
   ),
   1,
   'reopening a cleaned session advances its delivery generation'
+);
+
+update public.photo_sessions
+set updated_at = statement_timestamp() - interval '25 hours'
+where id = 'aaaaaaaa-1111-4111-8111-111111111111';
+
+select is(
+  (
+    select storage_backend
+    from public.claim_photo_cleanup(100, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+    where id = 'aaaaaaaa-1111-4111-8111-111111111111'
+  ),
+  'r2',
+  'cleanup claims preserve the object storage backend'
 );
 
 select throws_ok(

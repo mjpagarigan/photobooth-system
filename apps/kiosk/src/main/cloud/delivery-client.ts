@@ -95,8 +95,7 @@ export class SupabaseDeliveryClient implements DeliveryClient {
       );
     }
     const expiresAt =
-      data.session.expires_at ??
-      Math.floor(Date.now() / 1_000) + data.session.expires_in;
+      data.session.expires_at ?? Math.floor(Date.now() / 1_000) + data.session.expires_in;
     this.sessions.save(
       BoothAuthSessionSchema.parse({
         accessToken: data.session.access_token,
@@ -108,7 +107,42 @@ export class SupabaseDeliveryClient implements DeliveryClient {
   }
 
   async createUpload(request: CreateUploadRequest): Promise<CreateUploadResponse> {
-    return CreateUploadResponseSchema.parse(await this.invokeFunction('create-upload', request));
+    try {
+      return CreateUploadResponseSchema.parse(await this.invokeFunction('create-upload', request));
+    } catch (error) {
+      if (
+        request.capturedAt === undefined ||
+        !(error instanceof DeliveryFailure) ||
+        error.kind !== 'permanent' ||
+        error.code !== 'invalid_request'
+      ) {
+        throw error;
+      }
+
+      // Keep kiosk and Edge Function rollouts independently deployable. Older strict function
+      // schemas do not know about capturedAt, so retry once with the legacy request shape.
+      const legacyRequest: CreateUploadRequest = { ...request };
+      delete legacyRequest.capturedAt;
+      try {
+        return CreateUploadResponseSchema.parse(
+          await this.invokeFunction('create-upload', legacyRequest),
+        );
+      } catch (legacyError) {
+        if (
+          legacyError instanceof DeliveryFailure &&
+          legacyError.kind === 'permanent' &&
+          legacyError.code === 'invalid_request'
+        ) {
+          throw new DeliveryFailure(
+            'permanent',
+            'cloud_schema_incompatible',
+            'The cloud photo service must be updated before this strip can upload.',
+            { cause: legacyError },
+          );
+        }
+        throw legacyError;
+      }
+    }
   }
 
   async resumeUpload(request: ResumeUploadRequest): Promise<ResumeUploadResponse> {
@@ -210,12 +244,17 @@ export class SupabaseDeliveryClient implements DeliveryClient {
         );
       }
       const transient = response.status === 429 || response.status >= 500;
+      const serverError = functionErrorFromResponse(responseBody);
+      const serverCode =
+        serverError.code ?? (transient ? 'cloud_unavailable' : 'cloud_request_rejected');
+
       throw new DeliveryFailure(
         transient ? 'transient' : 'permanent',
-        transient ? 'cloud_unavailable' : 'cloud_request_rejected',
-        transient
-          ? 'The photo service is temporarily unavailable.'
-          : 'The photo service rejected the request.',
+        serverCode,
+        serverError.message ??
+          (transient
+            ? 'The photo service is temporarily unavailable.'
+            : 'The photo service rejected the request.'),
       );
     }
     return responseBody;
@@ -260,8 +299,7 @@ export class SupabaseDeliveryClient implements DeliveryClient {
       );
     }
     const expiresAt =
-      data.session.expires_at ??
-      Math.floor(Date.now() / 1_000) + data.session.expires_in;
+      data.session.expires_at ?? Math.floor(Date.now() / 1_000) + data.session.expires_in;
     const refreshed = BoothAuthSessionSchema.parse({
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token || stored.refreshToken,
@@ -271,6 +309,19 @@ export class SupabaseDeliveryClient implements DeliveryClient {
     this.sessions.save(refreshed);
     return refreshed.accessToken;
   }
+}
+
+function functionErrorFromResponse(body: unknown): { code: string | null; message: string | null } {
+  if (!body || typeof body !== 'object') return { code: null, message: null };
+  const response = body as Record<string, unknown>;
+  const candidate =
+    response.error && typeof response.error === 'object'
+      ? (response.error as Record<string, unknown>)
+      : response;
+  return {
+    code: typeof candidate.code === 'string' ? candidate.code : null,
+    message: typeof candidate.message === 'string' ? candidate.message : null,
+  };
 }
 
 export function classifySignedUploadFailure(error: unknown): Exclude<DeliveryFailureKind, 'auth'> {

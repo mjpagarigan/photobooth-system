@@ -9,6 +9,7 @@ import { type AdminClient, createAdminClient } from '../_shared/supabase.ts';
 type CleanupClaim = {
   id: string;
   storage_object_path: string;
+  storage_backend: 'supabase' | 'r2';
   previous_status: 'pending' | 'expired' | 'deleting';
 };
 
@@ -18,6 +19,7 @@ function isCleanupClaim(value: unknown): value is CleanupClaim {
   return (
     typeof claim.id === 'string' &&
     typeof claim.storage_object_path === 'string' &&
+    (claim.storage_backend === 'supabase' || claim.storage_backend === 'r2') &&
     (claim.previous_status === 'pending' ||
       claim.previous_status === 'expired' ||
       claim.previous_status === 'deleting')
@@ -49,10 +51,23 @@ export type CleanupSummary = {
   hasMore: boolean;
 };
 
+export type CleanupDependencies = {
+  isR2Configured: typeof isR2Configured;
+  createR2Client: typeof createR2Client;
+  deleteR2Objects: typeof deleteR2Objects;
+};
+
+const DEFAULT_CLEANUP_DEPENDENCIES: CleanupDependencies = {
+  isR2Configured,
+  createR2Client,
+  deleteR2Objects,
+};
+
 export async function runCleanup(
   admin: AdminClient,
   leaseId = crypto.randomUUID(),
   bucket = photoBucket(),
+  dependencies: CleanupDependencies = DEFAULT_CLEANUP_DEPENDENCIES,
 ): Promise<CleanupSummary> {
   let claimedCount = 0;
   let deletedCount = 0;
@@ -78,10 +93,14 @@ export async function runCleanup(
     if (claims.length === 0) break;
 
     for (const claim of claims) {
-      if (isR2Configured()) {
+      if (claim.storage_backend === 'r2') {
         try {
-          const r2 = createR2Client();
-          await deleteR2Objects(r2, [claim.storage_object_path]);
+          if (!dependencies.isR2Configured()) {
+            failedCount += 1;
+            continue;
+          }
+          const r2 = dependencies.createR2Client();
+          await dependencies.deleteR2Objects(r2, [claim.storage_object_path]);
         } catch {
           failedCount += 1;
           continue;

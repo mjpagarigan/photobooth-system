@@ -41,6 +41,16 @@ The visual project checks 11 canonical states at both 1366 x 768 and 1280 x 720.
 
 The checked-in pgTAP suite contains 60 assertions. The checked-in local Function integration suite covers allow-listing, ownership, direct-access denial, concurrent idempotency, signed upload, validation, atomic confirmation, exact expiry, exact CORS and routes, controlled streaming, expired-token equivalence, and repeated cleanup. Both sources pass static checking.
 
+## Deploy order
+
+The QR photo-delivery chain only works when hosted artifacts come from the same tree and are applied in this order:
+
+1. Apply the checked-in Supabase migrations (`supabase db push`) so `resolve_photo_session` returns `storage_backend`.
+2. Deploy the Edge Functions from that same tree.
+3. Build and deploy the public page from that same tree with `VITE_PUBLIC_PHOTO_API_URL`, `VITE_PUBLIC_PAGE_ORIGIN`, and `VITE_PUBLIC_R2_ORIGIN` all set.
+4. Apply the R2 bucket CORS policy (`pnpm r2:cors:apply` with `R2_BUCKET_NAME`, `PUBLIC_PAGE_ORIGIN`, and Cloudflare credentials set).
+5. Run the hosted smoke test (`pnpm smoke:photo` with a valid token); it names the failing layer - Function/HTTP status, R2 CORS, presigned-origin mismatch, storage-backend drift, or non-JPEG body.
+
 ## Windows artifact
 
 - Installer: `apps/kiosk/release/Grace-Booth-0.1.0-x64-setup.exe`
@@ -64,8 +74,8 @@ The installer is unsigned and is for internal verification only. Production rele
 ## Intentionally blocked or not authorized
 
 - Supabase local database reset, the 60 pgTAP assertions, and the live local Edge Function suite were not executed because Docker Desktop and Podman are unavailable. No substitute hosted target was used.
-- Supabase project creation, migration push, Function deployment, Storage provisioning, Vault/Cron materialization, Vercel creation/deployment, DNS, and production origins were not authorized and were not changed.
-- Hosted-origin/CORS smoke tests remain blocked until approved Supabase and Vercel resources exist.
+- Supabase project creation, migration push, Function deployment, Storage provisioning, Vault/Cron materialization, Cloudflare Pages deployment, DNS, and production origins were not authorized and were not changed.
+- Hosted-origin/CORS smoke tests remain blocked until approved Supabase and Cloudflare Pages resources exist.
 - Real Sony capture remains blocked pending the exact camera body, firmware, official SDK evidence and redistribution approval, and physical acceptance/soak tests.
 - Authenticode signing and installed/uninstall validation on a clean supported Windows 11 account remain release-operations tasks.
 

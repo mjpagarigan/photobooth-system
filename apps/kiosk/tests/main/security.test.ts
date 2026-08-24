@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { AdminSessionService } from '../../src/main/auth/admin-sessions.js';
 import { PasscodeService } from '../../src/main/auth/passcode-service.js';
-import { PhotoVault } from '../../src/main/storage/photo-vault.js';
+import {
+  isAcceptedVaultPlaintextSize,
+  PhotoVault,
+} from '../../src/main/storage/photo-vault.js';
 import { resolveInside } from '../../src/main/storage/paths.js';
 import { createTestStore, type TestStore } from './helpers.js';
 
@@ -34,6 +37,13 @@ describe('local secret boundaries', () => {
     bytes[headerStart + 12] = (bytes[headerStart + 12] ?? 0) ^ 1;
     writeFileSync(path, bytes);
     expect(() => store?.vault.read(stored.relativePath)).toThrow();
+  });
+
+  it('accepts completed JPEG sizes above the former 12 MiB ceiling', () => {
+    expect(isAcceptedVaultPlaintextSize('completed', 20_000_000)).toBe(true);
+    expect(isAcceptedVaultPlaintextSize('completed', Number.MAX_SAFE_INTEGER)).toBe(true);
+    expect(isAcceptedVaultPlaintextSize('completed', 0)).toBe(false);
+    expect(isAcceptedVaultPlaintextSize('pending', 60_000_000)).toBe(false);
   });
 });
 

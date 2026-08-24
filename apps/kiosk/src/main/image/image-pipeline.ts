@@ -5,6 +5,11 @@ import sharp, { type Metadata } from 'sharp';
 
 import { AppError } from '../errors.js';
 import type { CropFocus, CropStrategy } from './crop-strategy.js';
+import {
+  hasExactProductionStripAspect,
+  PRODUCTION_STRIP_EXPORT,
+  PRODUCTION_STRIP_JPEG_OPTIONS,
+} from './strip-export-config.js';
 
 const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -18,7 +23,6 @@ export type ImagePipelineInput = {
   framePng: Uint8Array;
   slots: FrameLayout;
   frameAspectRatio?: number;
-  longEdge?: number;
 };
 
 export type ImagePipelineResult = {
@@ -39,6 +43,9 @@ export class ImagePipeline {
 
   async process(input: ImagePipelineInput): Promise<ImagePipelineResult> {
     const startedAt = performance.now();
+    if (input.captures.length !== 3) {
+      throw new AppError('capture_count', 'Exactly three photos are required.');
+    }
     const slots = FrameLayoutSchema.parse(input.slots);
     for (const capture of input.captures) {
       validateSignatureAndSize(capture, JPEG_MAGIC, 'JPEG', MAX_SOURCE_BYTES);
@@ -66,6 +73,12 @@ export class ImagePipeline {
     }
     const correctedFrameSize = orientedSize(frameMetadata);
     const decodedAspect = correctedFrameSize.width / correctedFrameSize.height;
+    if (!hasExactProductionStripAspect(correctedFrameSize.width, correctedFrameSize.height)) {
+      throw new AppError(
+        'frame_aspect',
+        'The selected frame must use an exact 1:3 vertical 2×6 strip layout.',
+      );
+    }
     if (
       input.frameAspectRatio !== undefined &&
       (!Number.isFinite(input.frameAspectRatio) ||
@@ -75,11 +88,10 @@ export class ImagePipeline {
     }
     const validationComplete = performance.now();
 
-    const longEdge = input.longEdge ?? 2_700;
-    if (longEdge < 2_400 || longEdge > 3_600) {
-      throw new AppError('output_dimensions', 'The collage long edge must be 2400–3600 pixels.');
-    }
-    const canvas = dimensionsForAspect(decodedAspect, longEdge);
+    const canvas = {
+      width: PRODUCTION_STRIP_EXPORT.width,
+      height: PRODUCTION_STRIP_EXPORT.height,
+    };
     const focusPoints = await Promise.all(
       input.captures.map((capture) => this.cropStrategy.locateFace(capture)),
     );
@@ -88,7 +100,8 @@ export class ImagePipeline {
         const sourceIndex = slot.slotIndex - 1;
         const capture = input.captures[sourceIndex];
         const metadata = captureMetadata[sourceIndex];
-        if (!capture || !metadata) throw new AppError('capture_count', 'Three photos are required.');
+        if (!capture || !metadata)
+          throw new AppError('capture_count', 'Three photos are required.');
         const box = slotBox(slot, canvas.width, canvas.height);
         const corrected = orientedSize(metadata);
         let pipeline = sharp(capture, {
@@ -152,9 +165,24 @@ export class ImagePipeline {
           top: 0,
         },
       ])
-      .toColourspace('srgb')
-      .jpeg({ quality: 88, chromaSubsampling: '4:4:4', mozjpeg: true })
+      .toColourspace(PRODUCTION_STRIP_EXPORT.colourspace)
+      .withMetadata({ density: PRODUCTION_STRIP_EXPORT.densityDpi })
+      .jpeg(PRODUCTION_STRIP_JPEG_OPTIONS)
       .toBuffer();
+    const outputMetadata = await sharp(bytes, { failOn: 'warning' }).metadata();
+    if (
+      outputMetadata.format !== 'jpeg' ||
+      outputMetadata.width !== PRODUCTION_STRIP_EXPORT.width ||
+      outputMetadata.height !== PRODUCTION_STRIP_EXPORT.height ||
+      outputMetadata.space !== PRODUCTION_STRIP_EXPORT.colourspace ||
+      outputMetadata.chromaSubsampling !== PRODUCTION_STRIP_EXPORT.chromaSubsampling ||
+      outputMetadata.density !== PRODUCTION_STRIP_EXPORT.densityDpi
+    ) {
+      throw new AppError(
+        'output_metadata',
+        'The finished strip did not match the required production export metadata.',
+      );
+    }
     const completedAt = performance.now();
     return {
       bytes,
@@ -209,12 +237,6 @@ function orientedSize(metadata: Metadata): { width: number; height: number } {
     throw new AppError('image_dimensions', 'Image dimensions are unavailable.');
   }
   return { width: metadata.width, height: metadata.height };
-}
-
-function dimensionsForAspect(aspect: number, longEdge: number): { width: number; height: number } {
-  return aspect >= 1
-    ? { width: longEdge, height: Math.round(longEdge / aspect) }
-    : { width: Math.round(longEdge * aspect), height: longEdge };
 }
 
 function slotBox(

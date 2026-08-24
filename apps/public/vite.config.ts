@@ -3,13 +3,15 @@ import react from '@vitejs/plugin-react';
 import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-type ValidatedBuildEnvironment = {
+export type ValidatedBuildEnvironment = {
   apiUrl: URL;
   pageOrigin: string;
+  r2Origin: string;
 };
 
-const INERT_API_URL = 'https://unconfigured.invalid/functions/v1/photo';
-const INERT_PAGE_ORIGIN = 'https://unconfigured.invalid';
+const INERT_API_URL = 'https://unconfigured-api.invalid/functions/v1/photo';
+const INERT_PAGE_ORIGIN = 'https://unconfigured-page.invalid';
+const INERT_R2_ORIGIN = 'https://unconfigured-r2.invalid';
 
 function parseHttpsUrl(value: string, name: string, allowLocalHttp = true): URL {
   let parsed: URL;
@@ -29,15 +31,33 @@ function parseHttpsUrl(value: string, name: string, allowLocalHttp = true): URL 
   return parsed;
 }
 
-function validateEnvironment(mode: string): ValidatedBuildEnvironment {
-  const env = loadEnv(mode, fileURLToPath(new URL('../..', import.meta.url)), 'VITE_');
+export function validateEnvironment(
+  mode: string,
+  providedEnvironment?: Record<string, string>,
+): ValidatedBuildEnvironment {
+  const env =
+    providedEnvironment ?? loadEnv(mode, fileURLToPath(new URL('../..', import.meta.url)), 'VITE_');
   const testing = mode === 'test';
+  const production = mode === 'production';
+  const missing = [
+    env.VITE_PUBLIC_PHOTO_API_URL ? null : 'VITE_PUBLIC_PHOTO_API_URL',
+    env.VITE_PUBLIC_PAGE_ORIGIN ? null : 'VITE_PUBLIC_PAGE_ORIGIN',
+    env.VITE_PUBLIC_R2_ORIGIN ? null : 'VITE_PUBLIC_R2_ORIGIN',
+  ].filter((name): name is string => name !== null);
+  if (production && missing.length > 0) {
+    throw new Error(
+      `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required for a production build`,
+    );
+  }
   const apiValue = testing
     ? 'https://api.example.test/functions/v1/photo'
     : (env.VITE_PUBLIC_PHOTO_API_URL ?? INERT_API_URL);
   const pageValue = testing
     ? 'https://photos.example.test'
     : (env.VITE_PUBLIC_PAGE_ORIGIN ?? INERT_PAGE_ORIGIN);
+  const r2Value = testing
+    ? 'https://bucket.account.r2.cloudflarestorage.com'
+    : (env.VITE_PUBLIC_R2_ORIGIN ?? INERT_R2_ORIGIN);
 
   const apiUrl = parseHttpsUrl(apiValue, 'VITE_PUBLIC_PHOTO_API_URL');
   if (
@@ -54,7 +74,42 @@ function validateEnvironment(mode: string): ValidatedBuildEnvironment {
     throw new Error('VITE_PUBLIC_PAGE_ORIGIN must contain only an origin');
   }
 
-  return { apiUrl, pageOrigin: pageUrl.origin };
+  const r2Url = parseHttpsUrl(r2Value, 'VITE_PUBLIC_R2_ORIGIN', false);
+  if (r2Url.pathname !== '/' || r2Url.search || r2Url.hash || r2Url.port) {
+    throw new Error('VITE_PUBLIC_R2_ORIGIN must contain only an HTTPS origin without a port');
+  }
+
+  return { apiUrl, pageOrigin: pageUrl.origin, r2Origin: r2Url.origin };
+}
+
+function contentSecurityPolicy(environment: ValidatedBuildEnvironment): string {
+  const upgradeInsecureRequests =
+    environment.apiUrl.protocol === 'https:' && environment.pageOrigin.startsWith('https://')
+      ? ' upgrade-insecure-requests'
+      : '';
+  return `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob:; connect-src ${environment.apiUrl.origin} ${environment.r2Origin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; manifest-src 'self';${upgradeInsecureRequests}`;
+}
+
+export function renderCloudflarePagesHeaders(environment: ValidatedBuildEnvironment): string {
+  return `/*
+  Content-Security-Policy: ${contentSecurityPolicy(environment)}
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/photo
+  Cache-Control: private, no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow, noarchive, noimageindex
+
+/photo/*
+  Cache-Control: private, no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow, noarchive, noimageindex
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+`;
 }
 
 function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin {
@@ -65,10 +120,27 @@ function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin 
         environment.apiUrl.protocol === 'https:' && environment.pageOrigin.startsWith('https://')
           ? 'upgrade-insecure-requests'
           : '';
-      return html
+      const rendered = html
         .replaceAll('__PHOTO_API_ORIGIN__', environment.apiUrl.origin)
         .replaceAll('__PUBLIC_PAGE_ORIGIN__', environment.pageOrigin)
+        .replaceAll('__R2_ORIGIN__', environment.r2Origin)
         .replaceAll('__UPGRADE_INSECURE_REQUESTS__', upgradeInsecureRequests);
+      if (/__[A-Z0-9_]+__/u.test(rendered)) {
+        throw new Error('Public security template contains an unresolved placeholder');
+      }
+      return rendered;
+    },
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: '_headers',
+        source: renderCloudflarePagesHeaders(environment),
+      });
+      this.emitFile({
+        type: 'asset',
+        fileName: '_redirects',
+        source: '/photo /index.html 200\n/photo/* /index.html 200\n',
+      });
     },
   };
 }

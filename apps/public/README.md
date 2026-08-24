@@ -1,52 +1,50 @@
 # Grace Booth public photo page
 
-This package is a static Vite application for the guest-facing `/photo#<token>` URL. The raw
-256-bit token stays in the fragment and is sent only in strict JSON bodies to the three Supabase
-Function POST routes:
+This package is the static Vite application deployed to Cloudflare Pages for the guest-facing
+`/photo#<token>` URL. The raw 256-bit token stays in the fragment and is sent only in strict JSON
+bodies to the three Supabase Function POST routes:
 
 - `/photo/resolve`
 - `/photo/image`
 - `/photo/download`
 
 The page does not put the token in a request URL, browser storage, DOM text, referrers, analytics,
-or application logs. Image and download responses are non-cacheable controlled responses, not
-signed Storage URLs.
+or application logs. With R2 enabled, an authenticated image/download POST returns a bodyless
+`303` to a private five-minute presigned GET. Fetch follows it directly, validates the final R2
+origin and JPEG signature, and exposes only a blob URL to the DOM. The application has no fixed
+JPEG byte-size ceiling; Cloudflare, R2, the browser, and the guest device retain their platform and
+memory limits.
 
-## Required build configuration
+## Required Cloudflare Pages build configuration
 
-Set both values for development, tests that exercise a production build, and Vercel:
+Configure the Pages project to build from the repository root:
+
+```text
+Build command: pnpm build
+Build output directory: apps/public/dist
+```
+
+Set all three production build variables:
 
 ```text
 VITE_PUBLIC_PHOTO_API_URL=https://<project-ref>.supabase.co/functions/v1/photo
 VITE_PUBLIC_PAGE_ORIGIN=https://<production-photo-domain>
+VITE_PUBLIC_R2_ORIGIN=https://<bucket>.<account-id>.r2.cloudflarestorage.com
 ```
 
-`VITE_PUBLIC_PAGE_ORIGIN` must be the exact production origin. Supabase must receive the same value
-as its server-only `PUBLIC_PAGE_ORIGIN` secret. Preview origins intentionally cannot call the photo
-API.
+`VITE_PUBLIC_PAGE_ORIGIN` must be the exact Cloudflare Pages production or custom-domain origin.
+Supabase must receive the same value as its server-only `PUBLIC_PAGE_ORIGIN` secret. Preview origins
+intentionally cannot call the photo API.
 
-## Vercel CSP configuration
+`VITE_PUBLIC_R2_ORIGIN` must be the exact HTTPS origin emitted by R2 S3 presigned URLs. It is not an
+`r2.dev` or custom-domain origin and may not contain credentials, an explicit port, path, query, or
+fragment.
 
-Set the Vercel project's Root Directory to `apps/public` so the package-local build command,
-rewrite, and headers are authoritative.
-
-Vercel does not substitute build environment variables inside `vercel.json` header strings. After
-the Supabase project URL is known, generate the exact response-header CSP before deploying:
-
-```powershell
-$env:VITE_PUBLIC_PHOTO_API_URL = 'https://<project-ref>.supabase.co/functions/v1/photo'
-pnpm configure:vercel
-```
-
-Run this before `vercel deploy`, or check the generated non-secret `vercel.json` into the deployment
-branch used by a Git-based Vercel project. The generator validates HTTPS and the exact Function base
-path, then substitutes only the Supabase origin into `connect-src`. The checked-in example fails
-closed against a non-project endpoint until this explicit configuration step is completed.
-
-The Vercel configuration rewrites `/photo` to the static application, serves hashed assets with an
-immutable cache policy, keeps `/photo` non-cacheable and `noindex`, and sends the full CSP plus
-permissions, framing, referrer, opener, and MIME-sniffing protections. CSS and all three font
-families are bundled by Vite, so the policy requires no unsafe inline or third-party asset source.
+The Vite production build validates these values and emits Cloudflare Pages `_headers` and
+`_redirects` files into `dist`. The response CSP permits connections only to the exact Supabase API
+and R2 origins. `/photo` remains non-cacheable and unindexed, while hashed assets receive immutable
+caching. The checked-in `wrangler.jsonc` provides the equivalent SPA fallback when deploying the
+same output through Wrangler static assets.
 
 ## Local verification
 
@@ -55,6 +53,7 @@ pnpm typecheck
 pnpm test
 $env:VITE_PUBLIC_PHOTO_API_URL = 'http://127.0.0.1:54321/functions/v1/photo'
 $env:VITE_PUBLIC_PAGE_ORIGIN = 'http://127.0.0.1:4173'
+$env:VITE_PUBLIC_R2_ORIGIN = 'https://<bucket>.<account-id>.r2.cloudflarestorage.com'
 pnpm build
 ```
 
@@ -64,9 +63,10 @@ pnpm build
 ```powershell
 $env:VITE_PUBLIC_PHOTO_API_URL = 'https://<project-ref>.supabase.co/functions/v1/photo'
 $env:VITE_PUBLIC_PAGE_ORIGIN = 'https://photos.example.org'
+$env:VITE_PUBLIC_R2_ORIGIN = 'https://<bucket>.<account-id>.r2.cloudflarestorage.com'
 ```
 
-`VITE_PUBLIC_PAGE_ORIGIN` must be an exact origin — no path, no trailing slash — and it must be the **same value** you'll set as the `PUBLIC_PAGE_ORIGIN` secret on the Supabase Edge Functions (that's what the CORS/origin check compares against).
+`VITE_PUBLIC_PAGE_ORIGIN` must be an exact origin — no path, no trailing slash — and it must be the **same value** you'll set as the `PUBLIC_PAGE_ORIGIN` secret on the Supabase Edge Functions (that's what the CORS/origin check compares against). `VITE_PUBLIC_R2_ORIGIN` is required: the production build fails without it, and it must match the virtual-hosted S3 origin the Functions use to presign R2 GETs.
 
 ## 2. Build
 
@@ -80,7 +80,7 @@ Sanity-check the output before deploying:
 ```powershell
 Select-String -Path apps/public/dist/index.html -Pattern "__PHOTO_API_ORIGIN__|unconfigured.invalid"
 ```
-No matches means it's a real, configured build.
+No matches means it's a real, configured build. The build also emits `dist/_headers` (exact CSP including the API and R2 origins) and `dist/_redirects`; review both before deploying.
 
 ## 3. Deploy with Wrangler (matches the checked-in config)
 
@@ -103,7 +103,7 @@ Dashboard → **Workers & Pages → Create → Pages → Connect to Git**, then:
 - Build output directory: `dist`
 - Add `VITE_PUBLIC_PHOTO_API_URL` and `VITE_PUBLIC_PAGE_ORIGIN` as Pages environment variables (Production, and Preview if you use it)
 
-The existing `apps/public/public/_headers` file is already Cloudflare's native format (Pages and Workers-assets both honor it) and just adds a couple of security headers plus long-cache on `/assets/*` — nothing to change there.
+The build-generated `apps/public/dist/_headers` file is Cloudflare's native format (Pages and Workers-assets both honor it) and adds the exact security headers plus long-cache on `/assets/*` — nothing to maintain by hand.
 
 ## 4. Sync the origin back to Supabase
 
@@ -121,6 +121,6 @@ Open `https://photos.example.org/photo#<a-real-token>` from a confirmed session 
 The committed unit tests cover fragment validation, POST-only token transport, the separate binary
 routes, public states, optional registration copy, and download behavior. The page uses accessible
 roles and stable `data-state` values so a browser test can exercise loading, ready, missing/expired,
-and download flows without reading a secret from rendered text. A production-security regression
-test also renders the Vercel template and requires its response CSP to match the HTML CSP exactly,
-with one configured API origin, no unresolved placeholders, and no unsafe script/style directives.
+and download flows without reading a secret from rendered text. The security regression tests
+require the generated Cloudflare Pages response CSP to match the HTML CSP exactly, with the
+configured API and R2 origins, no unresolved placeholders, and no unsafe script/style directives.

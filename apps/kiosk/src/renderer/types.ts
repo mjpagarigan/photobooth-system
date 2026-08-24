@@ -1,6 +1,6 @@
 import type { BoothSnapshot, GuestErrorCode, SessionState } from '@grace-booth/shared';
 
-export type AdminView = 'frame' | 'settings';
+export type AdminView = 'frame' | 'settings' | 'gallery';
 
 export type RecoveryVariant = 'camera' | 'upload' | 'interrupted';
 

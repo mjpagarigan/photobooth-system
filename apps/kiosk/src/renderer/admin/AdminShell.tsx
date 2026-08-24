@@ -2,6 +2,7 @@ import {
   ArrowLeftIcon as ArrowLeft,
   FrameCornersIcon as FrameCorners,
   GearIcon as Gear,
+  ImagesIcon as Images,
   SignOutIcon as SignOut,
 } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
@@ -36,6 +37,14 @@ export function AdminShell({ children, onExit, onViewChange, view }: AdminShellP
             <span>FRAME EDITOR</span>
           </button>
           <button
+            className={view === 'gallery' ? 'is-active' : ''}
+            onClick={() => onViewChange('gallery')}
+            aria-current={view === 'gallery' ? 'page' : undefined}
+          >
+            <Images aria-hidden="true" weight="bold" />
+            <span>RECENT PHOTOS</span>
+          </button>
+          <button
             className={view === 'settings' ? 'is-active' : ''}
             onClick={() => onViewChange('settings')}
             aria-current={view === 'settings' ? 'page' : undefined}
@@ -45,7 +54,12 @@ export function AdminShell({ children, onExit, onViewChange, view }: AdminShellP
           </button>
         </nav>
         <div className="admin-nav__exit">
-          <Button icon={<ArrowLeft aria-hidden="true" weight="bold" />} onClick={onExit} variant="secondary" wide>
+          <Button
+            icon={<ArrowLeft aria-hidden="true" weight="bold" />}
+            onClick={onExit}
+            variant="secondary"
+            wide
+          >
             Back to booth
           </Button>
           <span className="admin-nav__lock-note">

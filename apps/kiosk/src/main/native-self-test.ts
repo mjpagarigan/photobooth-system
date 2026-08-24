@@ -43,12 +43,12 @@ export async function runNativeSelfTest(workerUrl: URL): Promise<SelfTestResult>
     const photo = await sharp({
       create: { width: 120, height: 80, channels: 3, background: '#3159b8' },
     })
-      .jpeg({ quality: 88 })
+      .jpeg({ quality: 90 })
       .toBuffer();
     const frame = await sharp({
       create: {
-        width: 180,
-        height: 120,
+        width: 120,
+        height: 360,
         channels: 4,
         background: { r: 255, g: 255, b: 255, alpha: 0.001 },
       },
@@ -69,33 +69,33 @@ export async function runNativeSelfTest(workerUrl: URL): Promise<SelfTestResult>
             name: '1',
             x: 0,
             y: 0,
-            width: 1 / 3,
-            height: 1,
+            width: 1,
+            height: 1 / 3,
             cropMode: 'crop-to-fill',
           },
           {
             slotIndex: 2,
             name: '2',
-            x: 1 / 3,
-            y: 0,
-            width: 1 / 3,
-            height: 1,
+            x: 0,
+            y: 1 / 3,
+            width: 1,
+            height: 1 / 3,
             cropMode: 'crop-to-fill',
           },
           {
             slotIndex: 3,
             name: '3',
-            x: 2 / 3,
-            y: 0,
-            width: 1 / 3,
-            height: 1,
+            x: 0,
+            y: 2 / 3,
+            width: 1,
+            height: 1 / 3,
             cropMode: 'crop-to-fill',
           },
         ],
-        frameAspectRatio: 1.5,
-        longEdge: 2_500,
+        frameAspectRatio: 1 / 3,
       });
-      result.worker = processed.width === 2_500 && processed.height > 0 && processed.byteSize > 0;
+      result.worker =
+        processed.width === 1_200 && processed.height === 3_600 && processed.byteSize > 0;
     } finally {
       await worker.close();
     }

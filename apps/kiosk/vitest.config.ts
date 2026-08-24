@@ -16,6 +16,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
     },
     environment: 'node',
+    fileParallelism: false,
     include: ['tests/**/*.test.{ts,tsx}'],
     restoreMocks: true,
     setupFiles: ['./tests/setup.ts'],

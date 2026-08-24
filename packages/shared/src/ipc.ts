@@ -2,8 +2,10 @@ import { z } from 'zod';
 import {
   CameraAdapterKindSchema,
   CameraConfigSchema,
+  CameraResolutionSchema,
   type CameraAdapterKind,
   type CameraConfig,
+  type CameraResolution,
 } from './camera.js';
 import {
   AdminAuthStatusSchema,
@@ -13,6 +15,7 @@ import {
   EmptyResponseSchema,
   FrameLayoutSchema,
   FrameSummarySchema,
+  GalleryItemSchema,
   OpaqueIdSchema,
   OptionalGoogleFormsUrlSchema,
   UploadJobSummarySchema,
@@ -24,6 +27,7 @@ import {
   type EmptyResponse,
   type FrameLayout,
   type FrameSummary,
+  type GalleryItem,
   type RpcResult,
   type UploadJobSummary,
 } from './domain.js';
@@ -52,9 +56,9 @@ export const IpcContracts = {
   'booth:accept-photos': {
     request: z
       .object({
-        selectedOption: z.union([z.literal(1), z.literal(2)]).default(1),
+        frameId: OpaqueIdSchema,
       })
-      .default({ selectedOption: 1 }),
+      .strict(),
     response: rpcResultSchema(BoothSnapshotSchema),
   },
   'booth:retry-upload': {
@@ -69,6 +73,10 @@ export const IpcContracts = {
     request: EmptyRequestSchema,
     response: rpcResultSchema(BoothSnapshotSchema),
   },
+  'booth:cancel-session': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(BoothSnapshotSchema),
+  },
   'booth:get-cameras': {
     request: EmptyRequestSchema,
     response: rpcResultSchema(CameraConfigSchema),
@@ -78,6 +86,7 @@ export const IpcContracts = {
       .object({
         adapter: CameraAdapterKindSchema,
         deviceId: z.string().nullable().optional(),
+        resolution: CameraResolutionSchema.default('1080p'),
       })
       .strict(),
     response: rpcResultSchema(CameraConfigSchema),
@@ -94,6 +103,14 @@ export const IpcContracts = {
       })
       .strict(),
     response: rpcResultSchema(EmptyResponseSchema),
+  },
+  'gallery:get-recent': {
+    request: z
+      .object({
+        limit: z.number().int().min(1).max(50).default(20),
+      })
+      .strict(),
+    response: rpcResultSchema(z.array(GalleryItemSchema)),
   },
   'admin:get-auth-status': {
     request: EmptyRequestSchema,
@@ -131,23 +148,37 @@ export const IpcContracts = {
       .strict(),
     response: rpcResultSchema(AdminSettingsSchema),
   },
-  'admin:choose-frame': {
-    request: z
-      .object({
-        optionIndex: z.union([z.literal(1), z.literal(2)]).default(1),
-      })
-      .default({ optionIndex: 1 }),
+  'admin:list-frames': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(z.array(FrameSummarySchema)),
+  },
+  'admin:add-frame': {
+    request: EmptyRequestSchema,
     response: rpcResultSchema(FrameSummarySchema.nullable()),
   },
-  'admin:save-frame-layout': {
+  'admin:update-frame-layout': {
     request: z
       .object({
         frameId: OpaqueIdSchema,
+        name: z.string().trim().min(1).max(120),
         slots: FrameLayoutSchema,
         expectedRevision: z.number().int().nonnegative(),
       })
       .strict(),
     response: rpcResultSchema(FrameSummarySchema),
+  },
+  'admin:delete-frame': {
+    request: z.object({ frameId: OpaqueIdSchema }).strict(),
+    response: rpcResultSchema(z.array(FrameSummarySchema)),
+  },
+  'admin:move-frame': {
+    request: z
+      .object({
+        frameId: OpaqueIdSchema,
+        direction: z.union([z.literal('up'), z.literal('down')]),
+      })
+      .strict(),
+    response: rpcResultSchema(z.array(FrameSummarySchema)),
   },
   'admin:choose-lan-certificate': {
     request: z.object({ passphrase: z.string().min(1).max(1_024) }).strict(),
@@ -212,18 +243,23 @@ export type GraceBoothBridge = {
     getSnapshot(): Promise<RpcResult<BoothSnapshot>>;
     start(): Promise<RpcResult<BoothSnapshot>>;
     retakeAll(): Promise<RpcResult<BoothSnapshot>>;
-    acceptPhotos(input?: { selectedOption?: 1 | 2 }): Promise<RpcResult<BoothSnapshot>>;
+    acceptPhotos(input: { frameId: string }): Promise<RpcResult<BoothSnapshot>>;
     retryUpload(): Promise<RpcResult<BoothSnapshot>>;
     finishOffline(): Promise<RpcResult<BoothSnapshot>>;
     done(): Promise<RpcResult<BoothSnapshot>>;
+    cancelSession(): Promise<RpcResult<BoothSnapshot>>;
     getCameras(): Promise<RpcResult<CameraConfig>>;
     setCamera(input: {
       adapter: CameraAdapterKind;
       deviceId?: string | null;
+      resolution: CameraResolution;
     }): Promise<RpcResult<CameraConfig>>;
     submitCameraFrame(captureId: string, jpegBase64: string): Promise<RpcResult<EmptyResponse>>;
     subscribe(listener: (snapshot: BoothSnapshot) => void): () => void;
     onCameraFrameRequest(listener: (request: CameraFrameRequestEvent) => void): () => void;
+  };
+  gallery: {
+    getRecent(limit?: number): Promise<RpcResult<GalleryItem[]>>;
   };
   admin: {
     getAuthStatus(): Promise<RpcResult<AdminAuthStatus>>;
@@ -239,12 +275,19 @@ export type GraceBoothBridge = {
       lanPort: number;
       expectedRevision: number;
     }): Promise<RpcResult<AdminSettings>>;
-    chooseFrame(input?: { optionIndex?: 1 | 2 }): Promise<RpcResult<FrameSummary | null>>;
-    saveFrameLayout(input: {
+    listFrames(): Promise<RpcResult<FrameSummary[]>>;
+    addFrame(): Promise<RpcResult<FrameSummary | null>>;
+    updateFrameLayout(input: {
       frameId: string;
+      name: string;
       slots: FrameLayout;
       expectedRevision: number;
     }): Promise<RpcResult<FrameSummary>>;
+    deleteFrame(frameId: string): Promise<RpcResult<FrameSummary[]>>;
+    moveFrame(input: {
+      frameId: string;
+      direction: 'up' | 'down';
+    }): Promise<RpcResult<FrameSummary[]>>;
     chooseLanCertificate(passphrase: string): Promise<RpcResult<{ message: string } | null>>;
     listUploadJobs(input?: {
       cursor?: string | null;

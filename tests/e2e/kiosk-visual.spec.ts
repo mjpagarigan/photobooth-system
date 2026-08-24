@@ -132,11 +132,9 @@ for (const viewport of VIEWPORTS) {
   test(`Operator Frame Editor Collage 2 fits at ${viewport.label}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/?visual=admin-frame');
-    await page.getByRole('tab', { name: 'Collage 2 · Anniversary' }).click();
-    await expect(page.getByRole('tab', { name: 'Collage 2 · Anniversary' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    const frameItem2 = page.getByTestId('frame-item-2');
+    await frameItem2.click();
+    await expect(page.locator('.frame-library__item').nth(1)).toHaveClass(/is-selected/);
     await waitForVisualAssets(page);
     await expectNoPageOverflow(page);
     await expect(page).toHaveScreenshot(`admin-frame-collage-2-${viewport.label}.png`, {

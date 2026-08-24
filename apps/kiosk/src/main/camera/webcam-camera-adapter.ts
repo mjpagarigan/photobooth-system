@@ -75,8 +75,14 @@ export class WebcamCameraAdapter implements CameraAdapter {
     }
   }
 
+  abortCapture(error?: Error): void {
+    this.busy = false;
+    this.broker.abortPending(error);
+  }
+
   disconnect(): Promise<void> {
     this.connected = false;
+    this.abortCapture();
     return Promise.resolve();
   }
 }

@@ -1,4 +1,11 @@
-import type { CameraAdapterKind, CameraDevice, CameraStatus } from '@grace-booth/shared';
+import {
+  CAMERA_RESOLUTION_DIMENSIONS,
+  isWebcamCameraAdapter,
+  type CameraAdapterKind,
+  type CameraDevice,
+  type CameraResolution,
+  type CameraStatus,
+} from '@grace-booth/shared';
 import {
   CameraIcon as Camera,
   CheckCircleIcon as CheckCircle,
@@ -15,7 +22,11 @@ import { enumerateVideoDevices, useCameraStream } from '../hooks/useCameraStream
 type CameraSetupModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onCameraSaved?: (adapter: CameraAdapterKind, deviceId: string | null) => void;
+  onCameraSaved?: (
+    adapter: CameraAdapterKind,
+    deviceId: string | null,
+    resolution: CameraResolution,
+  ) => void;
 };
 
 export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetupModalProps) {
@@ -23,18 +34,18 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const descriptionId = useId();
   const [selectedAdapter, setSelectedAdapter] = useState<CameraAdapterKind>('webcam');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedResolution, setSelectedResolution] = useState<CameraResolution>('1080p');
   const [videoDevices, setVideoDevices] = useState<CameraDevice[]>([]);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [configurationLoaded, setConfigurationLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const previewEnabled = isOpen && (selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam');
-  const { videoRef, ready: streamReady, denied: streamDenied } = useCameraStream(
-    previewEnabled,
-    selectedDeviceId,
-  );
+  const webcamSelected = isWebcamCameraAdapter(selectedAdapter);
+  const previewEnabled = isOpen && configurationLoaded && webcamSelected;
+  const cameraStream = useCameraStream(previewEnabled, selectedDeviceId, selectedResolution);
 
   const loadCameras = async () => {
     if (typeof window === 'undefined' || !window.graceBooth) return;
@@ -49,12 +60,14 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
       if (configResult.ok) {
         setSelectedAdapter(configResult.data.adapter);
         setSelectedDeviceId(configResult.data.deviceId);
+        setSelectedResolution(configResult.data.resolution);
         setCameraStatus(configResult.data.status);
       }
     } catch {
       setError('Could not query connected camera devices.');
     } finally {
       setLoading(false);
+      setConfigurationLoaded(true);
     }
   };
 
@@ -62,6 +75,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
     if (!isOpen) {
       return;
     }
+    setConfigurationLoaded(false);
     void loadCameras();
     setSuccessMessage(null);
     const previouslyFocused =
@@ -112,7 +126,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   if (!isOpen) return null;
 
   const handleSave = async () => {
-    if (!window.graceBooth) return;
+    if (!window.graceBooth || selectedAdapter === 'sony') return;
     setSaving(true);
     setError(null);
     setSuccessMessage(null);
@@ -120,6 +134,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
       const result = await window.graceBooth.booth.setCamera({
         adapter: selectedAdapter,
         deviceId: selectedDeviceId,
+        resolution: selectedResolution,
       });
       if (!result.ok) {
         setError(result.error.message);
@@ -127,7 +142,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
       }
       setCameraStatus(result.data.status);
       setSuccessMessage('Camera configuration saved successfully.');
-      onCameraSaved?.(selectedAdapter, selectedDeviceId);
+      onCameraSaved?.(selectedAdapter, selectedDeviceId, selectedResolution);
       setTimeout(() => {
         onClose();
       }, 700);
@@ -180,7 +195,9 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               >
                 <VideoCamera size={24} weight="bold" />
                 <span className="camera-source-card__title">Laptop / USB Webcam</span>
-                <span className="camera-source-card__desc">Internal camera or standard UVC device</span>
+                <span className="camera-source-card__desc">
+                  Internal camera or standard UVC device
+                </span>
               </button>
 
               <button
@@ -190,7 +207,9 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               >
                 <Camera size={24} weight="bold" />
                 <span className="camera-source-card__title">Sony A7 Tethered</span>
-                <span className="camera-source-card__desc">High-precision Sony Alpha mirrorless</span>
+                <span className="camera-source-card__desc">
+                  High-precision Sony Alpha mirrorless
+                </span>
               </button>
 
               <button
@@ -238,33 +257,114 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                 </div>
               </div>
 
+              <div className="camera-device-select-row">
+                <label htmlFor="camera-resolution-select" className="field-label">
+                  Capture Resolution
+                </label>
+                <select
+                  id="camera-resolution-select"
+                  className="select-input"
+                  value={selectedResolution}
+                  onChange={(event) =>
+                    setSelectedResolution(event.target.value === '720p' ? '720p' : '1080p')
+                  }
+                >
+                  <option value="720p">720p (1280 × 720) — virtual cameras and testing</option>
+                  <option value="1080p">1080p (1920 × 1080) — production quality</option>
+                </select>
+              </div>
+
               <div className="camera-preview-container">
                 <div className="camera-preview-box">
                   <video
-                    ref={videoRef}
+                    ref={cameraStream.videoRef}
                     autoPlay
                     playsInline
                     muted
                     className="camera-preview-video"
                   />
-                  <div className="camera-preview-box__crosshair camera-preview-box__crosshair--tl" aria-hidden="true">+</div>
-                  <div className="camera-preview-box__crosshair camera-preview-box__crosshair--tr" aria-hidden="true">+</div>
-                  <div className="camera-preview-box__crosshair camera-preview-box__crosshair--bl" aria-hidden="true">+</div>
-                  <div className="camera-preview-box__crosshair camera-preview-box__crosshair--br" aria-hidden="true">+</div>
-                  {!streamReady && !streamDenied && (
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--tl"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--tr"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--bl"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--br"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  {cameraStream.acquisitionState === 'initializing' && (
                     <div className="camera-preview-overlay">
-                      <span>INITIALIZING LIVE OPTICAL FEED...</span>
+                      <span>Preparing USB Streaming preview…</span>
                     </div>
                   )}
-                  {streamDenied && (
-                    <div className="camera-preview-overlay camera-preview-overlay--warning">
+                  {cameraStream.acquisitionState === 'permission-denied' && (
+                    <div
+                      className="camera-preview-overlay camera-preview-overlay--warning"
+                      role="alert"
+                    >
                       <WarningCircle size={24} weight="bold" />
-                      <span>Camera permission denied or camera in use by another app.</span>
+                      <span>Camera permission was denied.</span>
+                    </div>
+                  )}
+                  {cameraStream.acquisitionState === 'unavailable' && (
+                    <div
+                      className="camera-preview-overlay camera-preview-overlay--warning"
+                      role="alert"
+                    >
+                      <WarningCircle size={24} weight="bold" />
+                      <span>The camera is unavailable or in use by another app.</span>
                     </div>
                   )}
                 </div>
-                <div className="camera-preview-caption">
-                  <span>TELEMETRY: Verify optical alignment, framing, and exposure.</span>
+                <div
+                  className={`camera-preview-caption camera-preview-caption--${cameraStream.acquisitionState}`}
+                  role={
+                    cameraStream.acquisitionState === 'permission-denied' ||
+                    cameraStream.acquisitionState === 'unavailable'
+                      ? 'alert'
+                      : 'status'
+                  }
+                  aria-live="polite"
+                >
+                  <span>
+                    Actual:{' '}
+                    <strong>
+                      {cameraStream.resolution
+                        ? `${cameraStream.resolution.width} × ${cameraStream.resolution.height}`
+                        : 'Waiting for camera'}
+                    </strong>
+                  </span>
+                  <span>
+                    Requested:{' '}
+                    <strong>
+                      {CAMERA_RESOLUTION_DIMENSIONS[selectedResolution].width} ×{' '}
+                      {CAMERA_RESOLUTION_DIMENSIONS[selectedResolution].height}
+                    </strong>
+                  </span>
+                  <span>
+                    {cameraStream.acquisitionState === 'ready'
+                      ? 'Live preview connected.'
+                      : cameraStream.acquisitionState === 'permission-denied'
+                        ? 'Allow camera access in Windows and reopen Camera Settings.'
+                        : cameraStream.acquisitionState === 'unavailable'
+                          ? 'Close other camera apps or reconnect the USB camera.'
+                          : 'Negotiating the selected camera mode.'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -274,19 +374,22 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
             <div className="camera-info-card">
               <div className="camera-info-card__badge">
                 <WarningCircle size={20} weight="bold" />
-                <span>SONY ALPHA USB TETHERING PROTOCOL</span>
+                <span>NATIVE SONY PC REMOTE ADAPTER — NOT AVAILABLE</span>
               </div>
-              <p>
-                To connect a Sony A7 or compatible Sony Alpha camera:
-              </p>
+              <p>Use the Sony ILCE-7M4 as a standard webcam instead:</p>
               <ul className="camera-info-card__list">
-                <li>Turn on your Sony camera and connect via direct USB-C cable.</li>
-                <li>Set USB Connection mode in camera settings to <strong>PC Remote</strong>.</li>
-                <li>Ensure battery level is sufficient and sleep timer is set to disabled.</li>
+                <li>
+                  Select <strong>Laptop / USB Webcam</strong> above.
+                </li>
+                <li>
+                  Set the camera to <strong>1080p USB Streaming</strong>, not PC Remote.
+                </li>
+                <li>Use a USB 3 / SuperSpeed connection and select the Sony UVC device.</li>
               </ul>
               {cameraStatus && (
                 <div className="camera-status-pill">
-                  STATUS: <strong>{cameraStatus.state.toUpperCase()}</strong> ({cameraStatus.operatorMessage})
+                  STATUS: <strong>{cameraStatus.state.toUpperCase()}</strong> (
+                  {cameraStatus.operatorMessage})
                 </div>
               )}
             </div>
@@ -299,7 +402,8 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                 <span>MOCK CAMERA EMULATOR</span>
               </div>
               <p>
-                Simulates three guest shots using bundled test fixtures. Ideal for offline staging and UI verification without hardware.
+                Simulates three guest shots using bundled test fixtures. Ideal for offline staging
+                and UI verification without hardware.
               </p>
             </div>
           )}
@@ -322,7 +426,11 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
           <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button loading={saving} onClick={handleSave}>
+          <Button
+            loading={saving}
+            onClick={handleSave}
+            disabled={loading || selectedAdapter === 'sony'}
+          >
             Apply &amp; Save
           </Button>
         </div>

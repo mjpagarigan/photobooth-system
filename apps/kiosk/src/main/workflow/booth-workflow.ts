@@ -5,7 +5,6 @@ import type {
   BoothSnapshot,
   CameraAdapter,
   CaptureResult,
-  FrameSummary,
   GuestErrorCode,
   SessionState,
 } from '@grace-booth/shared';
@@ -17,14 +16,16 @@ import type { LocalRepository, NewAsset, StoredSession } from '../database/repos
 import { AppError, toSafeError } from '../errors.js';
 import type { FrameService } from '../frame/frame-service.js';
 import type { ImageProcessor } from '../image/image-worker-client.js';
+import { PRODUCTION_STRIP_EXPORT } from '../image/strip-export-config.js';
 import type { PhotoVault } from '../storage/photo-vault.js';
 import { reduceSessionState, type SessionEvent } from './session-state-machine.js';
 
 const PHOTO_COUNT = 3;
 const MAX_CAPTURE_BYTES = 50 * 1024 * 1024;
+const CANCELLABLE_STATES: readonly SessionState[] = ['countdown', 'capturing', 'review'];
 
 export type BoothWorkflowOptions = {
-  countdownMs: number;
+  shotCountdownsMs: readonly [number, number, number];
   cameraPreviewEnabled?: boolean;
   now?: () => number;
 };
@@ -115,18 +116,9 @@ export class BoothWorkflow {
       ? (assets.find((asset) => asset.id === session.collageAssetId) ?? null)
       : null;
     const qrImageUrl = this.qrBySession.get(session.id) ?? null;
-    const activeFrame = this.repository.getActiveFrame();
-    const [frame1, frame2] = this.frameService.getFrameOptions();
-    const frameOptions =
-      frame1 && frame2
-        ? ([this.frameService.toSummary(frame1), this.frameService.toSummary(frame2)] as [
-            FrameSummary,
-            FrameSummary,
-          ])
-        : undefined;
     const selectedFrame = session.selectedFrameId
-      ? (this.repository.getFrame(session.selectedFrameId) ?? activeFrame)
-      : activeFrame;
+      ? (this.repository.getFrame(session.selectedFrameId) ?? null)
+      : this.repository.getActiveFrame();
     return {
       screen: screenFor(session.state, qrImageUrl !== null),
       state: session.state,
@@ -142,7 +134,7 @@ export class BoothWorkflow {
         captureUrls: captures.map((asset) => mediaUrl(asset.id)),
         collageUrl: collage ? mediaUrl(collage.id) : null,
         frame: selectedFrame ? this.frameService.toSummary(selectedFrame) : null,
-        frames: frameOptions,
+        frames: this.frameService.getFrameSummaries(),
         qrImageUrl,
       },
       controls: {
@@ -190,13 +182,12 @@ export class BoothWorkflow {
     return this.getSnapshot();
   }
 
-  acceptPhotos(selectedOption: 1 | 2 = 1): BoothSnapshot {
+  acceptPhotos(frameId: string): BoothSnapshot {
     const session = this.requireActive();
     if (session.state !== 'review' || session.captureCount !== PHOTO_COUNT) {
       throw new AppError('review_incomplete', 'Three photos are required before processing.');
     }
-    const [frame1, frame2] = this.frameService.getFrameOptions();
-    const chosenFrame = selectedOption === 2 ? (frame2 ?? frame1) : frame1;
+    const chosenFrame = this.repository.getFrame(frameId);
     if (!chosenFrame) {
       throw new AppError('frame_missing', 'The selected photo frame is missing.');
     }
@@ -204,7 +195,7 @@ export class BoothWorkflow {
       session,
       'accept_photos',
       {
-        selectedOption,
+        selectedOption: 1,
         selectedFrameId: chosenFrame.id,
       },
       this.now(),
@@ -249,6 +240,39 @@ export class BoothWorkflow {
     return attractSnapshot(this.options.cameraPreviewEnabled ?? false);
   }
 
+  /**
+   * Guest-facing abort: purges every capture and vault file belonging to the live session and
+   * returns the booth to Attract. Idempotent — cancelling a session that is missing or already
+   * left a cancellable state simply reports the current snapshot without deleting anything.
+   */
+  cancelSession(): BoothSnapshot {
+    const sessionId = this.activeSessionId;
+    if (!sessionId) return this.getSnapshot();
+    const session = this.repository.getSession(sessionId);
+    if (!session || !CANCELLABLE_STATES.includes(session.state)) {
+      return this.getSnapshot();
+    }
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.countdownEndsAt = null;
+    this.camera.abortCapture?.();
+    // Detach first so an in-flight capture cannot re-attach to a deleted session.
+    this.activeSessionId = null;
+    this.qrBySession.delete(sessionId);
+    for (const asset of this.repository.listAssets(sessionId)) {
+      try {
+        this.vault.delete(asset.encryptedPath);
+      } catch {
+        // The row removal below is authoritative; a missing file is not a cancellation failure.
+      }
+    }
+    this.repository.deleteSession(sessionId);
+    this.emit();
+    return this.getSnapshot();
+  }
+
   async restartSession(sessionId: string): Promise<BoothSnapshot> {
     const session = this.repository.requireSession(sessionId);
     if (this.activeSessionId !== sessionId) {
@@ -274,11 +298,13 @@ export class BoothWorkflow {
     if (session.state !== 'countdown')
       throw new AppError('state_conflict', 'Countdown cannot start now.');
     if (this.countdownTimer) clearTimeout(this.countdownTimer);
-    this.countdownEndsAt = this.now() + this.options.countdownMs;
-    this.countdownTimer = setTimeout(
-      () => void this.captureNext(session.id),
-      this.options.countdownMs,
-    );
+    const shotNumber = Math.min(PHOTO_COUNT, session.captureCount + 1);
+    const durationMs = this.options.shotCountdownsMs[shotNumber - 1];
+    if (durationMs === undefined) {
+      throw new AppError('state_conflict', 'Countdown cannot start now.');
+    }
+    this.countdownEndsAt = this.now() + durationMs;
+    this.countdownTimer = setTimeout(() => void this.captureNext(session.id), durationMs);
     this.emit();
   }
 
@@ -364,8 +390,18 @@ export class BoothWorkflow {
         framePng,
         slots: frame.slots,
         frameAspectRatio: frame.width / frame.height,
-        longEdge: 2_700,
       });
+      if (
+        result.width !== PRODUCTION_STRIP_EXPORT.width ||
+        result.height !== PRODUCTION_STRIP_EXPORT.height ||
+        result.byteSize !== result.bytes.byteLength ||
+        result.byteSize < 1
+      ) {
+        throw new AppError(
+          'output_validation',
+          'The finished strip did not match the required 1200 × 3600 export.',
+        );
+      }
       const stored = this.vault.write('completed', result.bytes);
       const assetId = randomUUID();
       try {
@@ -401,8 +437,7 @@ export class BoothWorkflow {
           'processing_interrupted',
           {
             lastErrorCode: safe.code.slice(0, 80),
-            lastErrorMessage:
-              'The collage could not be completed. Please ask an operator for help.',
+            lastErrorMessage: safe.safeMessage.slice(0, 300),
           },
           this.now(),
         );

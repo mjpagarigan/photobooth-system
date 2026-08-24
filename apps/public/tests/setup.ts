@@ -4,7 +4,7 @@ import { cleanup } from '@testing-library/react';
 
 afterEach(() => {
   cleanup();
-  window.history.replaceState(null, '', '/photo');
+  if (typeof window !== 'undefined') window.history.replaceState(null, '', '/photo');
   vi.unstubAllGlobals();
 });
 

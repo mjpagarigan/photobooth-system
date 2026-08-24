@@ -55,6 +55,7 @@ const SETTINGS: AdminSettings = {
   frames: [FRAME, FRAME_2],
   cameraAdapter: 'webcam',
   cameraDeviceId: null,
+  cameraResolution: '1080p',
   supabaseUrl: null,
   supabasePublishableKey: null,
   revision: 4,
@@ -100,9 +101,45 @@ describe('guest screen components', () => {
     expect(screen.getByTestId('collage-option-1')).not.toHaveClass('is-selected');
 
     await user.click(screen.getByRole('button', { name: /use these photos/i }));
-    expect(onAccept).toHaveBeenCalledWith(2);
+    expect(onAccept).toHaveBeenCalledWith(FRAME_2.id);
     expect(screen.getAllByRole('button')).toHaveLength(2);
     expect(screen.queryByText(/retake photo 1/i)).not.toBeInTheDocument();
+  });
+
+  it('renders one preview per stored frame and supports keyboard-only walkthrough', async () => {
+    const user = userEvent.setup();
+    const onAccept = vi.fn();
+    const third = {
+      ...FRAME,
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Summer Fair Strip',
+    };
+    const fiveFrames = [FRAME, FRAME_2, third];
+    render(
+      <ReviewScreen
+        canAccept
+        canRetake={false}
+        captureUrls={['/a.jpg', '/b.jpg', '/c.jpg']}
+        frames={fiveFrames}
+        onAccept={onAccept}
+        onRetake={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('collage-option-1')).toBeVisible();
+    expect(screen.getByTestId('collage-option-2')).toBeVisible();
+    expect(screen.getByTestId('collage-option-3')).toBeVisible();
+    expect(screen.getByTestId('collage-option-1')).toHaveClass('is-selected');
+    expect(screen.queryByTestId('collage-option-4')).not.toBeInTheDocument();
+
+    screen.getByTestId('collage-option-1').focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByTestId('collage-option-2')).toHaveClass('is-selected');
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByTestId('collage-option-3')).toHaveClass('is-selected');
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('collage-option-3')).toHaveClass('is-selected');
+    await user.click(screen.getByRole('button', { name: /use these photos/i }));
+    expect(onAccept).toHaveBeenCalledWith(third.id);
   });
 
   it('distinguishes collage processing from upload backoff without claiming readiness', () => {
@@ -132,48 +169,141 @@ describe('guest screen components', () => {
 });
 
 describe('FrameEditor', () => {
-  it('saves edited slot geometry as normalized coordinates for active collage', async () => {
-    const onSave = vi.fn<(frameId: string, slots: FrameLayout, revision: number) => void>();
+  const baseProps = {
+    onAddFrame: vi.fn(),
+    onDeleteFrame: vi.fn(),
+    onMoveFrame: vi.fn(),
+    status: null,
+  };
+
+  it('saves edited slot geometry as normalized coordinates for the selected frame', async () => {
+    const onSave =
+      vi.fn<(frameId: string, name: string, slots: FrameLayout, revision: number) => void>();
     const user = userEvent.setup();
-    render(<FrameEditor frame={FRAME} onChooseFrame={() => undefined} onSave={onSave} />);
+    render(<FrameEditor {...baseProps} frames={[FRAME]} onSave={onSave} />);
 
     fireEvent.change(screen.getByLabelText('x percent'), { target: { value: '12.5' } });
     await user.click(screen.getByRole('button', { name: /save configuration/i }));
     expect(onSave).toHaveBeenCalledOnce();
-    const savedSlots = onSave.mock.calls[0]?.[1];
+    expect(onSave.mock.calls[0]?.[0]).toBe(FRAME.id);
+    const savedSlots = onSave.mock.calls[0]?.[2];
     expect(savedSlots).toBeDefined();
     expect(savedSlots?.[0]?.x).toBeCloseTo(0.125);
   });
 
-  it('resets the selected slot to persisted geometry', async () => {
+  it('renames the selected frame and resets its slot geometry', async () => {
+    const onSave =
+      vi.fn<(frameId: string, name: string, slots: FrameLayout, revision: number) => void>();
     const user = userEvent.setup();
-    render(<FrameEditor frame={FRAME} onChooseFrame={() => undefined} onSave={() => undefined} />);
+    render(<FrameEditor {...baseProps} frames={[FRAME, FRAME_2]} onSave={onSave} />);
+
+    await user.click(screen.getByTestId('frame-item-2'));
     fireEvent.change(screen.getByLabelText('width percent'), { target: { value: '30' } });
-    expect(screen.getByLabelText('width percent')).toHaveValue(30);
     await user.click(screen.getByRole('button', { name: /reset slot/i }));
-    expect(screen.getByLabelText('width percent')).toHaveValue(53.8);
+    expect(screen.getByLabelText('width percent')).toHaveValue(86);
+
+    const nameInput = screen.getByLabelText('Frame name');
+    fireEvent.change(nameInput, { target: { value: 'Renamed strip' } });
+    await user.click(screen.getByRole('button', { name: /save configuration/i }));
+    expect(onSave.mock.calls[0]?.[0]).toBe(FRAME_2.id);
+    expect(onSave.mock.calls[0]?.[1]).toBe('Renamed strip');
   });
 
-  it('switches between Collage 1 and Collage 2 tabs independently', async () => {
-    const onChooseFrame = vi.fn();
+  it('adds, reorders, and requires confirmation before deleting frames', async () => {
+    const onAddFrame = vi.fn();
+    const onDeleteFrame = vi.fn();
+    const onMoveFrame = vi.fn();
     const user = userEvent.setup();
     render(
       <FrameEditor
+        busy={false}
+        error={null}
         frames={[FRAME, FRAME_2]}
-        onChooseFrame={onChooseFrame}
+        onAddFrame={onAddFrame}
+        onDeleteFrame={onDeleteFrame}
+        onMoveFrame={onMoveFrame}
+        onSave={() => undefined}
+        status={null}
+      />,
+    );
+
+    await user.click(screen.getByTestId('frame-add'));
+    expect(onAddFrame).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByTestId('frame-item-1'));
+    await user.click(screen.getByRole('button', { name: `Move ${FRAME.name} down` }));
+    expect(onMoveFrame).toHaveBeenCalledWith(FRAME.id, 'down');
+
+    await user.click(screen.getByRole('button', { name: `Delete ${FRAME.name}` }));
+    expect(onDeleteFrame).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: `Confirm delete ${FRAME.name}` }));
+    expect(onDeleteFrame).toHaveBeenCalledWith(FRAME.id);
+  });
+
+  it('deletes the clicked row even when a different frame is currently selected', async () => {
+    const onDeleteFrame = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <FrameEditor
+        {...baseProps}
+        frames={[FRAME, FRAME_2]}
+        onDeleteFrame={onDeleteFrame}
         onSave={() => undefined}
       />,
     );
 
-    expect(screen.getByTestId('tab-collage-1')).toHaveClass('is-active');
-    expect(screen.getByTestId('tab-collage-2')).not.toHaveClass('is-active');
+    // Row 1 (FRAME) is selected by default. Click trash on Row 2 (FRAME_2).
+    await user.click(screen.getByRole('button', { name: `Delete ${FRAME_2.name}` }));
+    expect(onDeleteFrame).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: `Confirm delete ${FRAME_2.name}` }));
+    expect(onDeleteFrame).toHaveBeenCalledWith(FRAME_2.id);
+  });
 
-    await user.click(screen.getByTestId('tab-collage-2'));
-    expect(screen.getByTestId('tab-collage-2')).toHaveClass('is-active');
-    expect(screen.getByTestId('tab-collage-1')).not.toHaveClass('is-active');
+  it('handles ReviewScreen with 1, 3, and 20 frames with roving tabindex and keyboard navigation', async () => {
+    const user = userEvent.setup();
+    const onAccept = vi.fn();
 
-    await user.click(screen.getByRole('button', { name: /replace frame/i }));
-    expect(onChooseFrame).toHaveBeenCalledWith(2);
+    // 1 Frame
+    const { unmount: unmount1 } = render(
+      <ReviewScreen
+        canAccept
+        canRetake={false}
+        captureUrls={['/a.jpg', '/b.jpg', '/c.jpg']}
+        frames={[FRAME]}
+        onAccept={onAccept}
+        onRetake={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('collage-option-1')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('collage-option-1')).toHaveClass('is-selected');
+    unmount1();
+
+    // 20 Frames
+    const twentyFrames = Array.from({ length: 20 }, (_, index) => ({
+      ...FRAME,
+      id: `frame-${index + 1}-0000-0000-0000-000000000000`,
+      name: `Frame Variant ${index + 1}`,
+    }));
+    render(
+      <ReviewScreen
+        canAccept
+        canRetake={false}
+        captureUrls={['/a.jpg', '/b.jpg', '/c.jpg']}
+        frames={twentyFrames}
+        onAccept={onAccept}
+        onRetake={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId('collage-option-1')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('collage-option-2')).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByTestId('collage-option-20')).toBeInTheDocument();
+
+    screen.getByTestId('collage-option-1').focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByTestId('collage-option-2')).toHaveClass('is-selected');
+    expect(screen.getByTestId('collage-option-2')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('collage-option-1')).toHaveAttribute('tabindex', '-1');
   });
 });
 

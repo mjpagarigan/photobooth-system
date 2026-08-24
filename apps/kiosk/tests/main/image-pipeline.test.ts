@@ -10,10 +10,15 @@ import {
   MediaPipeCropStrategy,
 } from '../../src/main/image/crop-strategy.js';
 import { ImagePipeline } from '../../src/main/image/image-pipeline.js';
+import {
+  PRODUCTION_STRIP_EXPORT,
+  PRODUCTION_STRIP_JPEG_OPTIONS,
+} from '../../src/main/image/strip-export-config.js';
 import { DEFAULT_FRAME_SLOTS } from '../../src/main/frame/frame-service.js';
 
 let fixturePhotos: [Buffer, Buffer, Buffer];
 let fixtureFrame: Buffer;
+let pipelineSource: string;
 
 beforeAll(async () => {
   const root = fileURLToPath(new URL('../../resources/', import.meta.url));
@@ -21,6 +26,10 @@ beforeAll(async () => {
     [1, 2, 3].map((index) => readFile(`${root}mock/photo-${index}.jpg`)),
   )) as [Buffer, Buffer, Buffer];
   fixtureFrame = await readFile(`${root}frames/mat-frame.png`);
+  pipelineSource = await readFile(
+    fileURLToPath(new URL('../../src/main/image/image-pipeline.ts', import.meta.url)),
+    'utf8',
+  );
 });
 
 describe('deterministic Sharp collage pipeline', () => {
@@ -32,7 +41,6 @@ describe('deterministic Sharp collage pipeline', () => {
       captures: fixturePhotos,
       framePng: fixtureFrame,
       slots: DEFAULT_FRAME_SLOTS,
-      longEdge: 2_700,
     } as const;
     const [golden, repeat] = await Promise.all([pipeline.process(input), pipeline.process(input)]);
     const goldenPixels = await sharp(golden.bytes).removeAlpha().raw().toBuffer();
@@ -40,9 +48,17 @@ describe('deterministic Sharp collage pipeline', () => {
     const comparison = pixelDifference(goldenPixels, repeatPixels);
     expect(comparison.meanChannelDelta).toBeLessThanOrEqual(1.5);
     expect(comparison.fractionOverEight).toBeLessThanOrEqual(0.01);
-    expect(golden.height).toBe(2_700);
-    expect(golden.width).toBe(900);
-    expect((await sharp(golden.bytes).metadata()).space).toBe('srgb');
+    expect(golden.height).toBe(3_600);
+    expect(golden.width).toBe(1_200);
+    const metadata = await sharp(golden.bytes).metadata();
+    expect(metadata).toMatchObject({
+      format: 'jpeg',
+      width: 1_200,
+      height: 3_600,
+      space: 'srgb',
+      chromaSubsampling: '4:4:4',
+      density: 600,
+    });
   }, 30_000);
 
   it('places every capture inside its cutout on the shipped default frame', async () => {
@@ -62,7 +78,6 @@ describe('deterministic Sharp collage pipeline', () => {
       captures,
       framePng: fixtureFrame,
       slots: DEFAULT_FRAME_SLOTS,
-      longEdge: 2_700,
     });
 
     for (const slot of DEFAULT_FRAME_SLOTS) {
@@ -110,7 +125,6 @@ describe('deterministic Sharp collage pipeline', () => {
       captures,
       framePng: frame,
       slots,
-      longEdge: 2_700,
     });
     const slot1 = DEFAULT_FRAME_SLOTS[0]!;
     const topSlot = await pixelAt(
@@ -137,7 +151,6 @@ describe('deterministic Sharp collage pipeline', () => {
       captures: [wide, wide, wide],
       framePng: frame,
       slots: fitSlots,
-      longEdge: 2_700,
     });
     const slot1 = DEFAULT_FRAME_SLOTS[0]!;
     const letterbox = await pixelAt(
@@ -166,7 +179,6 @@ describe('deterministic Sharp collage pipeline', () => {
       captures: [oriented, oriented, oriented],
       framePng: frame,
       slots: DEFAULT_FRAME_SLOTS,
-      longEdge: 2_700,
     } as const;
     const [fallbackResult, centerResult] = await Promise.all([
       fallback.process(input),
@@ -201,6 +213,47 @@ describe('deterministic Sharp collage pipeline', () => {
         slots: DEFAULT_FRAME_SLOTS,
       }),
     ).rejects.toThrow(/transparent/i);
+  });
+
+  it('enforces exactly three captures and an exact 1:3 decoded frame', async () => {
+    const pipeline = new ImagePipeline(new CenterCropStrategy());
+    await expect(
+      pipeline.process({
+        captures: fixturePhotos.slice(0, 2),
+        framePng: fixtureFrame,
+        slots: DEFAULT_FRAME_SLOTS,
+      }),
+    ).rejects.toThrow(/exactly three/i);
+
+    const nearAspect = await transparentPng(1_200, 3_599);
+    await expect(
+      pipeline.process({
+        captures: fixturePhotos,
+        framePng: nearAspect,
+        slots: DEFAULT_FRAME_SLOTS,
+      }),
+    ).rejects.toThrow(/exact 1:3/i);
+  });
+
+  it('keeps the immutable production encoder contract without a fixed byte ceiling', () => {
+    expect(PRODUCTION_STRIP_EXPORT).toMatchObject({
+      width: 1_200,
+      height: 3_600,
+      aspectRatio: 1 / 3,
+      jpegQuality: 95,
+      chromaSubsampling: '4:4:4',
+      mozjpeg: true,
+      colourspace: 'srgb',
+      densityDpi: 600,
+    });
+    expect(PRODUCTION_STRIP_JPEG_OPTIONS).toEqual({
+      quality: 95,
+      chromaSubsampling: '4:4:4',
+      mozjpeg: true,
+    });
+    expect(Object.isFrozen(PRODUCTION_STRIP_EXPORT)).toBe(true);
+    expect(pipelineSource.match(/\.jpeg\(/gu)).toHaveLength(1);
+    expect(PRODUCTION_STRIP_EXPORT).not.toHaveProperty('maximumByteSize');
   });
 
   it('uses an injected face result and calls center only when the provider returns null', async () => {

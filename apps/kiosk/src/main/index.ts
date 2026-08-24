@@ -18,6 +18,7 @@ import { RendererFrameBroker } from './camera/renderer-frame-broker.js';
 import { openBoothDatabase } from './database/database.js';
 import { LocalRepository } from './database/repositories.js';
 import { FrameService } from './frame/frame-service.js';
+import { RecentGalleryService } from './gallery/recent-gallery-service.js';
 import { HealthService } from './health-service.js';
 import { WorkerImageProcessor } from './image/image-worker-client.js';
 import { registerIpcHandlers } from './ipc/register-ipc.js';
@@ -151,6 +152,14 @@ async function startApplication(): Promise<void> {
     ? new E2eDeliveryClient(config.e2e.uploadFailures, now, config.e2e.deliveryDelays)
     : new SupabaseDeliveryClient(cloudOptions, cloudSessions);
   const uploadQueue = new UploadQueue(repository, vault, secrets, delivery, now);
+  const qrService = new QrService();
+  const recentGallery = new RecentGalleryService({
+    repository,
+    vault,
+    uploadQueue,
+    qrService,
+    imageProcessor,
+  });
   const workflow = new BoothWorkflow(
     repository,
     vault,
@@ -158,9 +167,9 @@ async function startApplication(): Promise<void> {
     frameService,
     imageProcessor,
     uploadQueue,
-    new QrService(),
+    qrService,
     {
-      countdownMs: config.e2e.countdownMs,
+      shotCountdownsMs: config.shotCountdownsMs,
       cameraPreviewEnabled:
         initialCameraAdapter === 'webcam' || initialCameraAdapter === 'internal_webcam',
       now,
@@ -215,6 +224,7 @@ async function startApplication(): Promise<void> {
     delivery,
     uploadQueue,
     cameraFrames,
+    recentGallery,
     rendererOrigin: target.origin,
     onNetworkSettingsChanged: () => serverManager.requestReconfigure(),
   });

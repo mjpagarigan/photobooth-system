@@ -1,11 +1,16 @@
-import { SpinnerGapIcon as SpinnerGap } from '@phosphor-icons/react';
+import {
+  SpinnerGapIcon as SpinnerGap,
+  ArrowClockwiseIcon as ArrowClockwise,
+} from '@phosphor-icons/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AdminHealth,
   AdminSettings as AdminSettingsData,
   BoothSnapshot,
+  CameraResolution,
   FrameLayout,
+  GalleryItem,
   GraceBoothBridge,
   RpcResult,
   UploadJobSummary,
@@ -14,8 +19,10 @@ import type {
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
 import { FrameEditor } from './admin/FrameEditor';
+import { Button } from './components/Button';
 import { CameraSetupModal } from './components/CameraSetupModal';
 import { PasscodeDialog } from './components/PasscodeDialog';
+import { RecentGallery } from './components/RecentGallery';
 import { useCameraStream } from './hooks/useCameraStream';
 import { LOCAL_FIXTURES } from './local-fixtures';
 import { AttractScreen } from './screens/AttractScreen';
@@ -36,6 +43,8 @@ type DialogState = {
   intent: 'admin' | 'bootstrap' | 'restart';
   mode: 'bootstrap' | 'login' | 'restart';
 };
+
+const CANCEL_ARM_WINDOW_MS = 2_000;
 
 function getBridge(): GraceBoothBridge | null {
   return window.graceBooth ?? null;
@@ -68,7 +77,16 @@ function adminErrorMessage<T>(result: RpcResult<T>): string {
 }
 
 function useCountdown(deadline: number | null, fixedValue?: number): number {
-  const [seconds, setSeconds] = useState(5);
+  const computeSeconds = (d: number | null): number =>
+    d ? Math.max(1, Math.min(8, Math.ceil((d - Date.now()) / 1_000))) : 8;
+
+  const [seconds, setSeconds] = useState(() => computeSeconds(deadline));
+  const [prevDeadline, setPrevDeadline] = useState(deadline);
+
+  if (prevDeadline !== deadline) {
+    setPrevDeadline(deadline);
+    setSeconds(computeSeconds(deadline));
+  }
 
   useEffect(() => {
     if (fixedValue !== undefined || !deadline) {
@@ -76,17 +94,16 @@ function useCountdown(deadline: number | null, fixedValue?: number): number {
     }
 
     const update = () => {
-      setSeconds(Math.max(1, Math.min(5, Math.ceil((deadline - Date.now()) / 1_000))));
+      setSeconds(computeSeconds(deadline));
     };
-    const initialUpdate = window.setTimeout(update, 0);
+    update();
     const interval = window.setInterval(update, 100);
     return () => {
-      window.clearTimeout(initialUpdate);
       window.clearInterval(interval);
     };
   }, [deadline, fixedValue]);
 
-  return fixedValue ?? (deadline ? seconds : 5);
+  return fixedValue ?? (deadline ? seconds : 8);
 }
 
 export function App() {
@@ -107,20 +124,38 @@ export function App() {
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [cameraSetupOpen, setCameraSetupOpen] = useState(false);
   const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState<string | null>(null);
+  const [selectedCameraResolution, setSelectedCameraResolution] =
+    useState<CameraResolution>('1080p');
+  const [cancelArmed, setCancelArmed] = useState(false);
+  const [recent, setRecent] = useState<{
+    open: boolean;
+    busy: boolean;
+    items: GalleryItem[];
+    error: string | null;
+  }>({ open: false, busy: false, items: [], error: null });
   const [visualSeed, setVisualSeed] = useState<VisualSeedPayload | null>(null);
   const countdownAudioRef = useRef<HTMLAudioElement | null>(null);
   const shutterAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioArmedRef = useRef(false);
   const lastCueRef = useRef<number | null>(null);
   const lastStateRef = useRef(snapshot.state);
+  const cancelArmedRef = useRef(false);
+  const cancelDisarmTimerRef = useRef<number | null>(null);
 
   const countdownSeconds = useCountdown(
     snapshot.state === 'countdown' ? snapshot.countdownEndsAt : null,
     visualSeed?.countdownSeconds,
   );
 
-  const liveCameraEnabled = snapshot.cameraPreviewEnabled && !visualSeed;
-  const camera = useCameraStream(liveCameraEnabled, selectedCameraDeviceId);
+  // The webcam stream exists only inside an active capture window (countdown or shutter); it is
+  // released as soon as the session leaves those states so no track stays live while idle.
+  const captureWindowOpen = snapshot.screen === 'countdown' || snapshot.screen === 'capturing';
+  const liveCameraEnabled = !visualSeed && snapshot.cameraPreviewEnabled && captureWindowOpen;
+  const camera = useCameraStream(
+    liveCameraEnabled,
+    selectedCameraDeviceId,
+    selectedCameraResolution,
+  );
   const grabJpegBase64 = camera.grabJpegBase64;
 
   useEffect(() => {
@@ -197,6 +232,7 @@ export function App() {
       }
       if (cameraConfig?.ok) {
         setSelectedCameraDeviceId(cameraConfig.data.deviceId);
+        setSelectedCameraResolution(cameraConfig.data.resolution);
       }
       if (result.ok) {
         setSnapshot(result.data);
@@ -312,6 +348,11 @@ export function App() {
     },
     [visualSeed],
   );
+
+  const startGuestSession = useCallback(() => {
+    prepareAudio();
+    void runGuestCommand((bridge) => bridge.booth.start());
+  }, [prepareAudio, runGuestCommand]);
 
   const refreshAdminData = useCallback(async (): Promise<boolean> => {
     if (visualSeed) {
@@ -429,6 +470,54 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [beginProtectedAction]);
 
+  // Guest cancellation: the first ESC arms and shows a hint, a second ESC inside the window
+  // aborts the live session. Modal/dialog ESC handlers take precedence — when one is open this
+  // listener is inactive so ESC only closes the modal.
+  const sessionCancellable =
+    !visualSeed &&
+    !loading &&
+    !adminOpen &&
+    !dialog &&
+    !cameraSetupOpen &&
+    !recent.open &&
+    (snapshot.state === 'countdown' ||
+      snapshot.state === 'capturing' ||
+      snapshot.state === 'review');
+
+  useEffect(() => {
+    if (!sessionCancellable) {
+      cancelArmedRef.current = false;
+      setCancelArmed(false);
+      if (cancelDisarmTimerRef.current !== null) {
+        window.clearTimeout(cancelDisarmTimerRef.current);
+        cancelDisarmTimerRef.current = null;
+      }
+      return;
+    }
+    const disarm = () => {
+      cancelArmedRef.current = false;
+      setCancelArmed(false);
+      if (cancelDisarmTimerRef.current !== null) {
+        window.clearTimeout(cancelDisarmTimerRef.current);
+        cancelDisarmTimerRef.current = null;
+      }
+    };
+    const handleCancelKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      if (!cancelArmedRef.current) {
+        cancelArmedRef.current = true;
+        setCancelArmed(true);
+        cancelDisarmTimerRef.current = window.setTimeout(disarm, CANCEL_ARM_WINDOW_MS);
+        return;
+      }
+      disarm();
+      void runGuestCommand((bridge) => bridge.booth.cancelSession());
+    };
+    window.addEventListener('keydown', handleCancelKeyDown);
+    return () => window.removeEventListener('keydown', handleCancelKeyDown);
+  }, [runGuestCommand, sessionCancellable]);
+
   const submitPasscode = useCallback(
     async (passcode: string) => {
       if (!dialog) {
@@ -481,7 +570,7 @@ export function App() {
   }, [visualSeed]);
 
   const saveFrame = useCallback(
-    async (frameId: string, slots: FrameLayout, expectedRevision: number) => {
+    async (frameId: string, name: string, slots: FrameLayout, expectedRevision: number) => {
       if (!adminSettings || visualSeed) {
         return;
       }
@@ -493,8 +582,9 @@ export function App() {
       setAdminError(null);
       setAdminStatus(null);
       try {
-        const result = await bridge.admin.saveFrameLayout({
+        const result = await bridge.admin.updateFrameLayout({
           frameId,
+          name,
           slots,
           expectedRevision,
         });
@@ -511,8 +601,34 @@ export function App() {
     [adminSettings, refreshAdminData, visualSeed],
   );
 
-  const chooseFrame = useCallback(
-    async (optionIndex: 1 | 2 = 1) => {
+  const addFrame = useCallback(async () => {
+    if (visualSeed) {
+      return;
+    }
+    const bridge = getBridge();
+    if (!bridge) {
+      return;
+    }
+    setAdminBusy(true);
+    setAdminError(null);
+    setAdminStatus(null);
+    try {
+      const result = await bridge.admin.addFrame();
+      if (result.ok) {
+        if (result.data) {
+          await refreshAdminData();
+          setAdminStatus('Transparent frame added to the library. Review the slots, then save.');
+        }
+      } else {
+        setAdminError(adminErrorMessage(result));
+      }
+    } finally {
+      setAdminBusy(false);
+    }
+  }, [refreshAdminData, visualSeed]);
+
+  const deleteFrame = useCallback(
+    async (frameId: string) => {
       if (visualSeed) {
         return;
       }
@@ -524,15 +640,36 @@ export function App() {
       setAdminError(null);
       setAdminStatus(null);
       try {
-        const result = await bridge.admin.chooseFrame({ optionIndex });
+        const result = await bridge.admin.deleteFrame(frameId);
         if (result.ok) {
-          const selectedFrame = result.data;
-          if (selectedFrame) {
-            await refreshAdminData();
-            setAdminStatus(
-              `Transparent frame for Collage ${optionIndex} selected. Review the slots, then save.`,
-            );
-          }
+          await refreshAdminData();
+          setAdminStatus('Frame deleted from the library.');
+        } else {
+          setAdminError(adminErrorMessage(result));
+        }
+      } finally {
+        setAdminBusy(false);
+      }
+    },
+    [refreshAdminData, visualSeed],
+  );
+
+  const moveFrame = useCallback(
+    async (frameId: string, direction: 'up' | 'down') => {
+      if (visualSeed) {
+        return;
+      }
+      const bridge = getBridge();
+      if (!bridge) {
+        return;
+      }
+      setAdminBusy(true);
+      setAdminError(null);
+      setAdminStatus(null);
+      try {
+        const result = await bridge.admin.moveFrame({ frameId, direction });
+        if (result.ok) {
+          await refreshAdminData();
         } else {
           setAdminError(adminErrorMessage(result));
         }
@@ -694,6 +831,91 @@ export function App() {
     [refreshAdminData, visualSeed],
   );
 
+  const openRecentGallery = useCallback(async () => {
+    if (visualSeed) {
+      return;
+    }
+    const bridge = getBridge();
+    if (!bridge) {
+      setRecent({
+        open: true,
+        busy: false,
+        items: [],
+        error: 'The booth controls are unavailable.',
+      });
+      return;
+    }
+    setRecent((current) => ({ open: true, busy: true, items: current.items, error: null }));
+    try {
+      const result = await bridge.gallery.getRecent(20);
+      if (result.ok) {
+        setRecent({ open: true, busy: false, items: result.data, error: null });
+      } else {
+        setRecent({
+          open: true,
+          busy: false,
+          items: [],
+          error: safeGuestMessage(result.error.message, 'Recent photos could not be loaded.'),
+        });
+      }
+    } catch {
+      setRecent({
+        open: true,
+        busy: false,
+        items: [],
+        error: 'Recent photos could not be loaded.',
+      });
+    }
+  }, [visualSeed]);
+
+  const loadOperatorGallery = useCallback(async () => {
+    if (visualSeed) {
+      return;
+    }
+    const bridge = getBridge();
+    if (!bridge) {
+      setRecent((curr) => ({
+        ...curr,
+        busy: false,
+        items: [],
+        error: 'The booth controls are unavailable.',
+      }));
+      return;
+    }
+    setRecent((curr) => ({ ...curr, busy: true, error: null }));
+    try {
+      const result = await bridge.gallery.getRecent(20);
+      if (result.ok) {
+        setRecent((curr) => ({ ...curr, busy: false, items: result.data, error: null }));
+      } else {
+        setRecent((curr) => ({
+          ...curr,
+          busy: false,
+          items: [],
+          error: safeGuestMessage(result.error.message, 'Recent photos could not be loaded.'),
+        }));
+      }
+    } catch {
+      setRecent((curr) => ({
+        ...curr,
+        busy: false,
+        items: [],
+        error: 'Recent photos could not be loaded.',
+      }));
+    }
+  }, [visualSeed]);
+
+  const closeRecentGallery = useCallback(() => {
+    setRecent((current) => ({ ...current, open: false }));
+  }, []);
+
+  // Auto-load the operator gallery when its panel view is opened.
+  useEffect(() => {
+    if (adminOpen && adminView === 'gallery') {
+      void loadOperatorGallery();
+    }
+  }, [adminOpen, adminView, loadOperatorGallery]);
+
   const guestContent = useMemo(() => {
     if (loading) {
       return (
@@ -708,13 +930,12 @@ export function App() {
       return (
         <AttractScreen
           busy={guestBusy}
+          cameraMessage={guestError}
           canStart={snapshot.controls.canStart}
           onOpenAdmin={() => void beginProtectedAction('admin')}
           onOpenCameras={() => setCameraSetupOpen(true)}
-          onStart={() => {
-            prepareAudio();
-            void runGuestCommand((bridge) => bridge.booth.start());
-          }}
+          onOpenRecent={() => void openRecentGallery()}
+          onStart={startGuestSession}
         />
       );
     }
@@ -739,10 +960,9 @@ export function App() {
           canAccept={snapshot.controls.canAcceptPhotos}
           canRetake={snapshot.controls.canRetakeAll}
           captureUrls={snapshot.media.captureUrls}
-          frame={snapshot.media.frame}
           frames={snapshot.media.frames}
-          onAccept={(selectedOption) =>
-            void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ selectedOption }))
+          onAccept={(frameId) =>
+            void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ frameId }))
           }
           onRetake={() => void runGuestCommand((bridge) => bridge.booth.retakeAll())}
         />
@@ -773,6 +993,7 @@ export function App() {
           busy={guestBusy}
           collageUrl={snapshot.media.collageUrl}
           onDone={() => void runGuestCommand((bridge) => bridge.booth.done())}
+          onOpenRecent={() => void openRecentGallery()}
           qrImageUrl={snapshot.media.qrImageUrl}
         />
       );
@@ -807,8 +1028,9 @@ export function App() {
     guestError,
     liveCameraEnabled,
     loading,
-    prepareAudio,
+    openRecentGallery,
     runGuestCommand,
+    startGuestSession,
     snapshot,
   ]);
 
@@ -818,17 +1040,47 @@ export function App() {
         <AdminShell onExit={() => void exitAdmin()} onViewChange={setAdminView} view={adminView}>
           {adminView === 'frame' ? (
             <FrameEditor
-              key={`${adminSettings.activeFrame.id}:${adminSettings.activeFrame.revision}:${adminSettings.frames?.[1]?.id ?? ''}:${adminSettings.frames?.[1]?.revision ?? ''}`}
               busy={adminBusy}
               error={adminError}
-              frame={adminSettings.activeFrame}
-              frames={adminSettings.frames}
-              onChooseFrame={(optionIndex) => void chooseFrame(optionIndex)}
-              onSave={(frameId, slots, expectedRevision) =>
-                void saveFrame(frameId, slots, expectedRevision)
+              frames={adminSettings.frames ?? [adminSettings.activeFrame]}
+              onAddFrame={() => void addFrame()}
+              onDeleteFrame={(frameId) => void deleteFrame(frameId)}
+              onMoveFrame={(frameId, direction) => void moveFrame(frameId, direction)}
+              onSave={(frameId, name, slots, expectedRevision) =>
+                void saveFrame(frameId, name, slots, expectedRevision)
               }
               status={adminStatus}
             />
+          ) : adminView === 'gallery' ? (
+            <section className="admin-page" aria-label="Recent photos">
+              <header className="admin-page-header">
+                <div>
+                  <h1 data-screen-heading tabIndex={-1}>
+                    RECENT PHOTOS
+                  </h1>
+                  <p>Every finished collage with delivery status and metadata.</p>
+                </div>
+                <div className="admin-page-header__actions">
+                  <Button
+                    icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                    loading={recent.busy}
+                    onClick={() => void loadOperatorGallery()}
+                    variant="secondary"
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              </header>
+              <RecentGallery
+                busy={recent.busy}
+                error={recent.error}
+                items={recent.items}
+                jobs={jobs}
+                onClose={() => setAdminView('settings')}
+                onRetryJob={(jobId) => void retryJob(jobId)}
+                operator={true}
+              />
+            </section>
           ) : (
             <AdminSettings
               key={`${adminSettings.activeFrame.id}:${adminSettings.revision}`}
@@ -855,8 +1107,9 @@ export function App() {
         <CameraSetupModal
           isOpen={cameraSetupOpen}
           onClose={() => setCameraSetupOpen(false)}
-          onCameraSaved={(_adapter, deviceId) => {
+          onCameraSaved={(_adapter, deviceId, resolution) => {
             setSelectedCameraDeviceId(deviceId);
+            setSelectedCameraResolution(resolution);
             void refreshAdminData();
           }}
         />
@@ -867,11 +1120,16 @@ export function App() {
   return (
     <>
       <div
-        aria-hidden={dialog || cameraSetupOpen ? true : undefined}
+        aria-hidden={dialog || cameraSetupOpen || recent.open ? true : undefined}
         className="guest-layer"
-        inert={dialog || cameraSetupOpen ? true : undefined}
+        inert={dialog || cameraSetupOpen || recent.open ? true : undefined}
       >
         {guestContent}
+        {cancelArmed ? (
+          <div className="cancel-session-hint" data-testid="cancel-hint" role="status">
+            Press ESC again to cancel
+          </div>
+        ) : null}
       </div>
       {dialog ? (
         <PasscodeDialog
@@ -891,11 +1149,21 @@ export function App() {
       <CameraSetupModal
         isOpen={cameraSetupOpen}
         onClose={() => setCameraSetupOpen(false)}
-        onCameraSaved={(_adapter, deviceId) => {
+        onCameraSaved={(_adapter, deviceId, resolution) => {
           setSelectedCameraDeviceId(deviceId);
+          setSelectedCameraResolution(resolution);
           void refreshAdminData();
         }}
       />
+      {recent.open && !adminOpen ? (
+        <RecentGallery
+          busy={recent.busy}
+          error={recent.error}
+          items={recent.items}
+          onClose={closeRecentGallery}
+          operator={false}
+        />
+      ) : null}
     </>
   );
 }

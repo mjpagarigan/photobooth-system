@@ -77,7 +77,7 @@ test('the Anniversary selection produces and displays the second collage', async
           width: image.naturalWidth,
         })),
       )
-      .toEqual({ height: 2_700, width: 900 });
+      .toEqual({ height: 3_600, width: 1_200 });
     await kiosk.page.screenshot({
       path: 'test-results/electron-final-collage-2.png',
       fullPage: false,

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import type { FrameLayout, FrameSummary } from '@grace-booth/shared';
@@ -7,11 +7,11 @@ import { FrameLayoutSchema } from '@grace-booth/shared';
 import type { LocalRepository, StoredFrame } from '../database/repositories.js';
 import { AppError } from '../errors.js';
 import type { ImageProcessor } from '../image/image-worker-client.js';
+import { hasExactProductionStripAspect } from '../image/strip-export-config.js';
 import type { PhotoVault } from '../storage/photo-vault.js';
 
 /** 1:3 Vertical photobooth strip aspect of the CCF Alabang Ministry Fair frame (1200 x 3600 pixels). */
 export const SUPPORTED_FRAME_ASPECT = 1 / 3;
-const FRAME_ASPECT_TOLERANCE = 0.02;
 const LEGACY_MINISTRY_FAIR_FRAME_SHA256 =
   'a0a3dfacd86a4a458e1cf510b4a19a395cdafc1c2373863adac083b79603a2eb';
 
@@ -102,8 +102,31 @@ export class FrameService {
     private readonly imageProcessor: ImageProcessor,
   ) {}
 
+  /**
+   * Seeds the operator-managed library with the two packaged frames as entries 1 and 2 so a fresh
+   * installation behaves exactly like the previous two-option system. Existing entries are only
+   * replaced while they remain untouched shipped defaults; operator imports and edited layouts
+   * occupy their positions permanently.
+   */
   async ensureDefaultFrames(): Promise<{ option1: StoredFrame; option2: StoredFrame }> {
-    const existingOptions = this.repository.getFrameOptions();
+    // Deduplicate any duplicate frames with identical sha256
+    const initialLibrary = this.repository.listFrames();
+    const seenHashes = new Map<string, StoredFrame>();
+    for (const frame of initialLibrary) {
+      if (seenHashes.has(frame.sha256)) {
+        const canonical = seenHashes.get(frame.sha256)!;
+        this.repository.repointFramePointer(frame.id, canonical.id);
+        this.repository.deleteFrameRow(frame.id);
+        try {
+          this.vault.delete(frame.encryptedPath);
+        } catch {
+          // The library row removal is authoritative; a missing PNG is not a deletion failure.
+        }
+      } else {
+        seenHashes.set(frame.sha256, frame);
+      }
+    }
+
     const definitions: [PackagedFrameDefinition, PackagedFrameDefinition] = [
       {
         name: MAT_FRAME_NAME,
@@ -120,20 +143,31 @@ export class FrameService {
       readFile(definitions[0].path),
       readFile(definitions[1].path),
     ]);
-    const option1 = await this.ensurePackagedOption(
-      1,
-      existingOptions[0],
-      definitions[0],
-      option1Bytes,
-      existingOptions,
-    );
-    const option2 = await this.ensurePackagedOption(
-      2,
-      existingOptions[1],
-      definitions[1],
-      option2Bytes,
-      existingOptions,
-    );
+    const seeded: StoredFrame[] = [];
+    for (const [index, definition] of definitions.entries()) {
+      const library = this.repository.listFrames();
+      const occupant = library[index] ?? null;
+      if (occupant && !isReplaceable(occupant, library)) {
+        // An operator-owned or edited frame permanently holds this library position.
+        seeded.push(occupant);
+        continue;
+      }
+      const bytes = index === 0 ? option1Bytes : option2Bytes;
+      seeded.push(
+        await this.importLibraryFrame(
+          definition.name,
+          bytes,
+          definition.slots,
+          occupant ? occupant.sortOrder : undefined,
+          occupant ? [occupant.id] : [],
+        ),
+      );
+    }
+    const [option1, option2] = seeded;
+    if (!option1 || !option2) {
+      throw new AppError('frame_missing', 'The photo frames could not be prepared.');
+    }
+    this.ensureSequentialSeedOrder(option1, option2);
     return { option1, option2 };
   }
 
@@ -142,77 +176,79 @@ export class FrameService {
     return option1;
   }
 
+  /** Appends a validated frame to the end of the library. */
   async importFrame(
     name: string,
     bytes: Uint8Array,
     slots: FrameLayout = DEFAULT_FRAME_SLOTS,
   ): Promise<StoredFrame> {
-    return this.importFrameForOption(1, name, bytes, slots);
+    return this.importLibraryFrame(name, bytes, slots);
   }
 
-  async importFrameForOption(
-    optionIndex: 1 | 2,
+  listFrames(): StoredFrame[] {
+    return this.repository.listFrames();
+  }
+
+  getFrameSummaries(): FrameSummary[] {
+    return this.repository.listFrames().map((frame) => this.toSummary(frame));
+  }
+
+  getDefaultFrame(): StoredFrame | null {
+    return this.repository.getActiveFrame();
+  }
+
+  updateLayout(
+    frameId: string,
     name: string,
-    bytes: Uint8Array,
-    slots: FrameLayout = DEFAULT_FRAME_SLOTS,
-  ): Promise<StoredFrame> {
-    const validatedSlots = FrameLayoutSchema.parse(slots);
-    const normalized = await this.imageProcessor.normalizeFramePng(bytes);
-    const aspect = normalized.width / normalized.height;
-    if (Math.abs(aspect - SUPPORTED_FRAME_ASPECT) > FRAME_ASPECT_TOLERANCE) {
-      throw new AppError(
-        'frame_aspect',
-        'The frame must use the supported 1:3 vertical photobooth strip aspect.',
-      );
-    }
-    const stored = this.vault.write('frames', normalized.bytes);
-    const now = Date.now();
-    const frame: Omit<StoredFrame, 'slots'> = {
-      id: randomUUID(),
-      name: sanitizeFrameName(name),
-      encryptedPath: stored.relativePath,
-      width: normalized.width,
-      height: normalized.height,
-      byteSize: stored.byteSize,
-      sha256: stored.sha256,
-      revision: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    try {
-      this.repository.addFrame(frame, validatedSlots, optionIndex);
-    } catch (error) {
-      this.vault.delete(stored.relativePath);
-      throw error;
-    }
-    const saved = this.repository.getFrame(frame.id);
-    if (!saved) throw new AppError('frame_missing', 'The frame could not be saved.');
-    return saved;
-  }
-
-  getFrameOptions(): [StoredFrame | null, StoredFrame | null] {
-    return this.repository.getFrameOptions();
-  }
-
-  private async ensurePackagedOption(
-    optionIndex: 1 | 2,
-    existing: StoredFrame | null,
-    definition: PackagedFrameDefinition,
-    bytes: Uint8Array,
-    existingOptions: [StoredFrame | null, StoredFrame | null],
-  ): Promise<StoredFrame> {
-    if (existing && !isReplaceablePackagedDefault(optionIndex, existing, bytes, existingOptions)) {
-      return existing;
-    }
-    return this.importFrameForOption(optionIndex, definition.name, bytes, definition.slots);
-  }
-
-  updateLayout(frameId: string, slots: FrameLayout, expectedRevision: number): StoredFrame {
+    slots: FrameLayout,
+    expectedRevision: number,
+  ): StoredFrame {
     return this.repository.updateFrameLayout(
       frameId,
       FrameLayoutSchema.parse(slots),
       expectedRevision,
+      name,
     );
+  }
+
+  moveFrame(frameId: string, direction: 'up' | 'down'): StoredFrame[] {
+    const frames = this.repository.listFrames();
+    const index = frames.findIndex((frame) => frame.id === frameId);
+    if (index === -1) throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    const neighbor = direction === 'up' ? frames[index - 1] : frames[index + 1];
+    if (!neighbor) return frames;
+    this.repository.swapFrameSortOrders(frameId, neighbor.id);
+    return this.repository.listFrames();
+  }
+
+  /**
+   * Deletes an unused library entry. Frames referenced by any recorded session are rejected so
+   * archived collages can always be traced back to their artwork.
+   */
+  deleteFrame(frameId: string): StoredFrame[] {
+    const frame = this.repository.getFrame(frameId);
+    if (!frame) throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    const usage = this.repository.countSessionsReferencingFrame(frameId);
+    if (usage > 0) {
+      throw new AppError(
+        'frame_in_use',
+        'This frame is used by saved photo sessions and cannot be deleted.',
+      );
+    }
+    const replacement = this.repository.listFrames().find((candidate) => candidate.id !== frameId);
+    this.repository.repointFramePointer(frameId, replacement?.id ?? null);
+    this.repository.deleteFrameRow(frameId);
+    try {
+      this.vault.delete(frame.encryptedPath);
+    } catch {
+      // The library row removal is authoritative; a missing PNG is not a deletion failure.
+    }
+    return this.repository.listFrames();
+  }
+
+  getFrameOptions(): [StoredFrame | null, StoredFrame | null] {
+    const frames = this.repository.listFrames();
+    return [frames[0] ?? null, frames[1] ?? null];
   }
 
   toSummary(frame: StoredFrame): FrameSummary {
@@ -227,38 +263,79 @@ export class FrameService {
       revision: frame.revision,
     };
   }
-}
 
-/**
- * Replace only untouched, automatically supplied defaults. Operator imports and any frame whose
- * slot layout has been edited (revision > 0) are preserved across packaged artwork updates.
- */
-function isReplaceablePackagedDefault(
-  optionIndex: 1 | 2,
-  frame: StoredFrame,
-  packagedBytes: Uint8Array,
-  existingOptions: [StoredFrame | null, StoredFrame | null],
-): boolean {
-  if (frame.revision > 0) return false;
-  const packagedSha256 = createHash('sha256').update(packagedBytes).digest('hex');
-  if (frame.sha256 === packagedSha256) return false;
-
-  if (optionIndex === 1) {
-    return (
-      frame.name === 'CCF Alabang Ministry Fair Strip' &&
-      frame.sha256 === LEGACY_MINISTRY_FAIR_FRAME_SHA256
-    );
+  private ensureSequentialSeedOrder(option1: StoredFrame, option2: StoredFrame): void {
+    const now = Date.now();
+    if (option1.sortOrder === null) {
+      option1.sortOrder = 1;
+      this.repository.setFrameSortOrder(option1.id, 1, now);
+    }
+    if (option2.sortOrder === null || option2.sortOrder <= option1.sortOrder) {
+      option2.sortOrder = option1.sortOrder + 1;
+      this.repository.setFrameSortOrder(option2.id, option2.sortOrder, now);
+    }
   }
 
-  const option1 = existingOptions[0];
-  const isLegacyNamedDefault =
-    frame.name === 'CCF Alabang Ministry Fair Strip (Collage 2)' &&
-    frame.sha256 === LEGACY_MINISTRY_FAIR_FRAME_SHA256;
+  private async importLibraryFrame(
+    name: string,
+    bytes: Uint8Array,
+    slots: FrameLayout,
+    sortOrder?: number | null,
+    replaceIds: string[] = [],
+  ): Promise<StoredFrame> {
+    const validatedSlots = FrameLayoutSchema.parse(slots);
+    const normalized = await this.imageProcessor.normalizeFramePng(bytes);
+    if (!hasExactProductionStripAspect(normalized.width, normalized.height)) {
+      throw new AppError(
+        'frame_aspect',
+        'The frame must use an exact 1:3 vertical photobooth strip aspect.',
+      );
+    }
+    const stored = this.vault.write('frames', normalized.bytes);
+    const now = Date.now();
+    const frame: Omit<StoredFrame, 'slots'> = {
+      id: randomUUID(),
+      name: sanitizeFrameName(name),
+      encryptedPath: stored.relativePath,
+      width: normalized.width,
+      height: normalized.height,
+      byteSize: stored.byteSize,
+      sha256: stored.sha256,
+      revision: 0,
+      sortOrder: sortOrder === undefined ? this.repository.nextSortOrder() : sortOrder,
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      this.repository.insertLibraryFrame(frame, validatedSlots);
+      for (const replacedId of replaceIds) {
+        this.repository.repointFramePointer(replacedId, frame.id, now);
+        this.repository.deleteFrameRow(replacedId);
+      }
+    } catch (error) {
+      this.vault.delete(stored.relativePath);
+      throw error;
+    }
+    const saved = this.repository.getFrame(frame.id);
+    if (!saved) throw new AppError('frame_missing', 'The frame could not be saved.');
+    return saved;
+  }
+}
+
+function isReplaceable(frame: StoredFrame, library: StoredFrame[]): boolean {
+  if (frame.revision > 0) return false;
+  const legacyNamed =
+    frame.name === 'CCF Alabang Ministry Fair Strip' ||
+    frame.name === 'CCF Alabang Ministry Fair Strip (Collage 2)';
+  if (legacyNamed && frame.sha256 === LEGACY_MINISTRY_FAIR_FRAME_SHA256) return true;
+  const baseName = frame.name.replace(/ \(Collage 2\)$/, '');
+  const original = library.find((candidate) => candidate.name === baseName);
   const isAutomaticDuplicate =
-    option1 !== null &&
-    frame.name === `${option1.name} (Collage 2)` &&
-    frame.sha256 === option1.sha256;
-  return isLegacyNamedDefault || isAutomaticDuplicate;
+    original !== undefined &&
+    original.id !== frame.id &&
+    frame.name === `${original.name} (Collage 2)` &&
+    frame.sha256 === original.sha256;
+  return isAutomaticDuplicate;
 }
 
 function sanitizeFrameName(name: string): string {

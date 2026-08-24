@@ -5,24 +5,26 @@ import type { FrameLayout } from '@grace-booth/shared';
 
 import { AppError } from '../errors.js';
 import type { ImagePipelineInput, ImagePipelineResult } from './image-pipeline.js';
+import { PRODUCTION_STRIP_EXPORT } from './strip-export-config.js';
 
 type WorkerResult =
   | ({ kind: 'process' } & Omit<ImagePipelineResult, 'bytes'> & { bytes: Uint8Array })
   | { kind: 'jpeg-validation'; width: number; height: number }
-  | { kind: 'normalized-frame'; bytes: Uint8Array; width: number; height: number };
+  | { kind: 'normalized-frame'; bytes: Uint8Array; width: number; height: number }
+  | { kind: 'thumbnail'; bytes: Uint8Array; width: number; height: number };
 
 type WorkerRequestMessage =
   | {
       id: string;
       operation: 'process';
-      captures: [Uint8Array, Uint8Array, Uint8Array, Uint8Array];
+      captures: [Uint8Array, Uint8Array, Uint8Array];
       framePng: Uint8Array;
       slots: FrameLayout;
       frameAspectRatio?: number;
-      longEdge: number;
     }
   | { id: string; operation: 'validate-source'; bytes: Uint8Array }
-  | { id: string; operation: 'normalize-frame'; bytes: Uint8Array };
+  | { id: string; operation: 'normalize-frame'; bytes: Uint8Array }
+  | { id: string; operation: 'thumbnail'; bytes: Uint8Array; maxEdge: number };
 
 type PendingRequest = {
   resolve(value: WorkerResult): void;
@@ -41,6 +43,10 @@ export type ImageProcessor = {
   process(input: ImagePipelineInput): Promise<ImagePipelineResult>;
   validateSourceJpeg(bytes: Uint8Array): Promise<{ width: number; height: number }>;
   normalizeFramePng(bytes: Uint8Array): Promise<{ bytes: Buffer; width: number; height: number }>;
+  createThumbnail(
+    bytes: Uint8Array,
+    maxEdge?: number,
+  ): Promise<{ bytes: Buffer; width: number; height: number }>;
   close(): Promise<void>;
 };
 
@@ -73,24 +79,21 @@ export class WorkerImageProcessor implements ImageProcessor {
       Uint8Array,
       Uint8Array,
       Uint8Array,
-      Uint8Array,
     ];
     const framePng = Uint8Array.from(input.framePng);
     const message: {
       id: string;
       operation: 'process';
-      captures: [Uint8Array, Uint8Array, Uint8Array, Uint8Array];
+      captures: [Uint8Array, Uint8Array, Uint8Array];
       framePng: Uint8Array;
       slots: FrameLayout;
       frameAspectRatio?: number;
-      longEdge: number;
     } = {
       id,
       operation: 'process',
       captures,
       framePng,
       slots: input.slots,
-      longEdge: input.longEdge ?? 2_700,
       ...(input.frameAspectRatio === undefined ? {} : { frameAspectRatio: input.frameAspectRatio }),
     };
     return this.send(message, [
@@ -98,6 +101,17 @@ export class WorkerImageProcessor implements ImageProcessor {
       framePng.buffer,
     ]).then((result) => {
       if (result.kind !== 'process') throw new Error('Unexpected image-worker response');
+      if (
+        result.width !== PRODUCTION_STRIP_EXPORT.width ||
+        result.height !== PRODUCTION_STRIP_EXPORT.height ||
+        result.byteSize !== result.bytes.byteLength ||
+        result.byteSize < 1
+      ) {
+        throw new AppError(
+          'image_worker_output',
+          'The image processor returned an invalid production strip.',
+        );
+      }
       return { ...result, bytes: Buffer.from(result.bytes) };
     });
   }
@@ -119,6 +133,20 @@ export class WorkerImageProcessor implements ImageProcessor {
     return this.send({ id, operation: 'normalize-frame', bytes: copy }, [copy.buffer]).then(
       (result) => {
         if (result.kind !== 'normalized-frame') throw new Error('Unexpected image-worker response');
+        return { bytes: Buffer.from(result.bytes), width: result.width, height: result.height };
+      },
+    );
+  }
+
+  createThumbnail(
+    bytes: Uint8Array,
+    maxEdge = 360,
+  ): Promise<{ bytes: Buffer; width: number; height: number }> {
+    const id = randomUUID();
+    const copy = Uint8Array.from(bytes);
+    return this.send({ id, operation: 'thumbnail', bytes: copy, maxEdge }, [copy.buffer]).then(
+      (result) => {
+        if (result.kind !== 'thumbnail') throw new Error('Unexpected image-worker response');
         return { bytes: Buffer.from(result.bytes), width: result.width, height: result.height };
       },
     );

@@ -8,6 +8,7 @@ type FinalQrScreenProps = {
   busy?: boolean;
   collageUrl: string;
   onDone: () => void;
+  onOpenRecent?: () => void;
   qrImageUrl: string;
 };
 
@@ -15,6 +16,7 @@ export function FinalQrScreen({
   busy = false,
   collageUrl,
   onDone,
+  onOpenRecent,
   qrImageUrl,
 }: FinalQrScreenProps) {
   const resultRef = useRef<HTMLElement>(null);
@@ -42,7 +44,12 @@ export function FinalQrScreen({
             variant="collage"
           />
         </section>
-        <QrPanel busy={busy} onDone={onDone} qrImageUrl={qrImageUrl} />
+        <QrPanel
+          busy={busy}
+          onDone={onDone}
+          onOpenRecent={onOpenRecent}
+          qrImageUrl={qrImageUrl}
+        />
       </div>
     </main>
   );

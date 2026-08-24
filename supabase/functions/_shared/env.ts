@@ -17,7 +17,8 @@ export function supabaseUrl(): string {
     throw new ApiError(500, 'internal_error', 'The service is not configured.', true);
   }
 
-  const local = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost';
+  const local = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost' ||
+    parsed.hostname === 'kong';
   if ((parsed.protocol !== 'https:' && !local) || parsed.username || parsed.password) {
     throw new ApiError(500, 'internal_error', 'The service is not configured.', true);
   }
@@ -120,11 +121,29 @@ export function photoBucket(): string {
   return value;
 }
 
+export type R2Configuration = {
+  accountId: string | undefined;
+  accessKeyId: string | undefined;
+  secretAccessKey: string | undefined;
+  bucketName: string | undefined;
+};
+
+export function hasCompleteR2Configuration(configuration: R2Configuration): boolean {
+  const configuredValues = Object.values(configuration).filter((value) => Boolean(value?.trim()));
+  if (configuredValues.length === 0) return false;
+  if (configuredValues.length !== 4) {
+    throw new ApiError(500, 'internal_error', 'The photo storage service is not configured.', true);
+  }
+  return true;
+}
+
 export function isR2Configured(): boolean {
-  const accountId = Deno.env.get('R2_ACCOUNT_ID')?.trim();
-  const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')?.trim();
-  const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')?.trim();
-  return Boolean(accountId && accessKeyId && secretAccessKey);
+  return hasCompleteR2Configuration({
+    accountId: Deno.env.get('R2_ACCOUNT_ID'),
+    accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID'),
+    secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY'),
+    bucketName: Deno.env.get('R2_BUCKET_NAME'),
+  });
 }
 
 export function r2AccountId(): string {
@@ -140,10 +159,5 @@ export function r2SecretAccessKey(): string {
 }
 
 export function r2BucketName(): string {
-  return Deno.env.get('R2_BUCKET_NAME')?.trim() || Deno.env.get('PHOTO_BUCKET')?.trim() || 'grace-booth-photos';
+  return required('R2_BUCKET_NAME');
 }
-
-export function r2PublicDomain(): string | null {
-  return Deno.env.get('R2_PUBLIC_DOMAIN')?.trim() || null;
-}
-

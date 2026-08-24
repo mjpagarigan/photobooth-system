@@ -34,10 +34,11 @@ const bridge: GraceBoothBridge = {
     getSnapshot: () => invoke('booth:get-snapshot', {}),
     start: () => invoke('booth:start', {}),
     retakeAll: () => invoke('booth:retake-all', {}),
-    acceptPhotos: (input = {}) => invoke('booth:accept-photos', input),
+    acceptPhotos: (input) => invoke('booth:accept-photos', input),
     retryUpload: () => invoke('booth:retry-upload', {}),
     finishOffline: () => invoke('booth:finish-offline', {}),
     done: () => invoke('booth:done', {}),
+    cancelSession: () => invoke('booth:cancel-session', {}),
     getCameras: () => invoke('booth:get-cameras', {}),
     setCamera: (input) => invoke('booth:set-camera', input),
     submitCameraFrame: (captureId, jpegBase64) =>
@@ -59,6 +60,9 @@ const bridge: GraceBoothBridge = {
       return () => ipcRenderer.removeListener(CAMERA_FRAME_REQUEST_EVENT, handler);
     },
   },
+  gallery: {
+    getRecent: (limit = 20) => invoke('gallery:get-recent', { limit }),
+  },
   admin: {
     getAuthStatus: () => invoke('admin:get-auth-status', {}),
     login: (passcode) => invoke('admin:login', { passcode }),
@@ -68,8 +72,11 @@ const bridge: GraceBoothBridge = {
       invoke('admin:change-passcode', { currentPasscode, newPasscode }),
     getSettings: () => invoke('admin:get-settings', {}),
     saveSettings: (input) => invoke('admin:save-settings', input),
-    chooseFrame: (input = {}) => invoke('admin:choose-frame', input),
-    saveFrameLayout: (input) => invoke('admin:save-frame-layout', input),
+    listFrames: () => invoke('admin:list-frames', {}),
+    addFrame: () => invoke('admin:add-frame', {}),
+    updateFrameLayout: (input) => invoke('admin:update-frame-layout', input),
+    deleteFrame: (frameId) => invoke('admin:delete-frame', { frameId }),
+    moveFrame: (input) => invoke('admin:move-frame', input),
     chooseLanCertificate: (passphrase) => invoke('admin:choose-lan-certificate', { passphrase }),
     listUploadJobs: (input = {}) => invoke('admin:list-upload-jobs', input),
     retryUpload: (uploadJobId) => invoke('admin:retry-upload', { uploadJobId }),

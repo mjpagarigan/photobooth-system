@@ -76,6 +76,12 @@ export class RendererFrameBroker {
     pending.resolve(Buffer.from(bytes));
   }
 
+  abortPending(
+    error: Error = new AppError('capture_cancelled', 'Photo capture was cancelled.', true),
+  ): void {
+    this.settleWithError(error);
+  }
+
   private settleWithError(error: Error): void {
     const pending = this.pending;
     if (!pending) return;

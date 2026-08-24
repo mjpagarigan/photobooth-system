@@ -12,7 +12,13 @@ A laptop or system camera can only be opened by a renderer, so the default `webc
 
 Two boundary settings support this and nothing more. The session permission handlers grant `media` only when the requesting origin is exactly the kiosk's own `app://grace-booth` origin and the request is video-only; audio, mixed audio/video, every other permission, and every other origin are refused, and `setDevicePermissionHandler` continues to deny HID, serial, and USB devices outright. The renderer CSP adds `blob:` and `mediastream:` to `media-src` so the `<video>` viewfinder can bind the local stream; no other directive changes.
 
-Running `GRACE_BOOTH_CAMERA_ADAPTER=mock` or `sony` leaves `cameraPreviewEnabled` false in the booth snapshot, so the renderer never opens a camera device at all.
+Every webcam request carries 1920×1080 minimum and ideal constraints. A selected device always uses
+its exact device id; retries, track-end recovery, and device-list changes never switch to another
+camera. Guest Start performs a fresh 15-second resolution preflight before creating a booth
+session, preserves the compliant stream into countdown/capture, and releases all tracks on every
+idle, review, final, cancellation, failure, modal-close, and unmount path. Mock and visual fixtures
+bypass physical capture. The native Sony PC Remote adapter remains visibly unsupported; the
+ILCE-7M4 must appear as a UVC webcam in 1080p USB Streaming mode over USB 3/SuperSpeed.
 
 Static application resources use `app://grace-booth`. Decrypted session media is resolved by an opaque identifier through `grace-booth-media://asset/<opaque-id>`, served with an exact content type, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`. Session media is never intentionally exposed through `file://`.
 
@@ -52,11 +58,41 @@ If the interface or certificate becomes invalid, Grace Booth retains loopback ac
 
 Electron uses only the Supabase project URL, publishable key, and a dedicated booth user credential. The booth user must appear as enabled in `booth_devices`. It receives no direct table or Storage policy. Edge Functions use the server secret to enforce booth ownership and operate the private `photos` bucket.
 
+Every photo session records its storage backend. Existing rows default to `supabase`; newly created
+rows use `r2` when all four private R2 settings are present. Confirmation, public delivery, resume,
+and cleanup follow the recorded backend, so enabling R2 cannot orphan legacy Supabase objects. A
+partial R2 configuration fails closed instead of silently changing providers.
+
 `create-upload` derives a stable 32-byte base64url bearer token from the booth owner and client-session idempotency key using a server-only, domain-separated HMAC-SHA256 key. This makes concurrent and lost-response retries return the same secret without storing it in plaintext. Postgres stores only the token's SHA-256 hash. Electron seals the raw token immediately, before uploading. The two-hour signed upload authorization remains in memory only. `confirm-upload` rechecks ownership, token hash, cleanup state, JPEG bytes, dimensions, type, size, and SHA-256 before it creates an immutable ready timestamp and exact 720-hour expiry.
 
 The derivation key is independent of the cleanup and Supabase server keys. Routine rotation is allowed only after pending sessions and booth queues are reconciled; incident rotation must explicitly account for pending uploads. Existing ready links remain governed by their stored hashes and exact expiries.
 
-The QR target is `https://<approved-public-origin>/photo#<token>`. URL fragments do not reach Vercel or Supabase request paths. The public page sends the token only in strict POST bodies to `/photo/resolve`, `/photo/image`, and `/photo/download`. The application, page, and Functions never log those bodies. Unknown, expired, and deleted tokens receive the same public response shape; malformed requests fail validation before lookup.
+The QR target is `https://<approved-public-origin>/photo#<token>`. URL fragments do not reach Cloudflare Pages or Supabase request paths. The public page sends the token only in strict POST bodies to `/photo/resolve`, `/photo/image`, and `/photo/download`. The application, page, and Functions never log those bodies. Unknown, expired, and deleted tokens receive the same public response shape; malformed requests fail validation before lookup.
+
+For private R2 delivery, image/download authorization HEADs and size-checks the object, rechecks the
+permanent token immediately before signing, and returns only a bodyless `303 See Other`. The signed
+GET is valid for at most 300 seconds and is clamped to the remaining permanent-token lifetime. The
+browser deliberately follows the redirect, accepts redirected JPEG bytes only from the configured
+R2 S3 API origin, and renders a blob URL. Signed URLs, credentials, authorization headers, tokens,
+and object paths are never logged or placed in application state, storage, analytics, or DOM text.
+
+The private bucket's complete browser CORS configuration is:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": [],
+    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
+    "MaxAgeSeconds": 300
+  }
+]
+```
+
+No wildcard origin/header, write method, or additional exposed response header is permitted. The
+public CSP lists the exact Supabase photo API and actual R2 presigned S3 origins in `connect-src`;
+`img-src` remains `'self' blob:` because the page never renders R2 URLs directly.
 
 The bearer token grants access to one photo until its exact expiry. Anyone who receives the QR or copied URL can use it during that period. The public page therefore uses `no-store`, a restrictive CSP, no analytics, no third-party renderer requests, no referrer leakage, and no token in paths or query strings.
 
@@ -79,7 +115,7 @@ Retake-all never deletes the previous round immediately. Upload failure never di
 
 ## Production prerequisites
 
-The unsigned installer is for internal verification. Production deployment requires a Windows code-signing decision, trusted TLS material for any LAN listener, a provisioned Supabase project and Vercel site, a dedicated allowlisted booth identity, and an approved public origin.
+The unsigned installer is for internal verification. Production deployment requires a Windows code-signing decision, trusted TLS material for any LAN listener, a provisioned Supabase project and Cloudflare Pages site, a dedicated allowlisted booth identity, and an approved public origin.
 
 This development host runs Windows 10 build 19045, which is past standard support. A production booth must use Windows 11 or an actively supported Windows 10 ESU installation. Real Sony capture also remains disabled until the separate hardware gate in `SONY_CAMERA_INTEGRATION.md` passes.
 

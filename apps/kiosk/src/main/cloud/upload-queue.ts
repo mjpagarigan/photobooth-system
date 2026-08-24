@@ -224,7 +224,11 @@ export class UploadQueue extends EventEmitter {
       let remotePhotoSessionId = session.cloudPhotoSessionId;
       let secretRef = session.publicSecretRef;
       let deliverySecret: PublicDeliverySecret;
-      let upload: { storagePath: string; signedUploadToken: string; uploadUrl?: string | undefined };
+      let upload: {
+        storagePath: string;
+        signedUploadToken: string;
+        uploadUrl?: string | undefined;
+      };
 
       if (!remotePhotoSessionId || !secretRef) {
         const settings = this.repository.getSettings();
@@ -238,6 +242,7 @@ export class UploadQueue extends EventEmitter {
             width: asset.width,
             height: asset.height,
             googleFormsUrl: settings.googleFormsUrl,
+            capturedAt: new Date(session.createdAt).toISOString(),
           }),
         );
         deliverySecret = {

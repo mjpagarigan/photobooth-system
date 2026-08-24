@@ -1,4 +1,4 @@
-import type { FrameLayout } from '@grace-booth/shared';
+import type { FrameLayout, FrameSummary } from '@grace-booth/shared';
 
 export const LOCAL_FIXTURES = {
   attractBackground: '/backgrounds/attract.jpg',
@@ -74,19 +74,27 @@ export const ANNIVERSARY_FRAME_LAYOUT = [
   },
 ] satisfies FrameLayout;
 
-export const DEFAULT_FRAME_PREVIEW = {
+export const DEFAULT_FRAME_PREVIEW: FrameSummary = {
+  id: '00000000-0000-4000-8000-0000000000d0',
+  name: 'Default frame',
   width: 1_200,
   height: 3_600,
+  byteSize: 44_090,
   mediaUrl: LOCAL_FIXTURES.matFrame,
   slots: DEFAULT_FRAME_LAYOUT,
-} as const;
+  revision: 0,
+};
 
-export const ANNIVERSARY_FRAME_PREVIEW = {
+export const ANNIVERSARY_FRAME_PREVIEW: FrameSummary = {
+  id: '00000000-0000-4000-8000-0000000000d1',
+  name: 'Anniversary frame',
   width: 1_200,
   height: 3_600,
+  byteSize: 44_090,
   mediaUrl: LOCAL_FIXTURES.annivFrame,
   slots: ANNIVERSARY_FRAME_LAYOUT,
-} as const;
+  revision: 0,
+};
 
 export function mockPhotoFor(slotIndex: number): string {
   return (

@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   CameraAdapter,
   CameraAdapterKind,
   CameraStatus,
@@ -70,6 +70,10 @@ export class DynamicCameraAdapter implements CameraAdapter {
 
   async capture(request: CaptureRequest): Promise<CaptureResult> {
     return this.getActiveAdapter().capture(request);
+  }
+
+  abortCapture(error?: Error): void {
+    this.webcamAdapter.abortCapture(error);
   }
 
   async disconnect(): Promise<void> {

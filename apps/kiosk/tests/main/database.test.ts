@@ -61,6 +61,21 @@ describe('checked-in local migration', () => {
     ).toThrow();
   });
 
+  it('defaults camera resolution to 1080p and persists a 720p preference', () => {
+    store = createTestStore();
+    expect(store.repository.getSettings().cameraResolution).toBe('1080p');
+
+    const updated = store.repository.setCameraSettings('webcam', 'camo-camera', '720p', 1_000);
+    expect(updated.cameraAdapter).toBe('webcam');
+    expect(updated.cameraDeviceId).toBe('camo-camera');
+    expect(updated.cameraResolution).toBe('720p');
+    expect(() =>
+      store?.database.raw
+        .prepare("UPDATE settings SET camera_resolution = '480p' WHERE id = 1")
+        .run(),
+    ).toThrow();
+  });
+
   it('persists collage_2_frame_id on settings and selectedOption/selectedFrameId on sessions', () => {
     store = createTestStore();
     const frame1Id = randomUUID();

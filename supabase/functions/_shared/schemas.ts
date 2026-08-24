@@ -1,7 +1,6 @@
 import { z } from 'npm:zod@4.4.3';
 import {
   MAX_EDGE_PIXELS,
-  MAX_PHOTO_BYTES,
   MIN_LONG_EDGE_PIXELS,
   PUBLIC_TOKEN_PATTERN,
   SHA256_HEX_PATTERN,
@@ -34,11 +33,14 @@ const CreateUploadSchema = z
     action: z.literal('create'),
     clientSessionId: z.uuid(),
     contentType: z.literal('image/jpeg'),
-    byteSize: z.number().int().positive().max(MAX_PHOTO_BYTES),
+    byteSize: z.number().int().positive(),
     sha256: z.string().regex(SHA256_HEX_PATTERN),
     width: z.number().int().min(1).max(MAX_EDGE_PIXELS),
     height: z.number().int().min(1).max(MAX_EDGE_PIXELS),
     googleFormsUrl: GoogleFormsUrlSchema,
+    // Deliberately lenient: naming must never reject an upload. The handler parses this
+    // defensively and falls back to the current UTC time when absent or malformed.
+    capturedAt: z.string().max(64).optional(),
   })
   .strict()
   .superRefine((value, context) => {

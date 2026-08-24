@@ -21,6 +21,7 @@ export const settings = sqliteTable('settings', {
   lanCertificateFingerprint: text('lan_certificate_fingerprint'),
   cameraAdapter: text('camera_adapter', { enum: ['mock', 'sony', 'webcam', 'internal_webcam'] }),
   cameraDeviceId: text('camera_device_id'),
+  cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
   supabaseUrl: text('supabase_url'),
   supabasePublishableKey: text('supabase_publishable_key'),
   revision: integer('revision').notNull(),
@@ -37,6 +38,7 @@ export const frames = sqliteTable('frames', {
   byteSize: integer('byte_size').notNull(),
   sha256: text('sha256').notNull(),
   revision: integer('revision').notNull(),
+  sortOrder: integer('sort_order'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

@@ -5,13 +5,14 @@ import { assertPost, errorResponse, jsonResponse, readJson, requestId } from '..
 import { assertExpectedJpeg } from '../_shared/jpeg.ts';
 import { createR2Client, getR2ObjectBytes } from '../_shared/r2.ts';
 import { ConfirmUploadSchema, parseWithSchema } from '../_shared/schemas.ts';
-import { authenticateBooth, createAdminClient } from '../_shared/supabase.ts';
+import { type AdminClient, authenticateBooth, createAdminClient } from '../_shared/supabase.ts';
 import { hashPublicToken, sha256Hex } from '../_shared/token.ts';
 
 type PhotoSessionRow = {
   id: string;
   public_token_hash: string;
   storage_object_path: string;
+  storage_backend: 'supabase' | 'r2';
   status: 'pending' | 'ready' | 'expired' | 'deleting' | 'deleted';
   content_type: string;
   byte_size: number;
@@ -22,6 +23,51 @@ type PhotoSessionRow = {
   ready_at: string | null;
   expires_at: string | null;
 };
+
+export type ConfirmStorageDependencies = {
+  isR2Configured: typeof isR2Configured;
+  createR2Client: typeof createR2Client;
+  getR2ObjectBytes: typeof getR2ObjectBytes;
+  photoBucket: typeof photoBucket;
+};
+
+const DEFAULT_STORAGE_DEPENDENCIES: ConfirmStorageDependencies = {
+  isR2Configured,
+  createR2Client,
+  getR2ObjectBytes,
+  photoBucket,
+};
+
+export async function readUploadedBytes(
+  admin: AdminClient,
+  session: Pick<PhotoSessionRow, 'storage_backend' | 'storage_object_path' | 'content_type'>,
+  dependencies: ConfirmStorageDependencies = DEFAULT_STORAGE_DEPENDENCIES,
+): Promise<Uint8Array> {
+  if (session.storage_backend === 'r2') {
+    if (!dependencies.isR2Configured()) {
+      throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
+    }
+    const r2 = dependencies.createR2Client();
+    const r2Bytes = await dependencies.getR2ObjectBytes(r2, session.storage_object_path);
+    if (!r2Bytes) {
+      throw new ApiError(409, 'conflict', 'The uploaded image is not available yet.', true);
+    }
+    return r2Bytes;
+  }
+  if (session.storage_backend !== 'supabase') {
+    throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
+  }
+  const { data: uploaded, error: downloadError } = await admin.storage
+    .from(dependencies.photoBucket())
+    .download(session.storage_object_path);
+  if (downloadError || !uploaded) {
+    throw new ApiError(409, 'conflict', 'The uploaded image is not available yet.', true);
+  }
+  if (uploaded.type && uploaded.type.toLowerCase() !== session.content_type) {
+    throw new ApiError(422, 'conflict', 'The uploaded image has an unexpected content type.');
+  }
+  return new Uint8Array(await uploaded.arrayBuffer());
+}
 
 type FinalizedRow = {
   status: 'ready';
@@ -63,7 +109,7 @@ export async function handler(request: Request): Promise<Response> {
     const { data, error } = await admin
       .from('photo_sessions')
       .select(
-        'id, public_token_hash, storage_object_path, status, content_type, byte_size, content_sha256, image_width, image_height, delivery_generation, ready_at, expires_at',
+        'id, public_token_hash, storage_object_path, storage_backend, status, content_type, byte_size, content_sha256, image_width, image_height, delivery_generation, ready_at, expires_at',
       )
       .eq('id', input.photoSessionId)
       .eq('owner_user_id', booth.id)
@@ -102,26 +148,7 @@ export async function handler(request: Request): Promise<Response> {
       throw new ApiError(409, 'conflict', 'This upload session can no longer be confirmed.');
     }
 
-    let bytes: Uint8Array;
-    if (isR2Configured()) {
-      const r2 = createR2Client();
-      const r2Bytes = await getR2ObjectBytes(r2, session.storage_object_path);
-      if (!r2Bytes) {
-        throw new ApiError(409, 'conflict', 'The uploaded image is not available yet.', true);
-      }
-      bytes = r2Bytes;
-    } else {
-      const { data: uploaded, error: downloadError } = await admin.storage
-        .from(photoBucket())
-        .download(session.storage_object_path);
-      if (downloadError || !uploaded) {
-        throw new ApiError(409, 'conflict', 'The uploaded image is not available yet.', true);
-      }
-      if (uploaded.type && uploaded.type.toLowerCase() !== session.content_type) {
-        throw new ApiError(422, 'conflict', 'The uploaded image has an unexpected content type.');
-      }
-      bytes = new Uint8Array(await uploaded.arrayBuffer());
-    }
+    const bytes = await readUploadedBytes(admin, session);
     assertExpectedJpeg(bytes, {
       byteSize: Number(session.byte_size),
       width: session.image_width,

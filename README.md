@@ -85,6 +85,8 @@ On the first successful launch:
 2. Open **Admin**, enter the passcode, and select **Settings & Health**.
 3. Under **Optical Capture Hardware**, choose **Configure Camera & Test Feed**.
 4. Select the built-in/USB webcam and confirm that the preview works.
+   The saved device must report at least 1920×1080. For a Sony ILCE-7M4, enable 1080p USB Streaming,
+   connect over USB 3/SuperSpeed, and select its UVC webcam entry; native PC Remote is unsupported.
 5. Obtain the dedicated booth-account email and password assigned to this laptop by the Supabase project owner. The installer does not need a Supabase Dashboard account.
 6. Under **Cloud connection**, leave **Supabase Project URL** and **Supabase Publishable / Anon Key** blank to use the production project embedded in the official build. Enter only the assigned booth-account email and password, then click **Connect cloud**.
 7. Never enter a Supabase Dashboard-owner password, `sb_secret_...` key, or legacy `service_role` key in the kiosk.
@@ -212,8 +214,11 @@ Never distribute or enter a Supabase secret/service-role key in a desktop applic
 - A private `photos` Storage bucket accepting JPEG files.
 - The `create-upload`, `confirm-upload`, `photo`, and `cleanup-expired` Edge Functions deployed.
 - Function secrets for `PUBLIC_TOKEN_DERIVATION_KEY`, `PUBLIC_PAGE_ORIGIN`, `PHOTO_BUCKET`, and `CLEANUP_SECRET`.
+- Private R2 Function secrets (`R2_ACCOUNT_ID`, access key, secret key, and bucket name), plus the
+  exact GET/HEAD-only bucket CORS policy documented in `supabase/README.md`.
 - A dedicated confirmed Supabase Auth user enrolled in `booth_devices`.
-- The public download application deployed at the same `PUBLIC_PAGE_ORIGIN` used by the functions.
+- The public download application deployed at the same `PUBLIC_PAGE_ORIGIN` used by the functions,
+  with `VITE_PUBLIC_R2_ORIGIN` set to the actual presigned R2 S3 API origin.
 
 For backend development and deployment details, see [`supabase/README.md`](supabase/README.md).
 
@@ -332,7 +337,10 @@ On a network that blocks GitHub release downloads, configure an approved Electro
 2. In Windows **Privacy & security > Camera**, allow camera access and desktop-app access.
 3. Open **Admin > Settings & Health > Configure Camera & Test Feed**.
 4. Select the intended device and confirm its preview.
-5. Disconnect/reconnect the USB camera or restart the kiosk if the device list is stale.
+5. Confirm the modal reports at least **1920 × 1080**; saving is blocked below that resolution.
+6. For the Sony ILCE-7M4, use **1080p USB Streaming** over USB 3/SuperSpeed and select the Sony UVC
+   device. Do not select the unsupported native Sony PC Remote adapter.
+7. Disconnect/reconnect the USB camera or restart the kiosk if the device list is stale.
 
 ### QR delivery or upload fails
 

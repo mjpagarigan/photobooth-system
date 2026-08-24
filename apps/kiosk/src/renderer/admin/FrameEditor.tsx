@@ -1,9 +1,12 @@
 import {
   ArrowCounterClockwiseIcon as ArrowCounterClockwise,
+  ArrowDownIcon as ArrowDown,
+  ArrowUpIcon as ArrowUp,
   CropIcon as Crop,
   FilePngIcon as FilePng,
   FloppyDiskIcon as FloppyDisk,
   FilmStripIcon as FilmStrip,
+  TrashIcon as Trash,
 } from '@phosphor-icons/react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -22,10 +25,11 @@ import { LOCAL_FIXTURES, mockPhotoFor } from '../local-fixtures';
 type FrameEditorProps = {
   busy?: boolean | undefined;
   error?: string | null | undefined;
-  frame?: FrameSummary | undefined;
-  frames?: [FrameSummary, FrameSummary] | undefined;
-  onChooseFrame: (optionIndex: 1 | 2) => void;
-  onSave: (frameId: string, slots: FrameLayout, expectedRevision: number) => void;
+  frames?: FrameSummary[] | undefined;
+  onAddFrame: () => void;
+  onDeleteFrame: (frameId: string) => void;
+  onMoveFrame: (frameId: string, direction: 'up' | 'down') => void;
+  onSave: (frameId: string, name: string, slots: FrameLayout, expectedRevision: number) => void;
   status?: string | null | undefined;
 };
 
@@ -59,29 +63,42 @@ function parsePercent(value: string, fallback: number): number {
 export function FrameEditor({
   busy = false,
   error,
-  frame,
-  frames,
-  onChooseFrame,
+  frames = [],
+  onAddFrame,
+  onDeleteFrame,
+  onMoveFrame,
   onSave,
   status,
 }: FrameEditorProps) {
-  const [activeCollageIndex, setActiveCollageIndex] = useState<1 | 2>(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  // Name edits are scoped to the frame they started on so switching frames never leaks a draft.
+  const [nameDraft, setNameDraft] = useState<{ frameId: string; value: string } | null>(null);
 
-  const frame1 = frames?.[0] ?? frame;
-  const frame2 = frames?.[1] ?? frame;
-  const activeFrame = activeCollageIndex === 1 ? frame1 : (frame2 ?? frame1);
+  const selectedFrame = useMemo(
+    () => frames.find((frame) => frame.id === selectedId) ?? frames[0] ?? null,
+    [frames, selectedId],
+  );
+
+  const selectFrame = (frameId: string) => {
+    setSelectedId(frameId);
+    setConfirmingDeleteId(null);
+  };
 
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 540, height: 720 });
-  const [draft1, setDraft1] = useState<SlotDraft | null>(null);
-  const [draft2, setDraft2] = useState<SlotDraft | null>(null);
+  const [draft, setDraft] = useState<SlotDraft | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(1);
 
-  const frameKey1 = frame1 ? `${frame1.id}:${frame1.revision}` : '';
-  const frameKey2 = frame2 ? `${frame2.id}:${frame2.revision}` : '';
-  const slots1 = draft1?.frameKey === frameKey1 ? draft1.slots : (frame1?.slots ?? []);
-  const slots2 = draft2?.frameKey === frameKey2 ? draft2.slots : (frame2?.slots ?? []);
-  const currentSlots = activeCollageIndex === 1 ? slots1 : slots2;
+  const frameKey = selectedFrame ? `${selectedFrame.id}:${selectedFrame.revision}` : '';
+  const currentSlots = useMemo<FrameLayout>(
+    () => (draft?.frameKey === frameKey ? draft.slots : (selectedFrame?.slots ?? [])),
+    [draft, frameKey, selectedFrame],
+  );
+  const nameValue =
+    selectedFrame && nameDraft?.frameId === selectedFrame.id
+      ? nameDraft.value
+      : (selectedFrame?.name ?? '');
 
   useLayoutEffect(() => {
     const element = stageRef.current;
@@ -104,7 +121,7 @@ export function FrameEditor({
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [activeFrame?.height, activeFrame?.width, activeCollageIndex]);
+  }, [selectedFrame?.height, selectedFrame?.width, selectedFrame?.id]);
 
   const selectedSlot = useMemo(
     () => currentSlots.find((slot) => slot.slotIndex === selectedIndex) ?? currentSlots[0],
@@ -112,14 +129,11 @@ export function FrameEditor({
   );
 
   const updateSlot = (slotIndex: number, update: Partial<FrameSlot>) => {
+    if (!selectedFrame) return;
     const nextSlots = currentSlots.map((slot) =>
       slot.slotIndex === slotIndex ? constrainSlot({ ...slot, ...update }) : slot,
     );
-    if (activeCollageIndex === 1) {
-      setDraft1({ frameKey: frameKey1, slots: nextSlots });
-    } else {
-      setDraft2({ frameKey: frameKey2, slots: nextSlots });
-    }
+    setDraft({ frameKey, slots: nextSlots });
   };
 
   const updateSelectedPercent = (field: 'x' | 'y' | 'width' | 'height', value: string) => {
@@ -138,7 +152,7 @@ export function FrameEditor({
   };
 
   const resetSelected = () => {
-    const persisted = activeFrame?.slots.find((slot) => slot.slotIndex === selectedIndex);
+    const persisted = selectedFrame?.slots.find((slot) => slot.slotIndex === selectedIndex);
     if (persisted) {
       updateSlot(selectedIndex, persisted);
     }
@@ -164,8 +178,22 @@ export function FrameEditor({
   };
 
   const handleSave = () => {
-    if (!activeFrame) return;
-    onSave(activeFrame.id, currentSlots, activeFrame.revision);
+    if (!selectedFrame) return;
+    onSave(
+      selectedFrame.id,
+      nameValue.trim() || selectedFrame.name,
+      currentSlots,
+      selectedFrame.revision,
+    );
+  };
+
+  const handleDeleteRow = (frameId: string) => {
+    if (confirmingDeleteId === frameId) {
+      onDeleteFrame(frameId);
+      setConfirmingDeleteId(null);
+    } else {
+      setConfirmingDeleteId(frameId);
+    }
   };
 
   return (
@@ -173,41 +201,24 @@ export function FrameEditor({
       <header className="admin-page-header">
         <div>
           <h1 data-screen-heading tabIndex={-1}>
-            FRAME EDITOR
+            FRAME LIBRARY
           </h1>
-          <p>Configure two independent collage designs and their three-photo slot geometry.</p>
+          <p>
+            Manage every collage frame available at review time and its three-photo slot geometry.
+          </p>
         </div>
         <div className="admin-page-header__actions">
-          <div className="collage-tab-group" role="tablist" aria-label="Collage options to edit">
-            <button
-              className={`collage-tab-btn ${activeCollageIndex === 1 ? 'is-active' : ''}`}
-              onClick={() => setActiveCollageIndex(1)}
-              role="tab"
-              aria-selected={activeCollageIndex === 1}
-              type="button"
-              data-testid="tab-collage-1"
-            >
-              Collage 1 · M.A.T.
-            </button>
-            <button
-              className={`collage-tab-btn ${activeCollageIndex === 2 ? 'is-active' : ''}`}
-              onClick={() => setActiveCollageIndex(2)}
-              role="tab"
-              aria-selected={activeCollageIndex === 2}
-              type="button"
-              data-testid="tab-collage-2"
-            >
-              Collage 2 · Anniversary
-            </button>
-          </div>
           <Button
+            data-testid="frame-add"
+            disabled={busy}
             icon={<FilePng aria-hidden="true" weight="bold" />}
-            onClick={() => onChooseFrame(activeCollageIndex)}
+            onClick={onAddFrame}
             variant="secondary"
           >
-            Replace frame
+            Add frame
           </Button>
           <Button
+            disabled={!selectedFrame || busy}
             icon={<FloppyDisk aria-hidden="true" weight="bold" />}
             loading={busy}
             onClick={handleSave}
@@ -216,181 +227,263 @@ export function FrameEditor({
           </Button>
         </div>
       </header>
-      <div className="frame-editor__workspace">
-        <section className="frame-stage-wrapper" aria-label="Visual frame layout preview">
-          <div className="frame-stage-card">
+      <div className="frame-editor__workspace frame-editor__workspace--library">
+        <aside className="frame-library" aria-label="Frame library" data-testid="frame-library">
+          {frames.map((item, index) => (
             <div
-              className="frame-stage"
-              ref={stageRef}
-              style={{
-                aspectRatio: `${activeFrame?.width ?? 1200} / ${activeFrame?.height ?? 3600}`,
-              }}
+              className={`frame-library__item${selectedFrame?.id === item.id ? ' is-selected' : ''}`}
+              key={item.id}
             >
-              {currentSlots.map((slot) => {
-                const selected = slot.slotIndex === selectedIndex;
-                return (
-                  <Rnd
-                    bounds="parent"
-                    className={`frame-slot${selected ? ' is-selected' : ''}`}
-                    key={slot.slotIndex}
-                    minHeight={40}
-                    minWidth={40}
-                    onDragStart={() => setSelectedIndex(slot.slotIndex)}
-                    onDragStop={(_, position) =>
-                      updateSlot(slot.slotIndex, {
-                        x: position.x / stageSize.width,
-                        y: position.y / stageSize.height,
-                      })
-                    }
-                    onResizeStart={() => setSelectedIndex(slot.slotIndex)}
-                    onResizeStop={(_, __, element, ___, position) =>
-                      updateSlot(slot.slotIndex, {
-                        x: position.x / stageSize.width,
-                        y: position.y / stageSize.height,
-                        width: element.offsetWidth / stageSize.width,
-                        height: element.offsetHeight / stageSize.height,
-                      })
-                    }
-                    position={{
-                      x: slot.x * stageSize.width,
-                      y: slot.y * stageSize.height,
-                    }}
-                    size={{
-                      width: slot.width * stageSize.width,
-                      height: slot.height * stageSize.height,
-                    }}
-                  >
-                    <div
-                      aria-label={`${slot.name} preview`}
-                      className="frame-slot__inner"
-                      onClick={() => setSelectedIndex(slot.slotIndex)}
-                      onKeyDown={nudgeSelected}
-                      role="button"
-                      tabIndex={0}
-                      style={{ backgroundImage: `url(${mockPhotoFor(slot.slotIndex)})` }}
-                    >
-                      <span className="frame-slot__label">
-                        <FilmStrip aria-hidden="true" weight="bold" />
-                        <span>SLOT_0{slot.slotIndex}</span>
-                      </span>
-                    </div>
-                  </Rnd>
-                );
-              })}
-              <img
-                className="frame-stage__overlay"
-                src={activeFrame?.mediaUrl ?? LOCAL_FIXTURES.defaultFrame}
-                alt="Current transparent frame overlay"
-                draggable="false"
-              />
-            </div>
-          </div>
-        </section>
-        <aside className="slot-inspector" aria-label="Selected photo slot settings">
-          <div className="slot-inspector__heading">
-            <span>SELECTED SLOT</span>
-            <h2>{selectedSlot?.name ?? 'Photo slot'}</h2>
-          </div>
-          <div className="slot-tabs" role="tablist" aria-label="Photo slots">
-            {currentSlots.map((slot) => (
               <button
-                aria-selected={selectedIndex === slot.slotIndex}
-                className={selectedIndex === slot.slotIndex ? 'is-active' : ''}
-                key={slot.slotIndex}
-                onClick={() => setSelectedIndex(slot.slotIndex)}
-                role="tab"
+                className="frame-library__select"
+                onClick={() => selectFrame(item.id)}
+                type="button"
+                data-testid={`frame-item-${index + 1}`}
+                title={item.name}
               >
-                {slot.slotIndex}
+                <FilmStrip aria-hidden="true" weight="bold" />
+                <span className="frame-library__name">{item.name}</span>
+                <span className="frame-library__meta">
+                  {item.slots.length} slots · rev {item.revision}
+                </span>
               </button>
-            ))}
-          </div>
-          {selectedSlot ? (
-            <>
-              <fieldset className="slot-inspector__group">
-                <legend>POSITION &amp; SCALE (%)</legend>
-                <div className="coordinate-grid">
-                  {(['x', 'y', 'width', 'height'] as const).map((field) => (
-                    <label key={field}>
-                      <span>
-                        {field === 'x'
-                          ? 'X'
-                          : field === 'y'
-                            ? 'Y'
-                            : field === 'width'
-                              ? 'Width'
-                              : 'Height'}{' '}
-                        (%)
-                      </span>
-                      <input
-                        aria-label={`${field} percent`}
-                        max="100"
-                        min="0"
-                        onChange={(event) => updateSelectedPercent(field, event.target.value)}
-                        step="0.1"
-                        type="number"
-                        value={percent(selectedSlot[field])}
-                      />
-                    </label>
-                  ))}
-                </div>
-                <p>
-                  Drag the slot on the canvas or enter coordinates. Arrow keys nudge selected slot.
-                </p>
-              </fieldset>
-              <fieldset className="slot-inspector__group">
-                <legend>
-                  <Crop aria-hidden="true" weight="bold" /> CROP BEHAVIOR
-                </legend>
-                <label
-                  className={`crop-option${selectedSlot.cropMode === 'crop-to-fill' ? ' is-selected' : ''}`}
+              <span className="frame-library__controls">
+                <button
+                  aria-label={`Move ${item.name} up`}
+                  disabled={busy || index === 0}
+                  onClick={() => onMoveFrame(item.id, 'up')}
+                  type="button"
                 >
-                  <input
-                    checked={selectedSlot.cropMode === 'crop-to-fill'}
-                    name={`crop-${selectedSlot.slotIndex}`}
-                    onChange={() => setCropMode('crop-to-fill')}
-                    type="radio"
-                  />
-                  <span>
-                    <strong>Crop to fill</strong>
-                    <small>Fill entire slot bounds and crop outer margins.</small>
-                  </span>
-                </label>
-                <label
-                  className={`crop-option${selectedSlot.cropMode === 'fit' ? ' is-selected' : ''}`}
+                  <ArrowUp aria-hidden="true" weight="bold" />
+                </button>
+                <button
+                  aria-label={`Move ${item.name} down`}
+                  disabled={busy || index === frames.length - 1}
+                  onClick={() => onMoveFrame(item.id, 'down')}
+                  type="button"
                 >
-                  <input
-                    checked={selectedSlot.cropMode === 'fit'}
-                    name={`crop-${selectedSlot.slotIndex}`}
-                    onChange={() => setCropMode('fit')}
-                    type="radio"
-                  />
-                  <span>
-                    <strong>Fit</strong>
-                    <small>Preserve complete uncropped frame inside bounds.</small>
-                  </span>
-                </label>
-              </fieldset>
-              <Button
-                icon={<ArrowCounterClockwise aria-hidden="true" weight="bold" />}
-                onClick={resetSelected}
-                variant="secondary"
-                wide
-              >
-                Reset slot
-              </Button>
-            </>
-          ) : null}
-          {status ? (
-            <p className="form-success" role="status">
-              {status}
-            </p>
-          ) : null}
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+                  <ArrowDown aria-hidden="true" weight="bold" />
+                </button>
+                <button
+                  aria-label={
+                    confirmingDeleteId === item.id
+                      ? `Confirm delete ${item.name}`
+                      : `Delete ${item.name}`
+                  }
+                  className={confirmingDeleteId === item.id ? 'is-danger' : ''}
+                  disabled={busy}
+                  onClick={() => handleDeleteRow(item.id)}
+                  type="button"
+                >
+                  <Trash aria-hidden="true" weight="bold" />
+                </button>
+              </span>
+            </div>
+          ))}
+          <p className="frame-library__hint">
+            Add transparent PNG strips (1:3). Frames used by saved sessions cannot be deleted.
+          </p>
         </aside>
+
+        {selectedFrame ? (
+          <>
+            <section className="frame-stage-wrapper" aria-label="Visual frame layout preview">
+              <div className="frame-stage-card">
+                <div
+                  className="frame-stage"
+                  ref={stageRef}
+                  style={{
+                    aspectRatio: `${selectedFrame.width} / ${selectedFrame.height}`,
+                  }}
+                >
+                  {currentSlots.map((slot) => {
+                    const selected = slot.slotIndex === selectedIndex;
+                    return (
+                      <Rnd
+                        bounds="parent"
+                        className={`frame-slot${selected ? ' is-selected' : ''}`}
+                        key={slot.slotIndex}
+                        minHeight={40}
+                        minWidth={40}
+                        onDragStart={() => setSelectedIndex(slot.slotIndex)}
+                        onDragStop={(_, position) =>
+                          updateSlot(slot.slotIndex, {
+                            x: position.x / stageSize.width,
+                            y: position.y / stageSize.height,
+                          })
+                        }
+                        onResizeStart={() => setSelectedIndex(slot.slotIndex)}
+                        onResizeStop={(_, __, element, ___, position) =>
+                          updateSlot(slot.slotIndex, {
+                            x: position.x / stageSize.width,
+                            y: position.y / stageSize.height,
+                            width: element.offsetWidth / stageSize.width,
+                            height: element.offsetHeight / stageSize.height,
+                          })
+                        }
+                        position={{
+                          x: slot.x * stageSize.width,
+                          y: slot.y * stageSize.height,
+                        }}
+                        size={{
+                          width: slot.width * stageSize.width,
+                          height: slot.height * stageSize.height,
+                        }}
+                      >
+                        <div
+                          aria-label={`${slot.name} preview`}
+                          className="frame-slot__inner"
+                          onClick={() => setSelectedIndex(slot.slotIndex)}
+                          onKeyDown={nudgeSelected}
+                          role="button"
+                          tabIndex={0}
+                          style={{ backgroundImage: `url(${mockPhotoFor(slot.slotIndex)})` }}
+                        >
+                          <span className="frame-slot__label">
+                            <FilmStrip aria-hidden="true" weight="bold" />
+                            <span>SLOT_0{slot.slotIndex}</span>
+                          </span>
+                        </div>
+                      </Rnd>
+                    );
+                  })}
+                  <img
+                    className="frame-stage__overlay"
+                    src={selectedFrame.mediaUrl || LOCAL_FIXTURES.defaultFrame}
+                    alt="Current transparent frame overlay"
+                    draggable="false"
+                  />
+                </div>
+              </div>
+            </section>
+            <aside className="slot-inspector" aria-label="Selected photo slot settings">
+              <fieldset className="slot-inspector__group">
+                <legend>FRAME NAME</legend>
+                <input
+                  aria-label="Frame name"
+                  className="text-input"
+                  maxLength={120}
+                  onChange={(event) =>
+                    setNameDraft({ frameId: selectedFrame.id, value: event.target.value })
+                  }
+                  type="text"
+                  value={nameValue}
+                />
+              </fieldset>
+              <div className="slot-inspector__heading">
+                <span>SELECTED SLOT</span>
+                <h2>{selectedSlot?.name ?? 'Photo slot'}</h2>
+              </div>
+              <div className="slot-tabs" role="tablist" aria-label="Photo slots">
+                {currentSlots.map((slot) => (
+                  <button
+                    aria-selected={selectedIndex === slot.slotIndex}
+                    className={selectedIndex === slot.slotIndex ? 'is-active' : ''}
+                    key={slot.slotIndex}
+                    onClick={() => setSelectedIndex(slot.slotIndex)}
+                    role="tab"
+                    type="button"
+                  >
+                    {slot.slotIndex}
+                  </button>
+                ))}
+              </div>
+              {selectedSlot ? (
+                <>
+                  <fieldset className="slot-inspector__group">
+                    <legend>POSITION &amp; SCALE (%)</legend>
+                    <div className="coordinate-grid">
+                      {(['x', 'y', 'width', 'height'] as const).map((field) => (
+                        <label key={field}>
+                          <span>
+                            {field === 'x'
+                              ? 'X'
+                              : field === 'y'
+                                ? 'Y'
+                                : field === 'width'
+                                  ? 'Width'
+                                  : 'Height'}{' '}
+                            (%)
+                          </span>
+                          <input
+                            aria-label={`${field} percent`}
+                            max="100"
+                            min="0"
+                            onChange={(event) => updateSelectedPercent(field, event.target.value)}
+                            step="0.1"
+                            type="number"
+                            value={percent(selectedSlot[field])}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <p>
+                      Drag the slot on the canvas or enter coordinates. Arrow keys nudge selected
+                      slot.
+                    </p>
+                  </fieldset>
+                  <fieldset className="slot-inspector__group">
+                    <legend>
+                      <Crop aria-hidden="true" weight="bold" /> CROP BEHAVIOR
+                    </legend>
+                    <label
+                      className={`crop-option${selectedSlot.cropMode === 'crop-to-fill' ? ' is-selected' : ''}`}
+                    >
+                      <input
+                        checked={selectedSlot.cropMode === 'crop-to-fill'}
+                        name={`crop-${selectedSlot.slotIndex}`}
+                        onChange={() => setCropMode('crop-to-fill')}
+                        type="radio"
+                      />
+                      <span>
+                        <strong>Crop to fill</strong>
+                        <small>Fill entire slot bounds and crop outer margins.</small>
+                      </span>
+                    </label>
+                    <label
+                      className={`crop-option${selectedSlot.cropMode === 'fit' ? ' is-selected' : ''}`}
+                    >
+                      <input
+                        checked={selectedSlot.cropMode === 'fit'}
+                        name={`crop-${selectedSlot.slotIndex}`}
+                        onChange={() => setCropMode('fit')}
+                        type="radio"
+                      />
+                      <span>
+                        <strong>Fit</strong>
+                        <small>Preserve complete uncropped frame inside bounds.</small>
+                      </span>
+                    </label>
+                  </fieldset>
+                  <Button
+                    icon={<ArrowCounterClockwise aria-hidden="true" weight="bold" />}
+                    onClick={resetSelected}
+                    variant="secondary"
+                    wide
+                  >
+                    Reset slot
+                  </Button>
+                </>
+              ) : null}
+              {status ? (
+                <p className="form-success" role="status">
+                  {status}
+                </p>
+              ) : null}
+              {error ? (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </aside>
+          </>
+        ) : (
+          <section className="frame-stage-wrapper" aria-label="No frame selected">
+            <div className="frame-stage-card">
+              <p className="review-copy">Add a frame to begin configuring the photo library.</p>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

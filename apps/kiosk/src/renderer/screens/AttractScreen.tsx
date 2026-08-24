@@ -3,6 +3,7 @@ import {
   CameraIcon as Camera,
   CheckCircleIcon as CheckCircle,
   GearIcon as Gear,
+  ImagesIcon as Images,
   LockKeyIcon as LockKey,
 } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
@@ -12,17 +13,21 @@ import { LOCAL_FIXTURES } from '../local-fixtures';
 
 type AttractScreenProps = {
   busy?: boolean;
+  cameraMessage?: string | null;
   canStart: boolean;
   onOpenAdmin: () => void;
   onOpenCameras?: () => void;
+  onOpenRecent?: () => void;
   onStart: () => void;
 };
 
 export function AttractScreen({
   busy = false,
+  cameraMessage = null,
   canStart,
   onOpenAdmin,
   onOpenCameras,
+  onOpenRecent,
   onStart,
 }: AttractScreenProps) {
   const startButtonRef = useRef<HTMLButtonElement>(null);
@@ -42,10 +47,23 @@ export function AttractScreen({
       />
       <div className="attract-scrim" aria-hidden="true" />
       <div className="attract-top-controls">
+        {onOpenRecent && (
+          <button
+            className="operator-access recent-access"
+            onClick={onOpenRecent}
+            disabled={busy}
+            aria-label="Recent Photos"
+            title="Recent Photos"
+          >
+            <Images aria-hidden="true" weight="bold" />
+            <span className="operator-access__text">Recent</span>
+          </button>
+        )}
         {onOpenCameras && (
           <button
             className="operator-access camera-access"
             onClick={onOpenCameras}
+            disabled={busy}
             aria-label="Camera Setup"
             title="Camera Setup"
           >
@@ -53,7 +71,13 @@ export function AttractScreen({
             <span className="operator-access__text">Camera</span>
           </button>
         )}
-        <button className="operator-access" onClick={onOpenAdmin} aria-label="Admin" title="Admin">
+        <button
+          className="operator-access"
+          onClick={onOpenAdmin}
+          aria-label="Admin"
+          title="Admin"
+          disabled={busy}
+        >
           <LockKey aria-hidden="true" weight="bold" />
           <span className="operator-access__text">Admin</span>
         </button>
@@ -87,6 +111,12 @@ export function AttractScreen({
         >
           Start photo session
         </Button>
+
+        {cameraMessage ? (
+          <p className="attract-camera-message" role="alert">
+            {cameraMessage}
+          </p>
+        ) : null}
       </section>
     </main>
   );

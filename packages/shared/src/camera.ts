@@ -3,6 +3,23 @@ import { OpaqueIdSchema, UtcMillisSchema } from './domain.js';
 
 export const CameraAdapterKindSchema = z.enum(['mock', 'sony', 'webcam', 'internal_webcam']);
 export type CameraAdapterKind = z.infer<typeof CameraAdapterKindSchema>;
+
+export const CameraResolutionSchema = z.enum(['720p', '1080p']);
+export type CameraResolution = z.infer<typeof CameraResolutionSchema>;
+
+export const CAMERA_RESOLUTION_DIMENSIONS: Record<
+  CameraResolution,
+  { width: number; height: number }
+> = {
+  '720p': { width: 1_280, height: 720 },
+  '1080p': { width: 1_920, height: 1_080 },
+};
+
+export function isWebcamCameraAdapter(
+  adapter: CameraAdapterKind,
+): adapter is 'webcam' | 'internal_webcam' {
+  return adapter === 'webcam' || adapter === 'internal_webcam';
+}
 export const CameraConnectionStateSchema = z.enum([
   'disconnected',
   'connecting',
@@ -42,6 +59,7 @@ export const CameraConfigSchema = z
   .object({
     adapter: CameraAdapterKindSchema,
     deviceId: z.string().nullable(),
+    resolution: CameraResolutionSchema.default('1080p'),
     status: CameraStatusSchema,
   })
   .strict();
@@ -77,5 +95,6 @@ export type CameraAdapter = {
   connect(): Promise<CameraStatus>;
   getStatus(): Promise<CameraStatus>;
   capture(request: CaptureRequest): Promise<CaptureResult>;
+  abortCapture?(error?: Error): void;
   disconnect(): Promise<void>;
 };

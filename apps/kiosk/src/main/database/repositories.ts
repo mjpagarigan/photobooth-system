@@ -1,5 +1,6 @@
 import type {
   CameraAdapterKind,
+  CameraResolution,
   FrameLayout,
   SessionState,
   UploadJobState,
@@ -30,6 +31,7 @@ type RawSettingsRow = {
   lan_certificate_fingerprint: string | null;
   camera_adapter: string | null;
   camera_device_id: string | null;
+  camera_resolution: string;
   supabase_url: string | null;
   supabase_publishable_key: string | null;
   revision: number;
@@ -57,6 +59,7 @@ export type LocalSettings = {
   lanCertificateFingerprint: string | null;
   cameraAdapter: CameraAdapterKind;
   cameraDeviceId: string | null;
+  cameraResolution: CameraResolution;
   supabaseUrl: string | null;
   supabasePublishableKey: string | null;
   revision: number;
@@ -73,6 +76,7 @@ export type StoredFrame = {
   byteSize: number;
   sha256: string;
   revision: number;
+  sortOrder: number | null;
   createdAt: number;
   updatedAt: number;
   slots: FrameLayout;
@@ -152,7 +156,7 @@ const SETTINGS_SELECT = `
   SELECT passcode_hash, passcode_salt, scrypt_version, scrypt_n, scrypt_r, scrypt_p, scrypt_key_length,
     active_frame_id, collage_2_frame_id, google_forms_url, local_retention_days, cloud_retention_days,
     lan_enabled, lan_bind_host, lan_port, lan_tls_secret_ref,
-    lan_certificate_fingerprint, camera_adapter, camera_device_id,
+    lan_certificate_fingerprint, camera_adapter, camera_device_id, camera_resolution,
     revision, created_at, updated_at
   FROM settings WHERE id = 1
 `;
@@ -260,14 +264,15 @@ export class LocalRepository {
   setCameraSettings(
     adapter: CameraAdapterKind,
     deviceId: string | null = null,
+    resolution: CameraResolution = '1080p',
     now = Date.now(),
   ): LocalSettings {
     this.database.raw
       .prepare(
-        `UPDATE settings SET camera_adapter = ?, camera_device_id = ?,
+        `UPDATE settings SET camera_adapter = ?, camera_device_id = ?, camera_resolution = ?,
           revision = revision + 1, updated_at = ? WHERE id = 1`,
       )
-      .run(adapter, deviceId, now);
+      .run(adapter, deviceId, resolution, now);
     this.recordAudit('settings_change', 'success', 'camera_adapter_updated', now);
     return this.getSettings();
   }
@@ -291,25 +296,7 @@ export class LocalRepository {
     const validatedSlots = FrameLayoutSchema.parse(slots);
     const targetColumn = optionIndex === 2 ? 'collage_2_frame_id' : 'active_frame_id';
     this.database.raw.transaction(() => {
-      this.database.raw
-        .prepare(
-          `INSERT INTO frames
-            (id, name, encrypted_path, width, height, byte_size, sha256, revision, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          frame.id,
-          frame.name,
-          frame.encryptedPath,
-          frame.width,
-          frame.height,
-          frame.byteSize,
-          frame.sha256,
-          frame.revision,
-          frame.createdAt,
-          frame.updatedAt,
-        );
-      this.insertFrameSlots(frame.id, validatedSlots);
+      this.insertFrameRow(frame, validatedSlots);
       this.database.raw
         .prepare(
           `UPDATE settings SET ${targetColumn} = ?, revision = revision + 1, updated_at = ?
@@ -318,6 +305,79 @@ export class LocalRepository {
         .run(frame.id, frame.updatedAt);
       this.recordAudit('frame_change', 'success', 'frame_added', frame.updatedAt);
     })();
+  }
+
+  /** Appends a frame to the operator-managed library without changing collage pointers. */
+  insertLibraryFrame(frame: Omit<StoredFrame, 'slots'>, slots: FrameLayout): void {
+    const validatedSlots = FrameLayoutSchema.parse(slots);
+    this.database.raw.transaction(() => {
+      this.insertFrameRow(frame, validatedSlots);
+      if (this.getSettings().activeFrameId === null) {
+        // The first frame in an empty library becomes the default active frame.
+        this.database.raw
+          .prepare('UPDATE settings SET active_frame_id = ?, updated_at = ? WHERE id = 1')
+          .run(frame.id, frame.updatedAt);
+      }
+      this.recordAudit('frame_change', 'success', 'frame_added', frame.updatedAt);
+    })();
+  }
+
+  listFrames(): StoredFrame[] {
+    return loadFrameRows(
+      this.database,
+      'ORDER BY (sort_order IS NULL), sort_order, created_at, id',
+      [],
+    );
+  }
+
+  nextSortOrder(): number {
+    const row = this.database.raw
+      .prepare('SELECT MAX(sort_order) AS max_order FROM frames')
+      .get() as { max_order: number | null };
+    return (row.max_order ?? 0) + 1;
+  }
+
+  setFrameSortOrder(frameId: string, sortOrder: number | null, now = Date.now()): void {
+    const result = this.database.raw
+      .prepare('UPDATE frames SET sort_order = ?, updated_at = ? WHERE id = ?')
+      .run(sortOrder, now, frameId);
+    if (result.changes !== 1)
+      throw new AppError('frame_missing', 'The selected frame no longer exists.');
+  }
+
+  swapFrameSortOrders(firstId: string, secondId: string, now = Date.now()): void {
+    this.database.raw.transaction(() => {
+      const first = this.getFrame(firstId);
+      const second = this.getFrame(secondId);
+      if (!first || !second) {
+        throw new AppError('frame_missing', 'The selected frame no longer exists.');
+      }
+      this.setFrameSortOrder(firstId, second.sortOrder, now);
+      this.setFrameSortOrder(secondId, first.sortOrder, now);
+    })();
+  }
+
+  deleteFrameRow(frameId: string): void {
+    this.database.raw.prepare('DELETE FROM frames WHERE id = ?').run(frameId);
+  }
+
+  countSessionsReferencingFrame(frameId: string): number {
+    const row = this.database.raw
+      .prepare('SELECT COUNT(*) AS n FROM sessions WHERE selected_frame_id = ?')
+      .get(frameId) as { n: number };
+    return row.n;
+  }
+
+  repointFramePointer(frameId: string, replacementId: string | null, now = Date.now()): void {
+    this.database.raw
+      .prepare(
+        `UPDATE settings SET
+          active_frame_id = CASE WHEN active_frame_id = ? THEN ? ELSE active_frame_id END,
+          collage_2_frame_id = CASE WHEN collage_2_frame_id = ? THEN ? ELSE collage_2_frame_id END,
+          revision = revision + 1, updated_at = ?
+        WHERE id = 1`,
+      )
+      .run(frameId, replacementId, frameId, replacementId, now);
   }
 
   setCollageFrameId(optionIndex: 1 | 2, frameId: string, now = Date.now()): LocalSettings {
@@ -332,48 +392,7 @@ export class LocalRepository {
   }
 
   getFrame(frameId: string): StoredFrame | null {
-    const row = this.database.raw
-      .prepare(
-        `SELECT id, name, encrypted_path, width, height, byte_size, sha256,
-          revision, created_at, updated_at FROM frames WHERE id = ?`,
-      )
-      .get(frameId) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    const slots = this.database.raw
-      .prepare(
-        `SELECT slot_index, name, x, y, width, height, crop_mode
-        FROM frame_slots WHERE frame_id = ? ORDER BY slot_index`,
-      )
-      .all(frameId)
-      .map((slot) => {
-        const value = slot as Record<string, unknown>;
-        return {
-          slotIndex: Number(value.slot_index),
-          name: String(value.name),
-          x: Number(value.x),
-          y: Number(value.y),
-          width: Number(value.width),
-          height: Number(value.height),
-          cropMode: String(value.crop_mode),
-        };
-      });
-    const parsedSlots = FrameLayoutSchema.safeParse(slots);
-    if (!parsedSlots.success) {
-      return null;
-    }
-    return {
-      id: String(row.id),
-      name: String(row.name),
-      encryptedPath: String(row.encrypted_path),
-      width: Number(row.width),
-      height: Number(row.height),
-      byteSize: Number(row.byte_size),
-      sha256: String(row.sha256),
-      revision: Number(row.revision),
-      createdAt: Number(row.created_at),
-      updatedAt: Number(row.updated_at),
-      slots: parsedSlots.data,
-    };
+    return loadFrameRows(this.database, 'WHERE id = ?', [frameId])[0] ?? null;
   }
 
   getActiveFrame(): StoredFrame | null {
@@ -392,6 +411,7 @@ export class LocalRepository {
     frameId: string,
     slots: FrameLayout,
     expectedRevision: number,
+    name?: string,
     now = Date.now(),
   ): StoredFrame {
     const validatedSlots = FrameLayoutSchema.parse(slots);
@@ -403,6 +423,14 @@ export class LocalRepository {
         .run(now, frameId, expectedRevision);
       if (result.changes !== 1) {
         throw new AppError('frame_conflict', 'The frame changed elsewhere. Reload and try again.');
+      }
+      if (name !== undefined) {
+        const withName = this.database.raw
+          .prepare('UPDATE frames SET name = ? WHERE id = ?')
+          .run(name, frameId);
+        if (withName.changes !== 1) {
+          throw new AppError('frame_missing', 'The selected frame no longer exists.');
+        }
       }
       this.database.raw.prepare('DELETE FROM frame_slots WHERE frame_id = ?').run(frameId);
       this.insertFrameSlots(frameId, validatedSlots);
@@ -435,6 +463,16 @@ export class LocalRepository {
         `${SESSION_SELECT} WHERE public_secret_ref IS NOT NULL ORDER BY created_at DESC LIMIT ?`,
       )
       .all(limit)
+      .map((row) => mapSession(row as Record<string, unknown>));
+  }
+
+  listRecentSessionsWithCollage(limit = 20): StoredSession[] {
+    return this.database.raw
+      .prepare(
+        `${SESSION_SELECT} WHERE collage_asset_id IS NOT NULL
+        ORDER BY COALESCE(completed_at, updated_at) DESC LIMIT ?`,
+      )
+      .all(Math.max(1, Math.min(50, limit)))
       .map((row) => mapSession(row as Record<string, unknown>));
   }
 
@@ -1155,6 +1193,30 @@ export class LocalRepository {
     return this.database.raw.pragma('quick_check', { simple: true }) === 'ok';
   }
 
+  private insertFrameRow(frame: Omit<StoredFrame, 'slots'>, slots: FrameLayout): void {
+    this.database.raw
+      .prepare(
+        `INSERT INTO frames
+          (id, name, encrypted_path, width, height, byte_size, sha256, revision, sort_order,
+            created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        frame.id,
+        frame.name,
+        frame.encryptedPath,
+        frame.width,
+        frame.height,
+        frame.byteSize,
+        frame.sha256,
+        frame.revision,
+        frame.sortOrder,
+        frame.createdAt,
+        frame.updatedAt,
+      );
+    this.insertFrameSlots(frame.id, slots);
+  }
+
   private insertFrameSlots(frameId: string, slots: FrameLayout): void {
     const statement = this.database.raw.prepare(
       `INSERT INTO frame_slots
@@ -1199,6 +1261,56 @@ export class LocalRepository {
   }
 }
 
+function loadFrameRows(database: BoothDatabase, suffix: string, params: unknown[]): StoredFrame[] {
+  const rows = database.raw
+    .prepare(
+      `SELECT id, name, encrypted_path, width, height, byte_size, sha256,
+        revision, sort_order, created_at, updated_at FROM frames ${suffix}`,
+    )
+    .all(...params);
+  const slotsStatement = database.raw.prepare(
+    `SELECT slot_index, name, x, y, width, height, crop_mode
+    FROM frame_slots WHERE frame_id = ? ORDER BY slot_index`,
+  );
+  const frames: StoredFrame[] = [];
+  for (const row of rows) {
+    const record = row as Record<string, unknown>;
+    const parsedSlots = FrameLayoutSchema.safeParse(
+      slotsStatement.all(String(record.id)).map((slot) => {
+        const value = slot as Record<string, unknown>;
+        return {
+          slotIndex: Number(value.slot_index),
+          name: String(value.name),
+          x: Number(value.x),
+          y: Number(value.y),
+          width: Number(value.width),
+          height: Number(value.height),
+          cropMode: String(value.crop_mode),
+        };
+      }),
+    );
+    if (!parsedSlots.success) continue;
+    frames.push({
+      id: String(record.id),
+      name: String(record.name),
+      encryptedPath: String(record.encrypted_path),
+      width: Number(record.width),
+      height: Number(record.height),
+      byteSize: Number(record.byte_size),
+      sha256: String(record.sha256),
+      revision: Number(record.revision),
+      sortOrder:
+        record.sort_order === null || record.sort_order === undefined
+          ? null
+          : Number(record.sort_order),
+      createdAt: Number(record.created_at),
+      updatedAt: Number(record.updated_at),
+      slots: parsedSlots.data,
+    });
+  }
+  return frames;
+}
+
 function mapSettings(row: RawSettingsRow): LocalSettings {
   if (
     row.scrypt_version !== 1 ||
@@ -1227,6 +1339,7 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     lanCertificateFingerprint: row.lan_certificate_fingerprint,
     cameraAdapter: (row.camera_adapter as CameraAdapterKind | null) ?? 'webcam',
     cameraDeviceId: row.camera_device_id,
+    cameraResolution: row.camera_resolution === '720p' ? '720p' : '1080p',
     supabaseUrl: row.supabase_url,
     supabasePublishableKey: row.supabase_publishable_key,
     revision: row.revision,

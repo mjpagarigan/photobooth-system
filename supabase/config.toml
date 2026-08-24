@@ -29,11 +29,9 @@ port = 54324
 
 [storage]
 enabled = true
-file_size_limit = "12MiB"
 
 [storage.buckets.photos]
 public = false
-file_size_limit = "12MiB"
 allowed_mime_types = ["image/jpeg"]
 
 [auth]

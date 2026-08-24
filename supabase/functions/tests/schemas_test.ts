@@ -9,7 +9,7 @@ import {
 const uuid = 'cda39163-9036-4acd-ae10-0c08fdb39022';
 const token = 'A'.repeat(43);
 
-Deno.test('create upload schema accepts a constrained finished JPEG', () => {
+Deno.test('create upload schema accepts a constrained finished JPEG and standard 1200x3600 strips', () => {
   const value = parseWithSchema(CreateOrResumeUploadSchema, {
     action: 'create',
     clientSessionId: uuid,
@@ -21,6 +21,30 @@ Deno.test('create upload schema accepts a constrained finished JPEG', () => {
     googleFormsUrl: 'https://docs.google.com/forms/d/e/example/viewform',
   });
   assertEquals(value.action, 'create');
+
+  const strip = parseWithSchema(CreateOrResumeUploadSchema, {
+    action: 'create',
+    clientSessionId: uuid,
+    contentType: 'image/jpeg',
+    byteSize: 1_500_000,
+    sha256: 'b'.repeat(64),
+    width: 1200,
+    height: 3600,
+    googleFormsUrl: null,
+  });
+  assertEquals(strip.action, 'create');
+
+  const largeStrip = parseWithSchema(CreateOrResumeUploadSchema, {
+    action: 'create',
+    clientSessionId: uuid,
+    contentType: 'image/jpeg',
+    byteSize: 20_000_000,
+    sha256: 'c'.repeat(64),
+    width: 1200,
+    height: 3600,
+    googleFormsUrl: null,
+  });
+  assertEquals(largeStrip.action, 'create');
 });
 
 Deno.test('create upload schema rejects undersized output and unknown keys', () => {

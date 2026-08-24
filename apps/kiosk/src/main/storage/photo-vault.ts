@@ -16,11 +16,10 @@ const KEY_LENGTH = 32;
 const MAX_HEADER_BYTES = 512;
 const MAX_BYTES_BY_KIND = {
   pending: 50 * 1024 * 1024,
-  completed: 12 * 1024 * 1024,
   frames: 5 * 1024 * 1024,
 } as const;
 
-type VaultKind = keyof typeof MAX_BYTES_BY_KIND;
+export type VaultKind = 'pending' | 'completed' | 'frames';
 
 type VaultHeader = {
   version: 2;
@@ -68,7 +67,7 @@ export class PhotoVault {
   }
 
   write(kind: VaultKind, plaintext: Uint8Array): VaultWriteResult {
-    if (plaintext.byteLength === 0 || plaintext.byteLength > MAX_BYTES_BY_KIND[kind]) {
+    if (!isAcceptedVaultPlaintextSize(kind, plaintext.byteLength)) {
       throw new AppError('asset_size_invalid', 'The image size is outside the safe limit.');
     }
     const id = randomUUID();
@@ -126,8 +125,7 @@ export class PhotoVault {
     if (
       normalized !== `${header.kind}/${expectedFile}` ||
       header.contentType !== (header.kind === 'frames' ? 'image/png' : 'image/jpeg') ||
-      header.plaintextBytes < 1 ||
-      header.plaintextBytes > MAX_BYTES_BY_KIND[header.kind]
+      !isAcceptedVaultPlaintextSize(header.kind, header.plaintextBytes)
     ) {
       throw new AppError(
         'asset_header',
@@ -254,6 +252,12 @@ export class PhotoVault {
       readdirSync(directory).some((name) => name.endsWith('.gbv')),
     );
   }
+}
+
+export function isAcceptedVaultPlaintextSize(kind: VaultKind, byteLength: number): boolean {
+  if (!Number.isSafeInteger(byteLength) || byteLength < 1) return false;
+  if (kind === 'completed') return true;
+  return byteLength <= MAX_BYTES_BY_KIND[kind];
 }
 
 function parseHeader(bytes: Buffer): VaultHeader {

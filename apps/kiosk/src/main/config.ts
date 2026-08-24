@@ -32,9 +32,9 @@ const EnvironmentSchema = z
 export type RuntimeConfig = {
   cameraAdapter: CameraAdapterKind;
   cloud: { url: string | null; publishableKey: string | null };
+  shotCountdownsMs: readonly [number, number, number];
   e2e: {
     enabled: boolean;
-    countdownMs: number;
     cameraDelayMs: number;
     captureFailShot: number | null;
     uploadFailures: number;
@@ -69,9 +69,16 @@ export function loadRuntimeConfig(
   const clockBase =
     e2eEnabled && parsed.GRACE_BOOTH_E2E_NOW_MS ? parsed.GRACE_BOOTH_E2E_NOW_MS : clockStartedAt;
 
-  const cloudUrl = parsed.GRACE_BOOTH_SUPABASE_URL ?? (e2eEnabled ? null : DEFAULT_PROD_SUPABASE_URL);
+  const cloudUrl =
+    parsed.GRACE_BOOTH_SUPABASE_URL ?? (e2eEnabled ? null : DEFAULT_PROD_SUPABASE_URL);
   const cloudPublishableKey =
-    parsed.GRACE_BOOTH_SUPABASE_PUBLISHABLE_KEY ?? (e2eEnabled ? null : DEFAULT_PROD_SUPABASE_PUBLISHABLE_KEY);
+    parsed.GRACE_BOOTH_SUPABASE_PUBLISHABLE_KEY ??
+    (e2eEnabled ? null : DEFAULT_PROD_SUPABASE_PUBLISHABLE_KEY);
+
+  const e2eCountdownMs = parsed.GRACE_BOOTH_E2E_COUNTDOWN_MS ?? 40;
+  const shotCountdownsMs: readonly [number, number, number] = e2eEnabled
+    ? [e2eCountdownMs, e2eCountdownMs, e2eCountdownMs]
+    : [8_000, 5_000, 5_000];
 
   return {
     cameraAdapter: parsed.GRACE_BOOTH_CAMERA_ADAPTER,
@@ -79,9 +86,9 @@ export function loadRuntimeConfig(
       url: cloudUrl,
       publishableKey: cloudPublishableKey,
     },
+    shotCountdownsMs,
     e2e: {
       enabled: e2eEnabled,
-      countdownMs: e2eEnabled ? (parsed.GRACE_BOOTH_E2E_COUNTDOWN_MS ?? 40) : 5_000,
       cameraDelayMs: e2eEnabled ? (parsed.GRACE_BOOTH_E2E_CAMERA_DELAY_MS ?? 10) : 300,
       captureFailShot: e2eEnabled ? (parsed.GRACE_BOOTH_E2E_CAPTURE_FAIL_SHOT ?? null) : null,
       uploadFailures: e2eEnabled ? (parsed.GRACE_BOOTH_E2E_UPLOAD_FAILURES ?? 0) : 0,

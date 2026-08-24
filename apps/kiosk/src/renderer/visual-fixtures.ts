@@ -70,6 +70,7 @@ const SETTINGS: AdminSettings = {
   frames: [DEFAULT_FRAME, DEFAULT_FRAME_2],
   cameraAdapter: 'mock',
   cameraDeviceId: null,
+  cameraResolution: '1080p',
   supabaseUrl: null,
   supabasePublishableKey: null,
   revision: 3,

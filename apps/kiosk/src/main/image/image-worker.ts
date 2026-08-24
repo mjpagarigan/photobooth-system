@@ -5,16 +5,15 @@ import type { FrameLayout } from '@grace-booth/shared';
 import { AppError } from '../errors.js';
 import { FaceAwareWithCenterFallback, MediaPipeCropStrategy } from './crop-strategy.js';
 import { ImagePipeline } from './image-pipeline.js';
-import { normalizeFramePng, validateSourceJpeg } from './image-validation.js';
+import { createThumbnailJpeg, normalizeFramePng, validateSourceJpeg } from './image-validation.js';
 
 type ProcessRequest = {
   id: string;
   operation: 'process';
-  captures: [Uint8Array, Uint8Array, Uint8Array, Uint8Array];
+  captures: [Uint8Array, Uint8Array, Uint8Array];
   framePng: Uint8Array;
   slots: FrameLayout;
   frameAspectRatio?: number;
-  longEdge: number;
 };
 
 type SourceValidationRequest = {
@@ -29,7 +28,18 @@ type FrameNormalizationRequest = {
   bytes: Uint8Array;
 };
 
-type WorkerRequest = ProcessRequest | SourceValidationRequest | FrameNormalizationRequest;
+type ThumbnailRequest = {
+  id: string;
+  operation: 'thumbnail';
+  bytes: Uint8Array;
+  maxEdge: number;
+};
+
+type WorkerRequest =
+  | ProcessRequest
+  | SourceValidationRequest
+  | FrameNormalizationRequest
+  | ThumbnailRequest;
 
 type WorkerSuccess = {
   id: string;
@@ -69,6 +79,18 @@ async function processRequest(request: WorkerRequest): Promise<void> {
           id: request.id,
           ok: true,
           result: { kind: 'normalized-frame', ...result },
+        } satisfies WorkerSuccess,
+        [result.bytes.buffer as ArrayBuffer],
+      );
+      return;
+    }
+    if (request.operation === 'thumbnail') {
+      const result = await createThumbnailJpeg(request.bytes, request.maxEdge);
+      parentPort?.postMessage(
+        {
+          id: request.id,
+          ok: true,
+          result: { kind: 'thumbnail', ...result },
         } satisfies WorkerSuccess,
         [result.bytes.buffer as ArrayBuffer],
       );

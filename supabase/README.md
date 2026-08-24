@@ -17,8 +17,10 @@ deploy a hosted project by itself.
   cannot choose a final object path and cannot read the bucket directly.
 - `photo/resolve`, `photo/image`, and `photo/download` accept POST with exactly `{ "token": "..." }`.
   They require the configured browser origin, reveal no internal path, and treat missing and expired
-  tokens identically. Image bytes are served through a fresh exact-expiry check rather than a
-  signed download URL.
+  tokens identically. When R2 is configured, image/download HEAD the private object, compare its
+  size, reauthorize the permanent token, and return a bodyless `303` to a private presigned GET for
+  at most 300 seconds and never beyond the permanent-token expiry. The existing size-checked,
+  freshly reauthorized Supabase Storage binary response remains the fallback when R2 is absent.
 - Cleanup atomically moves expired or abandoned rows into a terminal `deleting` state before any
   Storage call, removes each private object, then records deletion. A claimed session can never race
   back to `ready`. Failed items retain their lease until timeout so later batches are not starved.
@@ -45,11 +47,40 @@ PUBLIC_PAGE_ORIGIN=https://<exact-production-photo-origin>
 PHOTO_BUCKET=photos
 CLEANUP_SECRET=<at-least-32-random-characters>
 PUBLIC_TOKEN_DERIVATION_KEY=<at-least-32-random-bytes-as-base64-or-hex>
+R2_ACCOUNT_ID=<cloudflare-account-id>
+R2_ACCESS_KEY_ID=<private-r2-api-token-access-key>
+R2_SECRET_ACCESS_KEY=<private-r2-api-token-secret>
+R2_BUCKET_NAME=<private-r2-bucket-name>
 ```
 
-`PUBLIC_PAGE_ORIGIN` must be an origin only, with no path. It must exactly match both the Vercel
-production origin and the browser `Origin` header. Never place any server key, cleanup secret, or
-token-derivation key in Electron, Vercel, browser code, SQLite, or logs.
+`PUBLIC_PAGE_ORIGIN` must be an origin only, with no path. It must exactly match both the Cloudflare
+Pages production origin and the browser `Origin` header. Never place any server key, cleanup secret,
+or token-derivation key in Electron, Cloudflare Pages, browser code, SQLite, or logs.
+
+The three R2 credential values are server-only Edge Function secrets. `R2_BUCKET_NAME` must name a
+private bucket. R2 configuration is all-or-nothing: all four values route new sessions to R2, no
+values keep new sessions on Supabase Storage, and a partial configuration fails closed. Each row
+records its backend so existing Supabase objects remain readable, confirmable, and cleanable after
+the R2 cutover. Do not configure `R2_PUBLIC_DOMAIN`; delivery uses the R2 S3 API origin because R2
+presigned URLs do not work on custom domains.
+
+Configure the private R2 bucket with this exact browser CORS rule, replacing only the approved
+public page origin:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": [],
+    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
+    "MaxAgeSeconds": 300
+  }
+]
+```
+
+Do not add `PUT`, `POST`, wildcard origins, wildcard headers, or additional exposed headers. Browser
+access to presigned R2 URLs still requires this bucket policy.
 
 `PUBLIC_TOKEN_DERIVATION_KEY` accepts standard base64, base64url, or hexadecimal encoding and must
 decode to at least 32 random bytes. Keep it backed up as a production secret. Do not rotate it while

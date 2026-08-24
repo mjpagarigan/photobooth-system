@@ -28,6 +28,22 @@ export async function validateSourceJpeg(bytes: Uint8Array): Promise<ValidatedIm
   return { width: metadata.width, height: metadata.height };
 }
 
+export async function createThumbnailJpeg(
+  bytes: Uint8Array,
+  maxEdge = 360,
+): Promise<{ bytes: Buffer; width: number; height: number }> {
+  validateSignature(bytes, JPEG_MAGIC, MAX_SOURCE_BYTES, 'JPEG');
+  const image = sharp(bytes, { failOn: 'warning', limitInputPixels: MAX_SOURCE_PIXELS });
+  const metadata = await image.metadata();
+  validateDecodedMetadata(metadata, MAX_SOURCE_PIXELS, 'photo');
+  const { data, info } = await image
+    .rotate()
+    .resize(maxEdge, maxEdge, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 80, mozjpeg: false })
+    .toBuffer({ resolveWithObject: true });
+  return { bytes: data, width: info.width, height: info.height };
+}
+
 export function isSafeSourceByteLength(byteLength: number): boolean {
   return Number.isSafeInteger(byteLength) && byteLength > 0 && byteLength <= MAX_SOURCE_BYTES;
 }
