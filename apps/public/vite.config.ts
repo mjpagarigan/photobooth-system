@@ -161,7 +161,7 @@ function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin 
       this.emitFile({
         type: 'asset',
         fileName: '_redirects',
-        source: '/photo /index.html 200\n/photo/* /index.html 200\n',
+        source: '/* /index.html 200\n',
       });
     },
   };
