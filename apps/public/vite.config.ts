@@ -13,6 +13,13 @@ const INERT_API_URL = 'https://unconfigured-api.invalid/functions/v1/photo';
 const INERT_PAGE_ORIGIN = 'https://unconfigured-page.invalid';
 const INERT_R2_ORIGIN = 'https://unconfigured-r2.invalid';
 
+export const DEFAULT_PRODUCTION_ENV: Record<string, string> = {
+  VITE_PUBLIC_PHOTO_API_URL: 'https://bejgkclvsfbkpkflftxu.supabase.co/functions/v1/photo',
+  VITE_PUBLIC_PAGE_ORIGIN: 'https://mat-photobooth.pages.dev',
+  VITE_PUBLIC_R2_ORIGIN:
+    'https://mat-photobooth-system.79a2773487948bc1e4900fb95e8723f0.r2.cloudflarestorage.com',
+};
+
 function parseHttpsUrl(value: string, name: string, allowLocalHttp = true): URL {
   let parsed: URL;
   try {
@@ -35,8 +42,23 @@ export function validateEnvironment(
   mode: string,
   providedEnvironment?: Record<string, string>,
 ): ValidatedBuildEnvironment {
+  const loadedEnv: Record<string, string> = {
+    ...loadEnv(mode, fileURLToPath(new URL('../..', import.meta.url)), 'VITE_'),
+    ...loadEnv(mode, process.cwd(), 'VITE_'),
+  };
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith('VITE_') && typeof value === 'string') {
+      loadedEnv[key] = value;
+    }
+  }
   const env =
-    providedEnvironment ?? loadEnv(mode, fileURLToPath(new URL('../..', import.meta.url)), 'VITE_');
+    providedEnvironment ??
+    (mode === 'production'
+      ? {
+          ...DEFAULT_PRODUCTION_ENV,
+          ...loadedEnv,
+        }
+      : loadedEnv);
   const testing = mode === 'test';
   const production = mode === 'production';
   const missing = [

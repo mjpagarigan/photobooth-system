@@ -5,9 +5,10 @@ function parseConfiguredUrl(value: string | undefined, name: string): URL {
     VITE_PUBLIC_R2_ORIGIN: 'https://bucket.account.r2.cloudflarestorage.com',
   };
   const productionFallbacks: Record<string, string> = {
-    VITE_PUBLIC_PHOTO_API_URL: 'https://unconfigured-api.invalid/functions/v1/photo',
-    VITE_PUBLIC_PAGE_ORIGIN: 'https://unconfigured-page.invalid',
-    VITE_PUBLIC_R2_ORIGIN: 'https://unconfigured-r2.invalid',
+    VITE_PUBLIC_PHOTO_API_URL: 'https://bejgkclvsfbkpkflftxu.supabase.co/functions/v1/photo',
+    VITE_PUBLIC_PAGE_ORIGIN: 'https://mat-photobooth.pages.dev',
+    VITE_PUBLIC_R2_ORIGIN:
+      'https://mat-photobooth-system.79a2773487948bc1e4900fb95e8723f0.r2.cloudflarestorage.com',
   };
   const fallback =
     import.meta.env.MODE === 'test' ? testFallbacks[name] : productionFallbacks[name];
