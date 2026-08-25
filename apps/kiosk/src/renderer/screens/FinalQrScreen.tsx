@@ -1,3 +1,4 @@
+import { ImagesIcon as Images } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
 
 import { Photostrip } from '../components/Photostrip';
@@ -36,6 +37,20 @@ export function FinalQrScreen({
         draggable="false"
       />
       <div className="final-scrim" aria-hidden="true" />
+      {onOpenRecent && (
+        <div className="final-top-controls">
+          <button
+            className="operator-access recent-access"
+            onClick={onOpenRecent}
+            disabled={busy}
+            aria-label="Recent Photos"
+            title="Recent Photos"
+          >
+            <Images aria-hidden="true" weight="bold" />
+            <span className="operator-access__text">Recent</span>
+          </button>
+        </div>
+      )}
       <div className="final-composition">
         <section className="final-result" aria-label="Your finished photo" ref={resultRef}>
           <Photostrip
@@ -47,7 +62,6 @@ export function FinalQrScreen({
         <QrPanel
           busy={busy}
           onDone={onDone}
-          onOpenRecent={onOpenRecent}
           qrImageUrl={qrImageUrl}
         />
       </div>

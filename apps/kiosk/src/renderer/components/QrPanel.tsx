@@ -1,7 +1,6 @@
 import {
   CalendarBlankIcon as CalendarBlank,
   CheckCircleIcon as CheckCircle,
-  ImagesIcon as Images,
 } from '@phosphor-icons/react';
 
 import { Button } from './Button';
@@ -9,11 +8,10 @@ import { Button } from './Button';
 type QrPanelProps = {
   qrImageUrl: string;
   onDone: () => void;
-  onOpenRecent?: (() => void) | undefined;
   busy?: boolean | undefined;
 };
 
-export function QrPanel({ busy = false, onDone, onOpenRecent, qrImageUrl }: QrPanelProps) {
+export function QrPanel({ busy = false, onDone, qrImageUrl }: QrPanelProps) {
   return (
     <section className="qr-panel" aria-labelledby="qr-title">
       <div className="qr-panel__copy">
@@ -39,17 +37,6 @@ export function QrPanel({ busy = false, onDone, onOpenRecent, qrImageUrl }: QrPa
         >
           Done
         </Button>
-        {onOpenRecent ? (
-          <Button
-            className="qr-panel__recent"
-            icon={<Images aria-hidden="true" weight="bold" />}
-            onClick={onOpenRecent}
-            variant="secondary"
-            wide
-          >
-            Recent
-          </Button>
-        ) : null}
       </div>
     </section>
   );

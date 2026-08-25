@@ -821,7 +821,8 @@ select:focus-visible {
   transform: translate(1px, 1px);
 }
 
-.attract-top-controls {
+.attract-top-controls,
+.final-top-controls {
   position: absolute;
   top: 24px;
   right: 24px;
@@ -830,7 +831,8 @@ select:focus-visible {
   z-index: 100;
 }
 
-.attract-top-controls .operator-access {
+.attract-top-controls .operator-access,
+.final-top-controls .operator-access {
   position: static;
 }
 
