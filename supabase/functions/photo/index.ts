@@ -1,6 +1,7 @@
+import { GetObjectCommand } from 'npm:@aws-sdk/client-s3@^3.750.0';
 import { ApiError } from '../_shared/errors.ts';
 import { SIGNED_DOWNLOAD_VALID_FOR_SECONDS } from '../_shared/constants.ts';
-import { isR2Configured, photoBucket, publicPageOrigin } from '../_shared/env.ts';
+import { isR2Configured, photoBucket, publicPageOrigin, r2BucketName } from '../_shared/env.ts';
 import {
   assertExactOrigin,
   jsonResponse,
@@ -75,6 +76,7 @@ export type PhotoHandlerDependencies = {
   createR2PresignedGetUrl: typeof createR2PresignedGetUrl;
   hashPublicToken: typeof hashPublicToken;
   photoBucket: typeof photoBucket;
+  r2BucketName: typeof r2BucketName;
   now: () => number;
 };
 
@@ -87,6 +89,7 @@ const DEFAULT_DEPENDENCIES: PhotoHandlerDependencies = {
   createR2PresignedGetUrl,
   hashPublicToken,
   photoBucket,
+  r2BucketName,
   now: Date.now,
 };
 
@@ -179,34 +182,37 @@ export async function handler(
         stillAuthorized.storage_object_path !== photo.storage_object_path ||
         stillAuthorized.storage_backend !== photo.storage_backend ||
         Number(stillAuthorized.byte_size) !== Number(photo.byte_size) ||
-        !Number.isFinite(expiresAt)
+        !Number.isFinite(expiresAt) ||
+        expiresAt <= dependencies.now()
       ) {
         throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
       }
-      const remainingSeconds = Math.floor((expiresAt - dependencies.now()) / 1_000);
-      if (remainingSeconds < 1) {
-        throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
+
+      const getCommand = new GetObjectCommand({
+        Bucket: dependencies.r2BucketName(),
+        Key: photo.storage_object_path,
+      });
+      const r2Response = await r2.send(getCommand);
+      const bytes = await r2Response.Body?.transformToByteArray();
+      if (!bytes || bytes.byteLength !== Number(photo.byte_size)) {
+        throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
       }
-      const signedLifetime = Math.min(
-        SIGNED_DOWNLOAD_VALID_FOR_SECONDS,
-        remainingSeconds,
-      );
-      const signedUrl = await dependencies.createR2PresignedGetUrl(
-        r2,
-        stillAuthorized.storage_object_path,
-        route === 'download' ? 'attachment' : 'inline',
-        signedLifetime,
-      );
+
+      const disposition = route === 'download'
+        ? 'attachment; filename="mat-photobooth-keepsake.jpg"'
+        : 'inline; filename="mat-photobooth-keepsake.jpg"';
       const headers = withBaseHeaders(
         {
           ...publicCorsHeaders(allowedOrigin),
-          Location: signedUrl,
+          'Content-Type': 'image/jpeg',
+          'Content-Length': String(bytes.byteLength),
+          'Content-Disposition': disposition,
           'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; sandbox",
           'Cross-Origin-Resource-Policy': 'cross-origin',
         },
         correlationId,
       );
-      return new Response(null, { status: 303, headers });
+      return new Response(bytes as unknown as BodyInit, { status: 200, headers });
     }
 
     const { data: image, error: imageError } = await admin.storage

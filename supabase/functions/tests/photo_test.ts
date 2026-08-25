@@ -72,7 +72,16 @@ function dependencies(
     publicPageOrigin: () => PAGE_ORIGIN,
     createAdminClient: () => admin,
     isR2Configured: () => true,
-    createR2Client: () => ({}) as ReturnType<PhotoHandlerDependencies['createR2Client']>,
+    createR2Client: () =>
+      ({
+        send: () =>
+          Promise.resolve({
+            Body: {
+              transformToByteArray: () =>
+                Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9])),
+            },
+          }),
+      }) as unknown as ReturnType<PhotoHandlerDependencies['createR2Client']>,
     checkR2ObjectExists: () => Promise.resolve({ exists: true, byteSize: PHOTO.byte_size }),
     createR2PresignedGetUrl: () =>
       Promise.resolve(
@@ -80,39 +89,29 @@ function dependencies(
       ),
     hashPublicToken: () => Promise.resolve('a'.repeat(64)),
     photoBucket: () => 'photos',
+    r2BucketName: () => 'private-photos',
     now: () => NOW,
     ...overrides,
   };
 }
 
-Deno.test('R2 image and download requests return fresh bodyless 303 redirects', async () => {
+Deno.test('R2 image and download requests return fresh JPEG bytes with CORS headers', async () => {
   const admin = adminClient([PHOTO, PHOTO, PHOTO, PHOTO]);
-  const signedCalls: { disposition: string; lifetime: number }[] = [];
-  let sequence = 0;
-  const deps = dependencies(admin.client, {
-    createR2PresignedGetUrl: (_client, _path, disposition, lifetime) => {
-      signedCalls.push({ disposition, lifetime });
-      sequence += 1;
-      return Promise.resolve(
-        `https://bucket.account.r2.cloudflarestorage.com/signed-${sequence}.jpg?X-Amz-Signature=${sequence}`,
-      );
-    },
-  });
+  const deps = dependencies(admin.client);
 
   const image = await handler(request('image'), deps);
   const download = await handler(request('download'), deps);
 
-  assertEquals(image.status, 303);
-  assertEquals(download.status, 303);
-  assertEquals(await image.text(), '');
-  assertEquals(await download.text(), '');
-  assertEquals(signedCalls, [
-    { disposition: 'inline', lifetime: 300 },
-    { disposition: 'attachment', lifetime: 300 },
-  ]);
-  assertStringIncludes(image.headers.get('location') ?? '', 'signed-1.jpg');
-  assertStringIncludes(download.headers.get('location') ?? '', 'signed-2.jpg');
-  assertFalse((image.headers.get('location') ?? '').includes(TOKEN));
+  assertEquals(image.status, 200);
+  assertEquals(download.status, 200);
+  assertEquals(image.headers.get('content-type'), 'image/jpeg');
+  assertEquals(download.headers.get('content-type'), 'image/jpeg');
+  assertEquals(
+    download.headers.get('content-disposition'),
+    'attachment; filename="mat-photobooth-keepsake.jpg"',
+  );
+  assertEquals((await image.arrayBuffer()).byteLength, PHOTO.byte_size);
+  assertEquals((await download.arrayBuffer()).byteLength, PHOTO.byte_size);
   assertEquals(admin.rpcCalls(), 4);
 });
 
@@ -138,21 +137,11 @@ Deno.test('resolve remains metadata-only even when R2 delivery is configured', a
   assertEquals(admin.rpcCalls(), 1);
 });
 
-Deno.test('R2 signing clamps expiry to the remaining permanent-token lifetime', async () => {
-  const expiring = { ...PHOTO, expires_at: new Date(NOW + 125_000).toISOString() };
-  const admin = adminClient([expiring, expiring]);
-  let signedLifetime = 0;
-  const response = await handler(
-    request('image'),
-    dependencies(admin.client, {
-      createR2PresignedGetUrl: (_client, _path, _disposition, lifetime) => {
-        signedLifetime = lifetime;
-        return Promise.resolve('https://bucket.account.r2.cloudflarestorage.com/signed.jpg');
-      },
-    }),
-  );
-  assertEquals(response.status, 303);
-  assertEquals(signedLifetime, 125);
+Deno.test('R2 delivery rejects expired token', async () => {
+  const expired = { ...PHOTO, expires_at: new Date(NOW - 1_000).toISOString() };
+  const admin = adminClient([expired, expired]);
+  const response = await handler(request('image'), dependencies(admin.client));
+  assertEquals(response.status, 404);
 });
 
 Deno.test('R2 delivery rejects missing, mismatched, and freshly unauthorized objects', async () => {
