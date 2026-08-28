@@ -134,6 +134,78 @@ export const FrameSummarySchema = z
   .strict();
 export type FrameSummary = z.infer<typeof FrameSummarySchema>;
 
+export const DualDisplayModeSchema = z.enum(['auto', 'enabled', 'disabled']);
+export type DualDisplayMode = z.infer<typeof DualDisplayModeSchema>;
+
+export const DualDisplaySettingsSchema = z
+  .object({
+    mode: DualDisplayModeSchema.default('auto'),
+    swapDisplays: z.boolean().default(false),
+    qrDismissSeconds: z.number().int().min(10).max(300).default(45),
+  })
+  .strict();
+export type DualDisplaySettings = z.infer<typeof DualDisplaySettingsSchema>;
+
+export const DisplayInfoSchema = z
+  .object({
+    id: z.number(),
+    label: z.string(),
+    bounds: z
+      .object({
+        x: z.number(),
+        y: z.number(),
+        width: z.number(),
+        height: z.number(),
+      })
+      .strict(),
+    isPrimary: z.boolean(),
+  })
+  .strict();
+export type DisplayInfo = z.infer<typeof DisplayInfoSchema>;
+
+export const QrStationStateSchema = z
+  .object({
+    status: z.enum(['idle', 'active', 'error']),
+    sessionId: OpaqueIdSchema.nullable(),
+    collageUrl: z.string().nullable(),
+    qrImageUrl: z.string().nullable(),
+    expiresAt: UtcMillisSchema.nullable(),
+    durationSeconds: z.number().int().positive(),
+    message: z.string().nullable(),
+    canRetryUpload: z.boolean().default(false),
+  })
+  .strict();
+export type QrStationState = z.infer<typeof QrStationStateSchema>;
+
+export const GooglePhotosConfigSchema = z
+  .object({
+    connectedEmail: z.string().nullable().default(null),
+    albumId: z.string().nullable().default(null),
+    albumTitle: z.string().nullable().default(null),
+    albumShareUrl: z.string().nullable().default(null),
+    enabled: z.boolean().default(false),
+  })
+  .strict();
+export type GooglePhotosConfig = z.infer<typeof GooglePhotosConfigSchema>;
+
+export const GoogleSyncStatsSchema = z
+  .object({
+    syncedCount: z.number().int().nonnegative().default(0),
+    pendingCount: z.number().int().nonnegative().default(0),
+    failedCount: z.number().int().nonnegative().default(0),
+    lastSyncedAt: UtcMillisSchema.nullable().default(null),
+  })
+  .strict();
+export type GoogleSyncStats = z.infer<typeof GoogleSyncStatsSchema>;
+
+export const GooglePhotosStatusSchema = z
+  .object({
+    config: GooglePhotosConfigSchema,
+    stats: GoogleSyncStatsSchema,
+  })
+  .strict();
+export type GooglePhotosStatus = z.infer<typeof GooglePhotosStatusSchema>;
+
 export const AdminSettingsSchema = z
   .object({
     googleFormsUrl: OptionalGoogleFormsUrlSchema,
@@ -147,6 +219,18 @@ export const AdminSettingsSchema = z
     cameraResolution: z.enum(['720p', '1080p']).default('1080p'),
     supabaseUrl: z.url().max(500).nullable().default(null),
     supabasePublishableKey: z.string().max(1_000).nullable().default(null),
+    dualDisplay: DualDisplaySettingsSchema.optional().default({
+      mode: 'auto',
+      swapDisplays: false,
+      qrDismissSeconds: 45,
+    }),
+    googlePhotos: GooglePhotosConfigSchema.optional().default({
+      connectedEmail: null,
+      albumId: null,
+      albumTitle: null,
+      albumShareUrl: null,
+      enabled: false,
+    }),
     revision: z.number().int().nonnegative(),
   })
   .strict();
@@ -212,7 +296,14 @@ export const UploadJobStateSchema = z.enum([
 ]);
 export type UploadJobState = z.infer<typeof UploadJobStateSchema>;
 
-export const GalleryUploadStatusSchema = z.enum(['pending', 'uploaded', 'failed', 'local-receipt']);
+export const GalleryUploadStatusSchema = z.enum([
+  'pending',
+  'uploaded',
+  'failed',
+  'local-receipt',
+  'unavailable',
+  'verification-failed',
+]);
 export type GalleryUploadStatus = z.infer<typeof GalleryUploadStatusSchema>;
 
 export const GalleryItemMetadataSchema = z
@@ -235,6 +326,14 @@ export const GalleryItemSchema = z
   })
   .strict();
 export type GalleryItem = z.infer<typeof GalleryItemSchema>;
+
+export const GalleryCloudRepairResultSchema = z
+  .object({
+    status: z.enum(['repaired', 'original-booth-required']),
+    message: z.string().min(1).max(300),
+  })
+  .strict();
+export type GalleryCloudRepairResult = z.infer<typeof GalleryCloudRepairResultSchema>;
 
 export const UploadJobSummarySchema = z
   .object({

@@ -1,6 +1,4 @@
-import { GetObjectCommand } from 'npm:@aws-sdk/client-s3@^3.750.0';
 import { ApiError } from '../_shared/errors.ts';
-import { SIGNED_DOWNLOAD_VALID_FOR_SECONDS } from '../_shared/constants.ts';
 import { isR2Configured, photoBucket, publicPageOrigin, r2BucketName } from '../_shared/env.ts';
 import {
   assertExactOrigin,
@@ -11,8 +9,9 @@ import {
   requestId,
   withBaseHeaders,
 } from '../_shared/http.ts';
-import { checkR2ObjectExists, createR2Client, createR2PresignedGetUrl } from '../_shared/r2.ts';
+import { checkR2ObjectExists, createR2Client, getR2ObjectBytes } from '../_shared/r2.ts';
 import { parseWithSchema, PublicPhotoTokenSchema } from '../_shared/schemas.ts';
+import { throwForStorageVerification, verifyStoredPhoto } from '../_shared/storage-verification.ts';
 import { type AdminClient, createAdminClient } from '../_shared/supabase.ts';
 import { hashPublicToken } from '../_shared/token.ts';
 
@@ -73,7 +72,7 @@ export type PhotoHandlerDependencies = {
   isR2Configured: typeof isR2Configured;
   createR2Client: typeof createR2Client;
   checkR2ObjectExists: typeof checkR2ObjectExists;
-  createR2PresignedGetUrl: typeof createR2PresignedGetUrl;
+  getR2ObjectBytes: typeof getR2ObjectBytes;
   hashPublicToken: typeof hashPublicToken;
   photoBucket: typeof photoBucket;
   r2BucketName: typeof r2BucketName;
@@ -86,7 +85,7 @@ const DEFAULT_DEPENDENCIES: PhotoHandlerDependencies = {
   isR2Configured,
   createR2Client,
   checkR2ObjectExists,
-  createR2PresignedGetUrl,
+  getR2ObjectBytes,
   hashPublicToken,
   photoBucket,
   r2BucketName,
@@ -101,6 +100,23 @@ function isStorageNotFound(error: unknown): boolean {
     candidate.statusCode === 404 ||
     candidate.statusCode === '404' ||
     candidate.message?.toLowerCase().includes('not found') === true
+  );
+}
+
+function isSameAuthorizedPhoto(
+  initial: ResolvedPhoto,
+  current: ResolvedPhoto,
+  now: number,
+): boolean {
+  const expiresAt = Date.parse(current.expires_at);
+  return (
+    current.id === initial.id &&
+    current.storage_object_path === initial.storage_object_path &&
+    current.storage_backend === initial.storage_backend &&
+    current.content_type === initial.content_type &&
+    Number(current.byte_size) === Number(initial.byte_size) &&
+    Number.isFinite(expiresAt) &&
+    expiresAt > now
   );
 }
 
@@ -150,6 +166,15 @@ export async function handler(
     const admin = dependencies.createAdminClient();
     const photo = await resolvePhoto(admin, tokenHash);
 
+    if (!isSameAuthorizedPhoto(photo, photo, dependencies.now())) {
+      throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
+    }
+    throwForStorageVerification(await verifyStoredPhoto(admin, photo, dependencies));
+    const stillAuthorized = await resolvePhoto(admin, tokenHash);
+    if (!isSameAuthorizedPhoto(photo, stillAuthorized, dependencies.now())) {
+      throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
+    }
+
     if (route === 'resolve') {
       return jsonResponse(
         {
@@ -164,37 +189,12 @@ export async function handler(
     }
 
     if (photo.storage_backend === 'r2') {
-      if (!dependencies.isR2Configured()) {
-        throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
-      }
       const r2 = dependencies.createR2Client();
-      const object = await dependencies.checkR2ObjectExists(r2, photo.storage_object_path);
-      if (!object.exists) {
+      const bytes = await dependencies.getR2ObjectBytes(r2, photo.storage_object_path);
+      if (!bytes) {
         throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
       }
-      if (object.byteSize !== Number(photo.byte_size)) {
-        throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
-      }
-      const stillAuthorized = await resolvePhoto(admin, tokenHash);
-      const expiresAt = Date.parse(stillAuthorized.expires_at);
-      if (
-        stillAuthorized.id !== photo.id ||
-        stillAuthorized.storage_object_path !== photo.storage_object_path ||
-        stillAuthorized.storage_backend !== photo.storage_backend ||
-        Number(stillAuthorized.byte_size) !== Number(photo.byte_size) ||
-        !Number.isFinite(expiresAt) ||
-        expiresAt <= dependencies.now()
-      ) {
-        throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
-      }
-
-      const getCommand = new GetObjectCommand({
-        Bucket: dependencies.r2BucketName(),
-        Key: photo.storage_object_path,
-      });
-      const r2Response = await r2.send(getCommand);
-      const bytes = await r2Response.Body?.transformToByteArray();
-      if (!bytes || bytes.byteLength !== Number(photo.byte_size)) {
+      if (bytes.byteLength !== Number(photo.byte_size)) {
         throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
       }
 
@@ -227,19 +227,6 @@ export async function handler(
     const bytes = new Uint8Array(await image.arrayBuffer());
     if (bytes.byteLength !== Number(photo.byte_size)) {
       throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
-    }
-
-    const stillAuthorized = await resolvePhoto(admin, tokenHash);
-    const reauthorizedExpiry = Date.parse(stillAuthorized.expires_at);
-    if (
-      stillAuthorized.id !== photo.id ||
-      stillAuthorized.storage_object_path !== photo.storage_object_path ||
-      stillAuthorized.storage_backend !== photo.storage_backend ||
-      Number(stillAuthorized.byte_size) !== Number(photo.byte_size) ||
-      !Number.isFinite(reauthorizedExpiry) ||
-      reauthorizedExpiry <= dependencies.now()
-    ) {
-      throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
     }
 
     const disposition = route === 'download'

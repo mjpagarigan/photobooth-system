@@ -1,0 +1,5768 @@
+[
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--attract--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Start photo session"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "countdown",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--countdown--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Get ready"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "review",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--review--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Choose your collage"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "processing",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--processing--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 316.796875,
+          "y": 342.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Creating your collage"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "uploading-backoff",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--uploading-backoff--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 316.796875,
+          "y": 342.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Your photo is safely saved"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "final",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--final--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1158.109375,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [
+        {
+          "label": "QR code for your private photo download",
+          "tag": "IMG",
+          "role": null,
+          "x": 669,
+          "y": 260.75,
+          "width": 190,
+          "height": 190,
+          "outside": false
+        }
+      ],
+      "activeElement": "All set!"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recovery-camera",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--recovery-camera--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 856.796875,
+          "y": 342.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Camera needs attention"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recovery-upload",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--recovery-upload--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 856.796875,
+          "y": 342.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Upload did not finish"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recovery-interrupted",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--recovery-interrupted--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Restoring your session"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "admin-frame",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--admin-frame--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "FRAME LIBRARY"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "admin-settings",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--admin-settings--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": "switch",
+          "x": 847.25,
+          "y": 847,
+          "width": 13,
+          "height": 13,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 415.65625,
+          "y": 866,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 661.890625,
+          "y": 866,
+          "width": 95,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 317,
+          "y": 967,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "Choose certificate",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 532,
+          "y": 954,
+          "width": 237.96875,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "Save settings",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1002,
+          "width": 190.5,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "Retry upload",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1420,
+          "width": 187.703125,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 452.390625,
+          "y": 1582,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 429.375,
+          "y": 1606,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 783.390625,
+          "y": 1606,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "Change passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1630,
+          "width": 220.90625,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 485.78125,
+          "y": 1758,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 954.703125,
+          "y": 1758,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 422.59375,
+          "y": 1782,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 825.734375,
+          "y": 1782,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "Connect cloud",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1806,
+          "width": 202.3125,
+          "height": 48,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "SETTINGS & TELEMETRY"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "keyboard-focus",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--attract--keyboard-focus--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Start photo session"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "start-disabled",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--attract--start-disabled--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "start-busy",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--attract--start-busy--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "camera-message",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--attract--camera-message--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recent-gallery",
+    "interaction": "empty",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--recent-gallery--empty--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close recent photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1169,
+          "y": 190,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Recently captured photostrips",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 50,
+          "y": 161,
+          "width": 1180,
+          "height": 398,
+          "outside": false
+        }
+      ],
+      "qr": [
+        {
+          "label": "QR code for the photo captured at 8/28/2026, 9:20:00 AM",
+          "tag": "IMG",
+          "role": null,
+          "x": 160,
+          "y": 304,
+          "width": 84,
+          "height": 84,
+          "outside": false
+        }
+      ],
+      "activeElement": "Close recent photos"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recent-gallery",
+    "interaction": "populated",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--recent-gallery--populated--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close recent photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1169,
+          "y": 190,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Recently captured photostrips",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 50,
+          "y": 161,
+          "width": 1180,
+          "height": 398,
+          "outside": false
+        }
+      ],
+      "qr": [
+        {
+          "label": "QR code for the photo captured at 8/28/2026, 9:20:00 AM",
+          "tag": "IMG",
+          "role": null,
+          "x": 160,
+          "y": 304,
+          "width": 84,
+          "height": 84,
+          "outside": false
+        }
+      ],
+      "activeElement": "Close recent photos"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recent-gallery",
+    "interaction": "detail",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--recent-gallery--detail--1280x720.png",
+    "seriousOrCritical": [
+      {
+        "id": "scrollable-region-focusable",
+        "impact": "serious",
+        "tags": [
+          "cat.keyboard",
+          "wcag2a",
+          "wcag211",
+          "wcag213",
+          "TTv5",
+          "TT4.a",
+          "EN-301-549",
+          "EN-9.2.1.1",
+          "EN-9.2.1.3",
+          "RGAAv4",
+          "RGAA-7.3.2"
+        ],
+        "description": "Ensure elements that have scrollable content are accessible by keyboard in Safari",
+        "help": "Scrollable region must have keyboard access",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/scrollable-region-focusable?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "focusable-content",
+                "data": null,
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element should have focusable content"
+              },
+              {
+                "id": "focusable-element",
+                "data": null,
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element should be focusable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<div class=\"recent-detail-modal__body\">",
+            "target": [
+              ".recent-detail-modal__body"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+          }
+        ]
+      }
+    ],
+    "moderate": [
+      {
+        "id": "landmark-no-duplicate-banner",
+        "impact": "moderate",
+        "tags": [
+          "cat.semantics",
+          "best-practice"
+        ],
+        "description": "Ensure the document has at most one banner landmark",
+        "help": "Document should not have more than one banner landmark",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/landmark-no-duplicate-banner?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "page-no-duplicate-banner",
+                "data": null,
+                "relatedNodes": [
+                  {
+                    "html": "<header class=\"recent-detail-modal__header\">",
+                    "target": [
+                      ".recent-detail-modal__header"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "Document has more than one banner landmark"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<header class=\"recent-gallery__header\">",
+            "target": [
+              ".recent-gallery__header"
+            ],
+            "failureSummary": "Fix any of the following:\n  Document has more than one banner landmark"
+          }
+        ]
+      },
+      {
+        "id": "landmark-no-duplicate-contentinfo",
+        "impact": "moderate",
+        "tags": [
+          "cat.semantics",
+          "best-practice"
+        ],
+        "description": "Ensure the document has at most one contentinfo landmark",
+        "help": "Document should not have more than one contentinfo landmark",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/landmark-no-duplicate-contentinfo?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "page-no-duplicate-contentinfo",
+                "data": null,
+                "relatedNodes": [
+                  {
+                    "html": "<footer class=\"recent-detail-modal__footer\">",
+                    "target": [
+                      ".recent-detail-modal__footer"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "Document has more than one contentinfo landmark"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<footer class=\"recent-gallery__footer\">",
+            "target": [
+              ".recent-gallery__footer"
+            ],
+            "failureSummary": "Fix any of the following:\n  Document has more than one contentinfo landmark"
+          }
+        ]
+      },
+      {
+        "id": "landmark-unique",
+        "impact": "moderate",
+        "tags": [
+          "cat.semantics",
+          "best-practice"
+        ],
+        "description": "Ensure landmarks are unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/landmark-unique?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "landmark-is-unique",
+                "data": {
+                  "role": "banner",
+                  "accessibleText": null
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<header class=\"recent-detail-modal__header\">",
+                    "target": [
+                      ".recent-detail-modal__header"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<header class=\"recent-gallery__header\">",
+            "target": [
+              ".recent-gallery__header"
+            ],
+            "failureSummary": "Fix any of the following:\n  The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+          },
+          {
+            "any": [
+              {
+                "id": "landmark-is-unique",
+                "data": {
+                  "role": "contentinfo",
+                  "accessibleText": null
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<footer class=\"recent-detail-modal__footer\">",
+                    "target": [
+                      ".recent-detail-modal__footer"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<footer class=\"recent-gallery__footer\">",
+            "target": [
+              ".recent-gallery__footer"
+            ],
+            "failureSummary": "Fix any of the following:\n  The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+          }
+        ]
+      }
+    ],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close recent photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1169,
+          "y": 190,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Close photo details",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1003,
+          "y": 63.75,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Recently captured photostrips",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 50,
+          "y": 161,
+          "width": 1180,
+          "height": 398,
+          "outside": false
+        },
+        {
+          "label": "Enlarged photo strip details",
+          "tag": "DIV",
+          "role": "dialog",
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 720,
+          "outside": false
+        }
+      ],
+      "qr": [
+        {
+          "label": "QR code for the photo captured at 8/28/2026, 9:20:00 AM",
+          "tag": "IMG",
+          "role": null,
+          "x": 160,
+          "y": 304,
+          "width": 84,
+          "height": 84,
+          "outside": false
+        },
+        {
+          "label": "Guest download QR code",
+          "tag": "IMG",
+          "role": null,
+          "x": 650.65625,
+          "y": 197,
+          "width": 170,
+          "height": 170,
+          "outside": false
+        }
+      ],
+      "activeElement": "Close recent photos"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "bootstrap",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--bootstrap--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 793,
+          "y": 332.890625,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Create operator passcodeCreate a shared passcode with at least 8 characters.Pass",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 420,
+          "y": 163.609375,
+          "width": 440,
+          "height": 392.78125,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "INPUT"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "login",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--login--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 811,
+          "y": 231.546875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 793,
+          "y": 366.4375,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeCancelUnlock",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 420,
+          "y": 214.546875,
+          "width": 440,
+          "height": 290.890625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "INPUT"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "validation-error",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--validation-error--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 811,
+          "y": 215.296875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 793,
+          "y": 350.1875,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeThe passcode was not a",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 420,
+          "y": 198.296875,
+          "width": 440,
+          "height": 323.390625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "busy",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--busy--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 811,
+          "y": 231.546875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 793,
+          "y": 366.4375,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeCancelUnlockLoading",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 420,
+          "y": 214.546875,
+          "width": 440,
+          "height": 290.890625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "show-password",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--show-password--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 811,
+          "y": 231.546875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Hide passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 793,
+          "y": 366.4375,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeCancelUnlock",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 420,
+          "y": 214.546875,
+          "width": 440,
+          "height": 290.890625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "Hide passcode"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "permission-error",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--permission-error--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1232,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Refresh camera devices",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 231.984375,
+          "y": 236,
+          "width": 34,
+          "height": 34,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 25.984375,
+          "y": 60,
+          "width": 1228.015625,
+          "height": 600,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "unavailable",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--unavailable--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1232,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Refresh camera devices",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 231.984375,
+          "y": 236,
+          "width": 34,
+          "height": 34,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 25.984375,
+          "y": 60,
+          "width": 1228.015625,
+          "height": 600,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "sony-unsupported",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--sony-unsupported--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1232,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 25.984375,
+          "y": 178,
+          "width": 1228.015625,
+          "height": 364,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "Sony A7 TetheredHigh-precision Sony Alpha mirrorless"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "mock-camera",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--mock-camera--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "body": {
+        "width": 1280,
+        "height": 720
+      },
+      "document": {
+        "width": 1280,
+        "height": 720
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 953.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1059.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1165.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1232,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 25.984375,
+          "y": 226,
+          "width": 1228.015625,
+          "height": 268,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "Mock HardwareSimulated capture for testing"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--attract--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Start photo session"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "countdown",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--countdown--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Get ready"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "review",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--review--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Choose your collage"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "processing",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--processing--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 359.796875,
+          "y": 366.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Creating your collage"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "uploading-backoff",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--uploading-backoff--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 359.796875,
+          "y": 366.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Your photo is safely saved"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "final",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--final--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1244.109375,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [
+        {
+          "label": "QR code for your private photo download",
+          "tag": "IMG",
+          "role": null,
+          "x": 720,
+          "y": 284.75,
+          "width": 190,
+          "height": 190,
+          "outside": false
+        }
+      ],
+      "activeElement": "All set!"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recovery-camera",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--recovery-camera--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 899.796875,
+          "y": 366.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Camera needs attention"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recovery-upload",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--recovery-upload--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 899.796875,
+          "y": 366.75,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Upload did not finish"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recovery-interrupted",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--recovery-interrupted--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Restoring your session"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "admin-frame",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--admin-frame--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "FRAME LIBRARY"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "admin-settings",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--admin-settings--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": "switch",
+          "x": 847.25,
+          "y": 847,
+          "width": 13,
+          "height": 13,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 415.65625,
+          "y": 866,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 661.890625,
+          "y": 866,
+          "width": 95,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 317,
+          "y": 967,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "Choose certificate",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 532,
+          "y": 954,
+          "width": 237.96875,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "Save settings",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1002,
+          "width": 190.5,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "Retry upload",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1420,
+          "width": 187.703125,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 452.390625,
+          "y": 1582,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 429.375,
+          "y": 1606,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 783.390625,
+          "y": 1606,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "Change passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 317,
+          "y": 1630,
+          "width": 220.90625,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 485.78125,
+          "y": 1758,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 954.703125,
+          "y": 1758,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 357.078125,
+          "y": 1795,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 760.21875,
+          "y": 1795,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "Connect cloud",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 975.21875,
+          "y": 1782,
+          "width": 202.3125,
+          "height": 48,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "SETTINGS & TELEMETRY"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "keyboard-focus",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--attract--keyboard-focus--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Start photo session"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "start-disabled",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--attract--start-disabled--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "start-busy",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--attract--start-busy--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "attract",
+    "interaction": "camera-message",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--attract--camera-message--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        }
+      ],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recent-gallery",
+    "interaction": "empty",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--recent-gallery--empty--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close recent photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1212,
+          "y": 214,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Recently captured photostrips",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 93,
+          "y": 185,
+          "width": 1180,
+          "height": 398,
+          "outside": false
+        }
+      ],
+      "qr": [
+        {
+          "label": "QR code for the photo captured at 8/28/2026, 9:20:00 AM",
+          "tag": "IMG",
+          "role": null,
+          "x": 203,
+          "y": 328,
+          "width": 84,
+          "height": 84,
+          "outside": false
+        }
+      ],
+      "activeElement": "Close recent photos"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recent-gallery",
+    "interaction": "populated",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--recent-gallery--populated--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close recent photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1212,
+          "y": 214,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Recently captured photostrips",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 93,
+          "y": 185,
+          "width": 1180,
+          "height": 398,
+          "outside": false
+        }
+      ],
+      "qr": [
+        {
+          "label": "QR code for the photo captured at 8/28/2026, 9:20:00 AM",
+          "tag": "IMG",
+          "role": null,
+          "x": 203,
+          "y": 328,
+          "width": 84,
+          "height": 84,
+          "outside": false
+        }
+      ],
+      "activeElement": "Close recent photos"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "recent-gallery",
+    "interaction": "detail",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--recent-gallery--detail--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-no-duplicate-banner",
+        "impact": "moderate",
+        "tags": [
+          "cat.semantics",
+          "best-practice"
+        ],
+        "description": "Ensure the document has at most one banner landmark",
+        "help": "Document should not have more than one banner landmark",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/landmark-no-duplicate-banner?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "page-no-duplicate-banner",
+                "data": null,
+                "relatedNodes": [
+                  {
+                    "html": "<header class=\"recent-detail-modal__header\">",
+                    "target": [
+                      ".recent-detail-modal__header"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "Document has more than one banner landmark"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<header class=\"recent-gallery__header\">",
+            "target": [
+              ".recent-gallery__header"
+            ],
+            "failureSummary": "Fix any of the following:\n  Document has more than one banner landmark"
+          }
+        ]
+      },
+      {
+        "id": "landmark-no-duplicate-contentinfo",
+        "impact": "moderate",
+        "tags": [
+          "cat.semantics",
+          "best-practice"
+        ],
+        "description": "Ensure the document has at most one contentinfo landmark",
+        "help": "Document should not have more than one contentinfo landmark",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/landmark-no-duplicate-contentinfo?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "page-no-duplicate-contentinfo",
+                "data": null,
+                "relatedNodes": [
+                  {
+                    "html": "<footer class=\"recent-detail-modal__footer\">",
+                    "target": [
+                      ".recent-detail-modal__footer"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "Document has more than one contentinfo landmark"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<footer class=\"recent-gallery__footer\">",
+            "target": [
+              ".recent-gallery__footer"
+            ],
+            "failureSummary": "Fix any of the following:\n  Document has more than one contentinfo landmark"
+          }
+        ]
+      },
+      {
+        "id": "landmark-unique",
+        "impact": "moderate",
+        "tags": [
+          "cat.semantics",
+          "best-practice"
+        ],
+        "description": "Ensure landmarks are unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/landmark-unique?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "landmark-is-unique",
+                "data": {
+                  "role": "banner",
+                  "accessibleText": null
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<header class=\"recent-detail-modal__header\">",
+                    "target": [
+                      ".recent-detail-modal__header"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<header class=\"recent-gallery__header\">",
+            "target": [
+              ".recent-gallery__header"
+            ],
+            "failureSummary": "Fix any of the following:\n  The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+          },
+          {
+            "any": [
+              {
+                "id": "landmark-is-unique",
+                "data": {
+                  "role": "contentinfo",
+                  "accessibleText": null
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<footer class=\"recent-detail-modal__footer\">",
+                    "target": [
+                      ".recent-detail-modal__footer"
+                    ]
+                  }
+                ],
+                "impact": "moderate",
+                "message": "The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "moderate",
+            "html": "<footer class=\"recent-gallery__footer\">",
+            "target": [
+              ".recent-gallery__footer"
+            ],
+            "failureSummary": "Fix any of the following:\n  The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable"
+          }
+        ]
+      }
+    ],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close recent photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1212,
+          "y": 214,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Close photo details",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1046,
+          "y": 66.15625,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Recently captured photostrips",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 93,
+          "y": 185,
+          "width": 1180,
+          "height": 398,
+          "outside": false
+        },
+        {
+          "label": "Enlarged photo strip details",
+          "tag": "DIV",
+          "role": "dialog",
+          "x": 0,
+          "y": 0,
+          "width": 1366,
+          "height": 768,
+          "outside": false
+        }
+      ],
+      "qr": [
+        {
+          "label": "QR code for the photo captured at 8/28/2026, 9:20:00 AM",
+          "tag": "IMG",
+          "role": null,
+          "x": 203,
+          "y": 328,
+          "width": 84,
+          "height": 84,
+          "outside": false
+        },
+        {
+          "label": "Guest download QR code",
+          "tag": "IMG",
+          "role": null,
+          "x": 694.328125,
+          "y": 199.40625,
+          "width": 170,
+          "height": 170,
+          "outside": false
+        }
+      ],
+      "activeElement": "Close recent photos"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "bootstrap",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--bootstrap--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 836,
+          "y": 356.890625,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Create operator passcodeCreate a shared passcode with at least 8 characters.Pass",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 463,
+          "y": 187.609375,
+          "width": 440,
+          "height": 392.78125,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "INPUT"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "login",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--login--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 854,
+          "y": 255.546875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 836,
+          "y": 390.4375,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeCancelUnlock",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 463,
+          "y": 238.546875,
+          "width": 440,
+          "height": 290.890625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "INPUT"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "validation-error",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--validation-error--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 854,
+          "y": 239.296875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 836,
+          "y": 374.1875,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeThe passcode was not a",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 463,
+          "y": 222.296875,
+          "width": 440,
+          "height": 323.390625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "busy",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--busy--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 854,
+          "y": 255.546875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Show passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 836,
+          "y": 390.4375,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeCancelUnlockLoading",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 463,
+          "y": 238.546875,
+          "width": 440,
+          "height": 290.890625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "passcode",
+    "interaction": "show-password",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--passcode--show-password--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 854,
+          "y": 255.546875,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Hide passcode",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 836,
+          "y": 390.4375,
+          "width": 16,
+          "height": 16,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Operator accessEnter the shared operator passcode.PasscodeCancelUnlock",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 463,
+          "y": 238.546875,
+          "width": 440,
+          "height": 290.890625,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "Hide passcode"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "permission-error",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--permission-error--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1318,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Refresh camera devices",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 274.984375,
+          "y": 260,
+          "width": 34,
+          "height": 34,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 68.984375,
+          "y": 84,
+          "width": 1228.015625,
+          "height": 600,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "unavailable",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--unavailable--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1318,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        },
+        {
+          "label": "Refresh camera devices",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 274.984375,
+          "y": 260,
+          "width": 34,
+          "height": 34,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 68.984375,
+          "y": 84,
+          "width": 1228.015625,
+          "height": 600,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "RecentCameraAdminM.A.T. PHOTOBOOTHMINISTRY FAIR // CELEBRATION ARCHIVETake three"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "sony-unsupported",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--sony-unsupported--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1318,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 68.984375,
+          "y": 202,
+          "width": 1228.015625,
+          "height": 364,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "Sony A7 TetheredHigh-precision Sony Alpha mirrorless"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "camera-setup",
+    "interaction": "mock-camera",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "screenshots/before/kiosk--camera-setup--mock-camera--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "body": {
+        "width": 1366,
+        "height": 768
+      },
+      "document": {
+        "width": 1366,
+        "height": 768
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [
+        {
+          "label": "Recent Photos",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1039.8125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Camera Setup",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1145.703125,
+          "y": 24,
+          "width": 93.890625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Admin",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1251.59375,
+          "y": 24,
+          "width": 86.40625,
+          "height": 34.5,
+          "outside": false
+        },
+        {
+          "label": "Close",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 1318,
+          "y": 16,
+          "width": 32,
+          "height": 32,
+          "outside": false
+        }
+      ],
+      "dialogs": [
+        {
+          "label": "Camera ConfigurationSelect active optical capture source and verify live telemet",
+          "tag": "SECTION",
+          "role": "dialog",
+          "x": 68.984375,
+          "y": 250,
+          "width": 1228.015625,
+          "height": 268,
+          "outside": false
+        }
+      ],
+      "qr": [],
+      "activeElement": "Mock HardwareSimulated capture for testing"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "review",
+    "interaction": "portrait",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/kiosk--review--portrait--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1024
+      },
+      "document": {
+        "width": 768,
+        "height": 1024
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Choose your collage"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "review",
+    "interaction": "desktop",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "screenshots/before/kiosk--review--desktop--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "body": {
+        "width": 1920,
+        "height": 1080
+      },
+      "document": {
+        "width": 1920,
+        "height": 1080
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Choose your collage"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "admin-frame",
+    "interaction": "portrait",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/kiosk--admin-frame--portrait--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1024
+      },
+      "document": {
+        "width": 768,
+        "height": 1024
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "Save configuration",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 567.578125,
+          "y": 86,
+          "width": 240.515625,
+          "height": 48,
+          "outside": true
+        },
+        {
+          "label": "Frame name",
+          "tag": "INPUT",
+          "role": null,
+          "x": 641,
+          "y": 290,
+          "width": 215,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "2",
+          "tag": "BUTTON",
+          "role": "tab",
+          "x": 735.65625,
+          "y": 394,
+          "width": 88.671875,
+          "height": 34.5,
+          "outside": true
+        },
+        {
+          "label": "3",
+          "tag": "BUTTON",
+          "role": "tab",
+          "x": 830.328125,
+          "y": 394,
+          "width": 88.671875,
+          "height": 34.5,
+          "outside": true
+        },
+        {
+          "label": "x percent",
+          "tag": "INPUT",
+          "role": null,
+          "x": 683.8125,
+          "y": 468.5,
+          "width": 95,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "y percent",
+          "tag": "INPUT",
+          "role": null,
+          "x": 821.5625,
+          "y": 468.5,
+          "width": 95,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "width percent",
+          "tag": "INPUT",
+          "role": null,
+          "x": 717.265625,
+          "y": 492.5,
+          "width": 95,
+          "height": 24,
+          "outside": true
+        },
+        {
+          "label": "INPUT",
+          "tag": "INPUT",
+          "role": null,
+          "x": 759.1875,
+          "y": 697.5,
+          "width": 13,
+          "height": 13,
+          "outside": true
+        },
+        {
+          "label": "Reset slot",
+          "tag": "BUTTON",
+          "role": null,
+          "x": 641,
+          "y": 756.5,
+          "width": 278,
+          "height": 48,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "FRAME LIBRARY"
+    }
+  },
+  {
+    "surface": "kiosk",
+    "state": "admin-frame",
+    "interaction": "desktop",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "screenshots/before/kiosk--admin-frame--desktop--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "body": {
+        "width": 1920,
+        "height": 1080
+      },
+      "document": {
+        "width": 1920,
+        "height": 1080
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "FRAME LIBRARY"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "loading",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--loading--default--390x844.png",
+    "seriousOrCritical": [
+      {
+        "id": "scrollable-region-focusable",
+        "impact": "serious",
+        "tags": [
+          "cat.keyboard",
+          "wcag2a",
+          "wcag211",
+          "wcag213",
+          "TTv5",
+          "TT4.a",
+          "EN-301-549",
+          "EN-9.2.1.1",
+          "EN-9.2.1.3",
+          "RGAAv4",
+          "RGAA-7.3.2"
+        ],
+        "description": "Ensure elements that have scrollable content are accessible by keyboard in Safari",
+        "help": "Scrollable region must have keyboard access",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/scrollable-region-focusable?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "focusable-content",
+                "data": null,
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element should have focusable content"
+              },
+              {
+                "id": "focusable-element",
+                "data": null,
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element should be focusable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<html lang=\"en\">",
+            "target": [
+              "html"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+          }
+        ]
+      }
+    ],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1144
+      },
+      "document": {
+        "width": 390,
+        "height": 1144
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHLoading your photo.RETRIEVING ENCRYPTED ARCHI"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "ready",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--ready--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1190
+      },
+      "document": {
+        "width": 390,
+        "height": 1190
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 787.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "ready",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--ready--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1307
+      },
+      "document": {
+        "width": 768,
+        "height": 1307
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 683.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "ready",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--ready--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "loading",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--loading--default--768x1024.png",
+    "seriousOrCritical": [
+      {
+        "id": "scrollable-region-focusable",
+        "impact": "serious",
+        "tags": [
+          "cat.keyboard",
+          "wcag2a",
+          "wcag211",
+          "wcag213",
+          "TTv5",
+          "TT4.a",
+          "EN-301-549",
+          "EN-9.2.1.1",
+          "EN-9.2.1.3",
+          "RGAAv4",
+          "RGAA-7.3.2"
+        ],
+        "description": "Ensure elements that have scrollable content are accessible by keyboard in Safari",
+        "help": "Scrollable region must have keyboard access",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/scrollable-region-focusable?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "focusable-content",
+                "data": null,
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element should have focusable content"
+              },
+              {
+                "id": "focusable-element",
+                "data": null,
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element should be focusable"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<html lang=\"en\">",
+            "target": [
+              "html"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+          }
+        ]
+      }
+    ],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1065
+      },
+      "document": {
+        "width": 768,
+        "height": 1065
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHLoading your photo.RETRIEVING ENCRYPTED ARCHI"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "loading",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--loading--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHLoading your photo.RETRIEVING ENCRYPTED ARCHI"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "download-busy",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--download-busy--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1190
+      },
+      "document": {
+        "width": 390,
+        "height": 1190
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 787.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "download-busy",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--download-busy--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1307
+      },
+      "document": {
+        "width": 768,
+        "height": 1307
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 683.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "download-busy",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--download-busy--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "download-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--download-error--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1242
+      },
+      "document": {
+        "width": 390,
+        "height": 1242
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 839.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "download-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--download-error--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1341
+      },
+      "document": {
+        "width": 768,
+        "height": 1341
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 717.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "download-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--download-error--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "cta-focus",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--cta-focus--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1190
+      },
+      "document": {
+        "width": 390,
+        "height": 1190
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 787.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Join a Ministry"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "cta-focus",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--cta-focus--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1307
+      },
+      "document": {
+        "width": 768,
+        "height": 1307
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 683.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Join a Ministry"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "cta-focus",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--cta-focus--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "Join a Ministry"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "cta-hover",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--cta-hover--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1190
+      },
+      "document": {
+        "width": 390,
+        "height": 1190
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 787.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "cta-hover",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--cta-hover--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1307
+      },
+      "document": {
+        "width": 768,
+        "height": 1307
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 683.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "cta-hover",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--cta-hover--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "non-retryable-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--non-retryable-error--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "width": 390,
+        "height": 844
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHThe photo could not be opened.ARCHIVE UNAVAIL"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "non-retryable-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--non-retryable-error--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1024
+      },
+      "document": {
+        "width": 768,
+        "height": 1024
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHThe photo could not be opened.ARCHIVE UNAVAIL"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "non-retryable-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--non-retryable-error--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHThe photo could not be opened.ARCHIVE UNAVAIL"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "retryable-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--retryable-error--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "width": 390,
+        "height": 844
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHThe photo could not be opened.ARCHIVE UNAVAIL"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "retryable-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--retryable-error--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1024
+      },
+      "document": {
+        "width": 768,
+        "height": 1024
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHThe photo could not be opened.ARCHIVE UNAVAIL"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "retryable-error",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--retryable-error--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHThe photo could not be opened.ARCHIVE UNAVAIL"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "long-expiry",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--long-expiry--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1190
+      },
+      "document": {
+        "width": 390,
+        "height": 1190
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 787.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "long-expiry",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--long-expiry--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1307
+      },
+      "document": {
+        "width": 768,
+        "height": 1307
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 683.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "long-expiry",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--long-expiry--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "reduced-motion",
+    "interaction": "default",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "screenshots/before/public--reduced-motion--default--390x844.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body": {
+        "width": 390,
+        "height": 1190
+      },
+      "document": {
+        "width": 390,
+        "height": 1190
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 787.5625,
+          "width": 274,
+          "height": 182.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "reduced-motion",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "screenshots/before/public--reduced-motion--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "body": {
+        "width": 768,
+        "height": 1307
+      },
+      "document": {
+        "width": 768,
+        "height": 1307
+      },
+      "horizontalOverflow": false,
+      "outside": [
+        {
+          "label": "M.A.T. Photobooth finished event collage",
+          "tag": "IMG",
+          "role": null,
+          "x": 58,
+          "y": 683.015625,
+          "width": 652,
+          "height": 434.65625,
+          "outside": true
+        }
+      ],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  },
+  {
+    "surface": "public",
+    "state": "reduced-motion",
+    "interaction": "default",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "screenshots/before/public--reduced-motion--default--1440x900.png",
+    "seriousOrCritical": [],
+    "moderate": [],
+    "geometry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "body": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outside": [],
+      "guestSmallTargets": [],
+      "dialogs": [],
+      "qr": [],
+      "activeElement": "M.A.T.PHOTOBOOTHARCHIVE // DISPATCHYour photo is ready.ARCHIVE READYHold on to t"
+    }
+  }
+]

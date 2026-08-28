@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 import type { ConfirmUploadResponse } from '@grace-booth/shared';
 import { describe, expect, it } from 'vitest';
@@ -141,6 +142,9 @@ describe('recent gallery service', () => {
         },
         qrService,
         imageProcessor,
+        delivery: {
+          checkPhotoAvailability: () => Promise.resolve('available'),
+        },
       });
 
       const items = await service.getRecent(20);
@@ -174,6 +178,201 @@ describe('recent gallery service', () => {
       const cloudItem = items.find((item) => item.sessionId === cloudUploaded)!;
       expect(cloudItem.metadata.uploadStatus).toBe('uploaded');
       expect(cloudItem.metadata.cloudExpiresAt).toBe(2_000_000 + RETENTION_30_DAYS_MS);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('suppresses cloud QR codes when objects are missing or cannot be verified', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+      const unavailable = seedFinishedSession(store, frameId, {
+        completedAt: 2_000_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'https://photos.example.test' },
+      });
+      const transient = seedFinishedSession(store, frameId, {
+        completedAt: 3_000_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'https://photos.example.test' },
+      });
+      const statusByToken = new Map<string, 'unavailable' | 'verification-failed'>([
+        [`token-${unavailable.replace(/-/g, '').slice(0, 10)}`.padEnd(43, 'a'), 'unavailable'],
+        [`token-${transient.replace(/-/g, '').slice(0, 10)}`.padEnd(43, 'a'), 'verification-failed'],
+      ]);
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: {
+          render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,should-not-render', expiresAt: '' }),
+        },
+        imageProcessor: {
+          process: () => Promise.reject(new Error('not used')),
+          validateSourceJpeg: () => Promise.reject(new Error('not used')),
+          normalizeFramePng: () => Promise.reject(new Error('not used')),
+          createThumbnail: (bytes) =>
+            Promise.resolve({ bytes: Buffer.from(bytes), width: 360, height: 1080 }),
+          close: () => Promise.resolve(),
+        },
+        delivery: {
+          checkPhotoAvailability: (token) =>
+            Promise.resolve(statusByToken.get(token) ?? 'verification-failed'),
+        },
+      });
+
+      const items = await service.getRecent(20);
+      expect(items.find((item) => item.sessionId === unavailable)).toMatchObject({
+        qrDataUrl: null,
+        metadata: { uploadStatus: 'unavailable' },
+      });
+      expect(items.find((item) => item.sessionId === transient)).toMatchObject({
+        qrDataUrl: null,
+        metadata: { uploadStatus: 'verification-failed' },
+      });
+      expect(JSON.stringify(items)).not.toContain('token-');
+    } finally {
+      store.close();
+    }
+  });
+
+  it('limits concurrent cloud availability checks to four items', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+      for (let index = 0; index < 9; index += 1) {
+        seedFinishedSession(store, frameId, {
+          completedAt: 2_000_000 + index,
+          jobState: 'succeeded',
+          delivery: { origin: 'https://photos.example.test' },
+        });
+      }
+
+      let active = 0;
+      let maximumActive = 0;
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: {
+          render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+        },
+        imageProcessor: {
+          process: () => Promise.reject(new Error('not used')),
+          validateSourceJpeg: () => Promise.reject(new Error('not used')),
+          normalizeFramePng: () => Promise.reject(new Error('not used')),
+          createThumbnail: (bytes) =>
+            Promise.resolve({ bytes: Buffer.from(bytes), width: 360, height: 1080 }),
+          close: () => Promise.resolve(),
+        },
+        delivery: {
+          checkPhotoAvailability: async () => {
+            active += 1;
+            maximumActive = Math.max(maximumActive, active);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            active -= 1;
+            return 'available';
+          },
+        },
+      });
+
+      const items = await service.getRecent(20);
+      expect(items).toHaveLength(9);
+      expect(maximumActive).toBe(4);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('repairs a missing cloud copy from the verified encrypted local collage', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+      const sessionId = seedFinishedSession(store, frameId, {
+        completedAt: 4_000_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'https://photos.example.test' },
+      });
+      const session = store.repository.requireSession(sessionId);
+      const collage = store.repository.getAsset(session.collageAssetId!)!;
+      const bytes = store.vault.read(collage.encryptedPath);
+      const sha256 = createHash('sha256').update(bytes).digest('hex');
+      store.database.raw
+        .prepare('UPDATE session_assets SET byte_size = ?, sha256 = ? WHERE id = ?')
+        .run(bytes.byteLength, sha256, collage.id);
+
+      const calls: string[] = [];
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: { render: () => Promise.reject(new Error('not used')) },
+        imageProcessor: {
+          process: () => Promise.reject(new Error('not used')),
+          validateSourceJpeg: () => Promise.reject(new Error('not used')),
+          normalizeFramePng: () => Promise.reject(new Error('not used')),
+          createThumbnail: () => Promise.reject(new Error('not used')),
+          close: () => Promise.resolve(),
+        },
+        delivery: {
+          checkPhotoAvailability: () => Promise.resolve('unavailable'),
+          authorizePhotoRepair: (request) => {
+            calls.push(`authorize:${request.metadata.sha256}`);
+            return Promise.resolve({
+              action: 'authorize',
+              repairBatchId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              upload: {
+                storagePath: 'private/photo.jpg',
+                uploadUrl: 'https://r2.example.test/repair',
+                requiredHeaders: { 'content-type': 'image/jpeg', 'if-none-match': '*' },
+                validForSeconds: 300,
+              },
+            });
+          },
+          uploadSigned: (_path, _token, uploaded, _url, headers) => {
+            expect(Buffer.from(uploaded)).toEqual(bytes);
+            expect(headers).toEqual({ 'content-type': 'image/jpeg', 'if-none-match': '*' });
+            calls.push('upload');
+            return Promise.resolve();
+          },
+          confirmPhotoRepair: (request) => {
+            calls.push(`confirm:${request.repairBatchId}`);
+            return Promise.resolve({
+              status: 'ready',
+              readyAt: '2026-08-27T00:00:00.000Z',
+              expiresAt: '2026-09-26T00:00:00.000Z',
+              publicPageOrigin: 'https://photos.example.test',
+              publicPath: '/photo',
+            });
+          },
+        },
+      });
+
+      await expect(service.repairCloudPhoto(sessionId)).resolves.toMatchObject({
+        status: 'repaired',
+      });
+      expect(calls).toEqual([
+        `authorize:${sha256}`,
+        'upload',
+        'confirm:dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      ]);
+      await expect(service.repairCloudPhoto(randomUUID())).resolves.toEqual({
+        status: 'original-booth-required',
+        message: 'Recovery requires the original booth.',
+      });
     } finally {
       store.close();
     }

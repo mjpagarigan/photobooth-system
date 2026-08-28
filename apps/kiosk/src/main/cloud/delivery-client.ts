@@ -1,14 +1,22 @@
 import {
+  AuthorizePhotoRepairResponseSchema,
   BoothAuthSessionSchema,
   ConfirmUploadResponseSchema,
   CreateUploadResponseSchema,
+  GooglePhotosStatusSchema,
   ResumeUploadResponseSchema,
   type ConfirmUploadRequest,
   type ConfirmUploadResponse,
+  type AuthorizePhotoRepairRequest,
+  type AuthorizePhotoRepairResponse,
+  type ConfirmPhotoRepairRequest,
   type CreateUploadRequest,
   type CreateUploadResponse,
   type ResumeUploadRequest,
   type ResumeUploadResponse,
+  type PhotoAvailability,
+  type GooglePhotosConfig,
+  type GooglePhotosStatus,
 } from '@grace-booth/shared';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -16,6 +24,7 @@ import type { CloudSessionStore } from '../auth/cloud-session-store.js';
 import { AppError } from '../errors.js';
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const PHOTO_AVAILABILITY_TIMEOUT_MS = 5_000;
 
 export type DeliveryClient = {
   isConfigured(): boolean;
@@ -24,8 +33,24 @@ export type DeliveryClient = {
   connect(email: string, password: string): Promise<void>;
   createUpload(request: CreateUploadRequest): Promise<CreateUploadResponse>;
   resumeUpload(request: ResumeUploadRequest): Promise<ResumeUploadResponse>;
-  uploadSigned(path: string, token: string, bytes: Uint8Array, uploadUrl?: string): Promise<void>;
+  uploadSigned(
+    path: string,
+    token: string,
+    bytes: Uint8Array,
+    uploadUrl?: string,
+    requiredHeaders?: Readonly<Record<string, string>>,
+  ): Promise<void>;
   confirmUpload(request: ConfirmUploadRequest): Promise<ConfirmUploadResponse>;
+  checkPhotoAvailability(publicToken: string, publicPageOrigin: string): Promise<PhotoAvailability>;
+  authorizePhotoRepair(
+    request: AuthorizePhotoRepairRequest,
+  ): Promise<AuthorizePhotoRepairResponse>;
+  confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse>;
+  getGooglePhotosStatus?(): Promise<GooglePhotosStatus>;
+  saveGooglePhotosConfig?(config: GooglePhotosConfig): Promise<void>;
+  resolveGooglePhotosAlbum?(shareUrl: string): Promise<{ albumId: string; albumTitle: string; shareUrl: string }>;
+  testGooglePhotosUpload?(): Promise<{ success: boolean; message: string }>;
+  disconnectGooglePhotos?(): Promise<void>;
   health(): Promise<{ healthy: boolean; code: string | null; message: string }>;
 };
 
@@ -154,6 +179,7 @@ export class SupabaseDeliveryClient implements DeliveryClient {
     token: string,
     bytes: Uint8Array,
     uploadUrl?: string,
+    requiredHeaders?: Readonly<Record<string, string>>,
   ): Promise<void> {
     if (uploadUrl) {
       try {
@@ -161,6 +187,7 @@ export class SupabaseDeliveryClient implements DeliveryClient {
           method: 'PUT',
           headers: {
             'content-type': 'image/jpeg',
+            ...requiredHeaders,
           },
           body: bytes,
         });
@@ -191,6 +218,96 @@ export class SupabaseDeliveryClient implements DeliveryClient {
 
   async confirmUpload(request: ConfirmUploadRequest): Promise<ConfirmUploadResponse> {
     return ConfirmUploadResponseSchema.parse(await this.invokeFunction('confirm-upload', request));
+  }
+
+  async checkPhotoAvailability(
+    publicToken: string,
+    publicPageOrigin: string,
+  ): Promise<PhotoAvailability> {
+    const url = this.options.url;
+    const publishableKey = this.options.publishableKey;
+    if (!url || !publishableKey) return 'verification-failed';
+    let origin: string;
+    try {
+      const parsed = new URL(publicPageOrigin);
+      if (parsed.protocol !== 'https:' || parsed.origin !== publicPageOrigin) {
+        return 'verification-failed';
+      }
+      origin = parsed.origin;
+    } catch {
+      return 'verification-failed';
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), PHOTO_AVAILABILITY_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${url}/functions/v1/photo/resolve`, {
+        method: 'POST',
+        headers: {
+          Origin: origin,
+          apikey: publishableKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ token: publicToken }),
+        signal: controller.signal,
+      });
+      if (response.status === 404) return 'unavailable';
+      if (!response.ok) return 'verification-failed';
+      const payload = (await response.json().catch(() => null)) as { status?: unknown } | null;
+      return payload?.status === 'ready' ? 'available' : 'verification-failed';
+    } catch {
+      return 'verification-failed';
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async authorizePhotoRepair(
+    request: AuthorizePhotoRepairRequest,
+  ): Promise<AuthorizePhotoRepairResponse> {
+    return AuthorizePhotoRepairResponseSchema.parse(
+      await this.invokeFunction('repair-photo', request),
+    );
+  }
+
+  async confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse> {
+    return ConfirmUploadResponseSchema.parse(await this.invokeFunction('repair-photo', request));
+  }
+
+  async getGooglePhotosStatus(): Promise<GooglePhotosStatus> {
+    const res = await this.invokeFunction('google-photos-auth', { action: 'get-status' });
+    return GooglePhotosStatusSchema.parse(res);
+  }
+
+  async saveGooglePhotosConfig(config: GooglePhotosConfig): Promise<void> {
+    await this.invokeFunction('google-photos-auth', { action: 'save-config', config });
+  }
+
+  async resolveGooglePhotosAlbum(
+    shareUrl: string,
+  ): Promise<{ albumId: string; albumTitle: string; shareUrl: string }> {
+    const res = (await this.invokeFunction('google-photos-auth', {
+      action: 'resolve-album',
+      shareUrl,
+    })) as {
+      ok: boolean;
+      data: { albumId: string; albumTitle: string; shareUrl: string };
+    };
+    return res.data;
+  }
+
+  async testGooglePhotosUpload(): Promise<{ success: boolean; message: string }> {
+    const res = (await this.invokeFunction('google-photos-auth', {
+      action: 'test-upload',
+    })) as {
+      ok: boolean;
+      data: { success: boolean; message: string };
+    };
+    return res.data;
+  }
+
+  async disconnectGooglePhotos(): Promise<void> {
+    await this.invokeFunction('google-photos-auth', { action: 'disconnect' });
   }
 
   async health(): Promise<{ healthy: boolean; code: string | null; message: string }> {

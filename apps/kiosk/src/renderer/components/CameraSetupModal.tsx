@@ -88,6 +88,16 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   useEffect(() => {
     if (!isOpen) return;
 
+    const focusFrame = requestAnimationFrame(() => {
+      dialogRef.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+    });
+
+    return () => cancelAnimationFrame(focusFrame);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !saving) {
         event.preventDefault();
@@ -120,7 +130,9 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [isOpen, saving, onClose]);
 
   if (!isOpen) return null;

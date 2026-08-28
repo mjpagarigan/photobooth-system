@@ -26,14 +26,18 @@ export async function createR2PresignedPutUrl(
   key: string,
   contentType: string,
   expiresInSeconds: number,
+  options: { ifNoneMatch?: '*' } = {},
+  signer: R2PutUrlSigner = (signingClient, command, signingOptions) =>
+    getSignedUrl(signingClient, command, signingOptions),
 ): Promise<string> {
   try {
     const command = new PutObjectCommand({
       Bucket: r2BucketName(),
       Key: key,
       ContentType: contentType,
+      IfNoneMatch: options.ifNoneMatch,
     });
-    return await getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+    return await signer(client, command, { expiresIn: expiresInSeconds });
   } catch {
     throw new ApiError(
       503,
@@ -43,6 +47,12 @@ export async function createR2PresignedPutUrl(
     );
   }
 }
+
+export type R2PutUrlSigner = (
+  client: S3Client,
+  command: PutObjectCommand,
+  options: { expiresIn: number },
+) => Promise<string>;
 
 export type R2DownloadDisposition = 'inline' | 'attachment';
 
@@ -119,10 +129,9 @@ export async function checkR2ObjectExists(
     const parsedContentLength = contentLength === null ? Number.NaN : Number(contentLength);
     return {
       exists: true,
-      byteSize:
-        Number.isSafeInteger(parsedContentLength) && parsedContentLength >= 0
-          ? parsedContentLength
-          : null,
+      byteSize: Number.isSafeInteger(parsedContentLength) && parsedContentLength >= 0
+        ? parsedContentLength
+        : null,
     };
   } catch {
     throw new ApiError(

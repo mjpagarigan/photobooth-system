@@ -1,0 +1,173 @@
+$ pnpm -r --if-present build
+Scope: 4 of 5 workspace projects
+apps/kiosk build$ electron-vite build
+apps/public build$ node -e "const fs=require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', {recursive:true, force:true});" && tsc --noEmit -p tsconfig.json && vite build
+apps/kiosk build: vite v7.3.6 building ssr environment for production...
+apps/kiosk build: transforming...
+apps/kiosk build: ✓ 55 modules transformed.
+apps/kiosk build: rendering chunks...
+apps/kiosk build: out/main/image-worker.js                          15.23 kB
+apps/kiosk build: out/main/chunks/strip-export-config-DCgWJdBd.js   19.50 kB
+apps/kiosk build: out/main/index.js                                222.46 kB
+apps/kiosk build: ✓ built in 2.94s
+apps/kiosk build: vite v7.3.6 building ssr environment for production...
+apps/kiosk build: transforming...
+apps/kiosk build: ✓ 85 modules transformed.
+apps/kiosk build: rendering chunks...
+apps/kiosk build: out/preload/index.cjs  160.26 kB
+apps/kiosk build: ✓ built in 1.61s
+apps/kiosk build: vite v7.3.6 building client environment for production...
+apps/kiosk build: transforming...
+apps/public build: vite v7.3.6 building client environment for production...
+apps/public build: transforming...
+apps/kiosk build: ✓ 5441 modules transformed.
+apps/kiosk build: rendering chunks...
+apps/kiosk build: ../../out/renderer/index.html                                                     0.90 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-greek-500-normal-JpySY46c.woff2          4.28 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-greek-700-normal-C6CZE3T8.woff2          4.30 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-greek-600-normal-H7WoG9Et.woff2          4.31 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-400-normal-DMkecbls.woff2              4.97 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-600-normal-Cc8MFFhd.woff2              5.10 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-700-normal-DlLaEgI2.woff2              5.10 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-500-normal-DOriooB6.woff2              5.11 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-400-normal-DGGRlc-M.woff2               5.26 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-cyrillic-700-normal-BWTpRfYl.woff2       5.34 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-cyrillic-500-normal-DmUKJPL_.woff2       5.36 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-cyrillic-600-normal-EVf6-Yzo.woff2       5.38 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-500-normal-C4iEst2y.woff2               5.43 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-600-normal-DRtmH8MT.woff2               5.43 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-700-normal-qfdV9bQt.woff2               5.44 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-vietnamese-700-normal-BDLVIk2r.woff      5.45 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-vietnamese-500-normal-DNRqzVM1.woff      5.48 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-vietnamese-600-normal-OWROknRo.woff      5.48 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-greek-700-normal-DEigVDxa.woff           5.70 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-greek-600-normal-mc2nkWzM.woff           5.70 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-greek-500-normal-D7SFKleX.woff           5.72 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-400-normal-Bbgyi5SW.woff               6.50 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-500-normal-mJboJaSs.woff               6.60 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-700-normal-BZaoP0fm.woff               6.63 kB
+apps/kiosk build: ../../out/renderer/assets/inter-vietnamese-600-normal-BuLX-rYi.woff               6.64 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-cyrillic-700-normal-CEoEElIJ.woff        7.02 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-cyrillic-600-normal-8K4wrrwR.woff        7.02 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-cyrillic-500-normal-DJqRU3vO.woff        7.02 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-400-normal-KugGGMne.woff                7.06 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-500-normal-2j5mBUwD.woff                7.19 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-vietnamese-900-normal-Dz06HFPU.woff          7.21 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-600-normal-B8X0CLgF.woff                7.21 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-ext-700-normal-BoQ6DsYi.woff                7.22 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-vietnamese-700-normal-DnwGT2D9.woff          7.30 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-vietnamese-800-normal-Chy8GRiB.woff          7.33 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-ext-700-normal-CZipNAKV.woff2      7.47 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-ext-600-normal-BfB_LPfz.woff2      7.51 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-ext-500-normal-Cut-4mMH.woff2      7.53 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-400-normal-obahsSVq.woff2                7.71 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-400-normal-B4URO6DV.woff2                   7.78 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-vietnamese-900-normal-DNvcOCEl.woff2         7.83 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-500-normal-BasfLYem.woff2                7.90 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-vietnamese-800-normal-BDwqwvSG.woff2         7.90 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-vietnamese-700-normal-C0x1De3p.woff2         7.90 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-700-normal-CjBOestx.woff2                7.90 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-500-normal-BIZE56-Y.woff2                   7.92 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-700-normal-C3JjAnD8.woff2                   7.92 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-600-normal-plRanbMR.woff2                   7.94 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-600-normal-CWCymEST.woff2                7.97 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-400-normal-HOLc17fK.woff                 9.78 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-700-normal-DrXBdSj3.woff                 9.91 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-400-normal-q2sYcFCs.woff                    9.92 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-600-normal-4D_pXhcN.woff                 9.94 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-500-normal-CxZf_p3X.woff                 9.94 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-500-normal-Xzm54t5V.woff                    9.98 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-700-normal-BUv2fZ6O.woff                    9.98 kB
+apps/kiosk build: ../../out/renderer/assets/inter-greek-600-normal-BZpKdvQh.woff                   10.03 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-400-normal-BQZuk6qB.woff2           10.23 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-ext-700-normal-CxPITLHs.woff      10.30 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-ext-600-normal-DObL3zCW.woff      10.32 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-ext-500-normal-ckzbgY84.woff      10.34 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-500-normal-B0yAr1jD.woff2           10.43 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-600-normal-Dfes3d0z.woff2           10.48 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-700-normal-BjwYoWNd.woff2           10.50 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-900-normal-CGsoW8-j.woff           10.54 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-900-normal-CrYcRZSi.woff2          10.91 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-800-normal-B_mUCQ9O.woff           10.92 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-700-normal-BvLYcGP1.woff           10.93 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-700-normal-D-Pqjtdp.woff2          11.16 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-800-normal-DDmpGQGC.woff2          11.18 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-ext-900-normal-ET-C-0fX.woff2      11.57 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-ext-900-normal-CfuaLo5j.woff       11.58 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-ext-800-normal-mB3PmEeV.woff       12.04 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-ext-700-normal-MyDreaeu.woff2      12.06 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-ext-700-normal-D-Mk2xRJ.woff       12.08 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-cyrillic-ext-800-normal-GOAQXnVZ.woff2      12.14 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-400-normal-DQukG94-.woff            13.34 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-700-normal-LO58E6JB.woff            13.41 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-500-normal-BmqWE9Dz.woff            13.45 kB
+apps/kiosk build: ../../out/renderer/assets/inter-cyrillic-ext-600-normal-Bcila6Z-.woff            13.46 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-900-normal-B0TD3Qnu.woff2             18.02 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-700-normal-BdjcYUrC.woff2             18.82 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-800-normal-axpkC1rd.woff2             19.01 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-900-normal-BDWDmVut.woff              19.50 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-800-normal-C3dfDxXV.woff              20.66 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-700-normal-BWkrl476.woff              20.67 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-500-normal-BWZEU5yA.woff2         21.83 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-600-normal-C8RAYTDA.woff2         21.86 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-700-normal-BYuf6tUa.woff2         21.91 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-400-normal-C38fXH4l.woff2                  23.66 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-500-normal-Cerq10X2.woff2                  24.27 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-700-normal-Yt3aPRUw.woff2                  24.36 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-600-normal-LgqL8muc.woff2                  24.45 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-600-normal-BfsvjouI.woff          28.18 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-700-normal-D3wTyLJW.woff          28.21 kB
+apps/kiosk build: ../../out/renderer/assets/jetbrains-mono-latin-500-normal-CJOVTJB7.woff          28.21 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-400-normal-CyCys3Eg.woff                   30.70 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-600-normal-CiBQ2DWP.woff                   31.26 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-500-normal-BL9OpVg8.woff                   31.28 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-700-normal-BLAVimhd.woff                   31.32 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-ext-900-normal-BTaqesvP.woff2         32.42 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-ext-700-normal-BOP2Nhf0.woff2         33.53 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-ext-800-normal-BBvmbyWk.woff2         33.62 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-400-normal-C1nco2VV.woff2              35.00 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-500-normal-CV4jyFjo.woff2              36.02 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-700-normal-Ca8adRJv.woff2              36.24 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-600-normal-D2bJ5OIk.woff2              36.26 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-ext-900-normal-DoASD5Eh.woff          40.34 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-ext-700-normal-DdDFr05Z.woff          41.34 kB
+apps/kiosk build: ../../out/renderer/assets/montserrat-latin-ext-800-normal-Wjq_OapB.woff          41.69 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-400-normal-77YHD8bZ.woff               47.56 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-500-normal-BxGbmqWO.woff               48.49 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-700-normal-TidjK2hL.woff               48.63 kB
+apps/kiosk build: ../../out/renderer/assets/inter-latin-ext-600-normal-CIVaiw4L.woff               48.67 kB
+apps/kiosk build: ../../out/renderer/assets/index-COXsxWRy.css                                    106.14 kB
+apps/kiosk build: ../../out/renderer/assets/index-BIvF_LBs.js                                   2,005.73 kB
+apps/kiosk build: ✓ built in 28.01s
+apps/kiosk build: Done
+apps/public build: ✓ 5273 modules transformed.
+apps/public build: rendering chunks...
+apps/public build: computing gzip size...
+apps/public build: dist/_headers                                                 0.83 kB
+apps/public build: dist/index.html                                               1.07 kB │ gzip:   0.56 kB
+apps/public build: dist/assets/montserrat-latin-900-normal-B0TD3Qnu.woff2       18.02 kB
+apps/public build: dist/assets/montserrat-latin-600-normal-UVxSCcoG.woff2       18.69 kB
+apps/public build: dist/assets/montserrat-latin-700-normal-BdjcYUrC.woff2       18.82 kB
+apps/public build: dist/assets/montserrat-latin-800-normal-axpkC1rd.woff2       19.01 kB
+apps/public build: dist/assets/montserrat-latin-900-normal-BDWDmVut.woff        19.50 kB
+apps/public build: dist/assets/montserrat-latin-600-normal-CdhFl4lI.woff        20.55 kB
+apps/public build: dist/assets/montserrat-latin-800-normal-C3dfDxXV.woff        20.66 kB
+apps/public build: dist/assets/montserrat-latin-700-normal-BWkrl476.woff        20.67 kB
+apps/public build: dist/assets/jetbrains-mono-latin-500-normal-BWZEU5yA.woff2   21.83 kB
+apps/public build: dist/assets/jetbrains-mono-latin-600-normal-C8RAYTDA.woff2   21.86 kB
+apps/public build: dist/assets/jetbrains-mono-latin-700-normal-BYuf6tUa.woff2   21.91 kB
+apps/public build: dist/assets/inter-latin-400-normal-C38fXH4l.woff2            23.66 kB
+apps/public build: dist/assets/inter-latin-500-normal-Cerq10X2.woff2            24.27 kB
+apps/public build: dist/assets/inter-latin-700-normal-Yt3aPRUw.woff2            24.36 kB
+apps/public build: dist/assets/inter-latin-600-normal-LgqL8muc.woff2            24.45 kB
+apps/public build: dist/assets/jetbrains-mono-latin-600-normal-BfsvjouI.woff    28.18 kB
+apps/public build: dist/assets/jetbrains-mono-latin-500-normal-CJOVTJB7.woff    28.21 kB
+apps/public build: dist/assets/jetbrains-mono-latin-700-normal-D3wTyLJW.woff    28.21 kB
+apps/public build: dist/assets/inter-latin-400-normal-CyCys3Eg.woff             30.70 kB
+apps/public build: dist/assets/inter-latin-600-normal-CiBQ2DWP.woff             31.26 kB
+apps/public build: dist/assets/inter-latin-500-normal-BL9OpVg8.woff             31.28 kB
+apps/public build: dist/assets/inter-latin-700-normal-BLAVimhd.woff             31.32 kB
+apps/public build: dist/assets/index-OObVpE9q.css                               15.71 kB │ gzip:   3.95 kB
+apps/public build: dist/assets/index-CDbID1Q6.js                               396.53 kB │ gzip: 127.63 kB
+apps/public build: ✓ built in 18.05s
+apps/public build: Done

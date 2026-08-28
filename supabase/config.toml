@@ -63,7 +63,16 @@ verify_jwt = true
 [functions.photo]
 verify_jwt = false
 
+[functions.repair-photo]
+verify_jwt = true
+
 [functions.cleanup-expired]
+verify_jwt = false
+
+[functions.sync-google-photos]
+verify_jwt = false
+
+[functions.google-photos-auth]
 verify_jwt = false
 
 [analytics]

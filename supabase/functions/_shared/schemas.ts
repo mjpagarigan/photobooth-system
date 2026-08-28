@@ -71,6 +71,39 @@ export const ConfirmUploadSchema = z
   })
   .strict();
 
+const RepairPhotoMetadataSchema = z
+  .object({
+    byteSize: z.number().int().positive(),
+    sha256: z.string().regex(SHA256_HEX_PATTERN),
+    width: z.number().int().min(1).max(MAX_EDGE_PIXELS),
+    height: z.number().int().min(1).max(MAX_EDGE_PIXELS),
+  })
+  .strict();
+
+const AuthorizePhotoRepairSchema = z
+  .object({
+    action: z.literal('authorize'),
+    photoSessionId: z.uuid(),
+    publicToken: z.string().regex(PUBLIC_TOKEN_PATTERN),
+    metadata: RepairPhotoMetadataSchema,
+  })
+  .strict();
+
+const ConfirmPhotoRepairSchema = z
+  .object({
+    action: z.literal('confirm'),
+    photoSessionId: z.uuid(),
+    publicToken: z.string().regex(PUBLIC_TOKEN_PATTERN),
+    repairBatchId: z.uuid(),
+    metadata: RepairPhotoMetadataSchema,
+  })
+  .strict();
+
+export const RepairPhotoSchema = z.discriminatedUnion('action', [
+  AuthorizePhotoRepairSchema,
+  ConfirmPhotoRepairSchema,
+]);
+
 export const PublicPhotoTokenSchema = z
   .object({ token: z.string().regex(PUBLIC_TOKEN_PATTERN) })
   .strict();

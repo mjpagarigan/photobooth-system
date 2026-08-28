@@ -6,10 +6,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { AdminHealth, AdminSettings, FrameLayout } from '@grace-booth/shared';
+import type { AdminHealth, AdminSettings, FrameLayout, GalleryItem } from '@grace-booth/shared';
 
 import { AdminSettings as AdminSettingsScreen } from '../../src/renderer/admin/AdminSettings';
 import { FrameEditor } from '../../src/renderer/admin/FrameEditor';
+import { RecentGallery } from '../../src/renderer/components/RecentGallery';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
 import { ProcessingScreen } from '../../src/renderer/screens/ProcessingScreen';
 import { RecoveryScreen } from '../../src/renderer/screens/RecoveryScreen';
@@ -58,6 +59,18 @@ const SETTINGS: AdminSettings = {
   cameraResolution: '1080p',
   supabaseUrl: null,
   supabasePublishableKey: null,
+  dualDisplay: {
+    mode: 'auto',
+    swapDisplays: false,
+    qrDismissSeconds: 45,
+  },
+  googlePhotos: {
+    connectedEmail: null,
+    albumId: null,
+    albumTitle: null,
+    albumShareUrl: null,
+    enabled: false,
+  },
   revision: 4,
 };
 
@@ -71,6 +84,66 @@ const HEALTH: AdminHealth = {
 afterEach(cleanup);
 
 describe('guest screen components', () => {
+  it('shows cloud repair only to operators for confirmed-unavailable photos', async () => {
+    const item: GalleryItem = {
+      sessionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      previewDataUrl: 'data:image/jpeg;base64,AA==',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: 1,
+        photoCount: 3,
+        frameName: 'Test',
+        uploadStatus: 'unavailable',
+        cloudExpiresAt: Date.now() + 60_000,
+      },
+    };
+    const repair = vi.fn();
+    const { rerender } = render(
+      <RecentGallery items={[item]} onClose={() => undefined} operator={false} />,
+    );
+    expect(screen.queryByRole('button', { name: /repair cloud copy/i })).not.toBeInTheDocument();
+
+    rerender(
+      <RecentGallery
+        items={[item]}
+        onClose={() => undefined}
+        onRepairCloudPhoto={repair}
+        operator
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /repair cloud copy/i }));
+    expect(repair).toHaveBeenCalledWith(item.sessionId);
+    expect(screen.queryByRole('img', { name: /QR code/i })).not.toBeInTheDocument();
+  });
+
+  it('moves focus into photo details, traps it there, and restores the invoking tile', async () => {
+    const item: GalleryItem = {
+      sessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      previewDataUrl: 'data:image/jpeg;base64,AA==',
+      qrDataUrl: 'data:image/png;base64,AA==',
+      metadata: {
+        capturedAt: 1,
+        photoCount: 3,
+        frameName: 'Test',
+        uploadStatus: 'uploaded',
+        cloudExpiresAt: Date.now() + 60_000,
+      },
+    };
+    const user = userEvent.setup();
+    render(<RecentGallery items={[item]} onClose={() => undefined} operator={false} />);
+
+    const tile = screen.getByRole('button', { name: /view photo strip/i });
+    await user.click(tile);
+    const detailClose = screen.getByRole('button', { name: /close photo details/i });
+    expect(detailClose).toHaveFocus();
+
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(tile).toHaveFocus();
+  });
+
   it('renders the locked countdown progress and current pose', () => {
     render(<CaptureScreen phase="countdown" secondsRemaining={5} shotNumber={3} />);
     expect(screen.getByText('Photo 3 of 3')).toBeVisible();

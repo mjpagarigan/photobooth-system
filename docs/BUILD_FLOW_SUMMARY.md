@@ -86,8 +86,8 @@ Pinned foundation: Node 24, pnpm 11, Electron 43.4, electron-vite 5, Vite 7.3, R
 - Added `create-upload`, `confirm-upload`, POST-only photo resolution/image/download actions, and idempotent leased cleanup.
 - Added exact expiry at confirmation time plus 720 hours, independent of later cleanup timing.
 - Added the Cloudflare Pages public page. QR targets are `https://<public-origin>/photo#<token>`, so the fragment
-  does not reach access logs. The page sends the token only in validated POST bodies and follows
-  authenticated bodyless 303 delivery redirects only to the configured private R2 S3 API origin.
+  does not reach access logs. The page sends the token only in validated POST bodies and accepts
+  direct JPEG bytes only from the configured photo API origin.
 - Added exact-origin CORS, no-store behavior, restrictive CSP, no analytics, and no third-party public-page requests.
 - Added a separate server-only `PUBLIC_TOKEN_DERIVATION_KEY` for stable, domain-separated HMAC-SHA256 token derivation across concurrent or lost-response retries. PostgreSQL stores only SHA-256 of the derived raw token.
 - Locked production Supabase region documentation to Singapore.
@@ -198,10 +198,9 @@ A fresh run in the current restricted Codex session reconfirmed formatting, lint
 - No Supabase project has been created. Production must use the locked Singapore region.
 - Supabase migrations, private Storage, Vault values, Cron/`pg_net`, booth identity allow-listing, and Edge Functions have not been deployed.
 - No Cloudflare Pages deployment, production-origin change, or DNS mutation is performed automatically.
-- Hosted CORS/origin and end-to-end cloud smoke tests cannot run until both services exist.
-- Production builds fail closed unless `VITE_PUBLIC_PHOTO_API_URL`, `VITE_PUBLIC_PAGE_ORIGIN`, and
-  the actual presigned S3 `VITE_PUBLIC_R2_ORIGIN` are set. The build emits the exact Cloudflare
-  Pages CSP and SPA routing into `apps/public/dist`.
+- Hosted origin and end-to-end cloud smoke tests cannot run until both services exist.
+- Production builds fail closed unless `VITE_PUBLIC_PHOTO_API_URL` and `VITE_PUBLIC_PAGE_ORIGIN`
+  are set. The build emits the exact Cloudflare Pages CSP and SPA routing into `apps/public/dist`.
 - `PUBLIC_TOKEN_DERIVATION_KEY`, `CLEANUP_SECRET`, Supabase server keys, and Vault values must be generated and stored operationally; none are included in the repository.
 
 ### Database/live Function testing

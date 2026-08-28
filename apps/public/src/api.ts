@@ -1,4 +1,4 @@
-import { PHOTO_API_BASE_URL, PUBLIC_R2_ORIGIN } from './config';
+import { PHOTO_API_BASE_URL } from './config';
 
 export type ResolvedPhoto = {
   status: 'ready';
@@ -98,10 +98,7 @@ async function fetchPhotoBlob(
   } catch {
     throw new PhotoApiError('We could not load this photo right now.', true);
   }
-  const expectedOrigin = response.redirected
-    ? PUBLIC_R2_ORIGIN
-    : new URL(PHOTO_API_BASE_URL).origin;
-  if (responseOrigin !== expectedOrigin) {
+  if (response.redirected || responseOrigin !== new URL(PHOTO_API_BASE_URL).origin) {
     throw new PhotoApiError('We could not load this photo right now.', true);
   }
   const type = response.headers.get('content-type')?.split(';', 1)[0]?.toLowerCase();

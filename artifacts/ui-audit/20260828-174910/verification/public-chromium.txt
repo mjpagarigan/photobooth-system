@@ -1,0 +1,10 @@
+
+Running 3 tests using 1 worker
+
+(node:28072) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [public-chromium] › tests\e2e\public-page.spec.ts:84:5 › resolves, displays, and downloads a private photo without leaking the token in URLs (6.2s)
+  ok 2 [public-chromium] › tests\e2e\public-page.spec.ts:112:5 › shows the same friendly unavailable state for an expired or unknown token (4.1s)
+  ok 3 [public-chromium] › tests\e2e\public-page.spec.ts:136:5 › rejects a malformed fragment locally and remains usable on a phone viewport (3.9s)
+
+  3 passed (19.7s)

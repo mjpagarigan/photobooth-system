@@ -1,7 +1,10 @@
 import type {
   CameraAdapterKind,
   CameraResolution,
+  DualDisplayMode,
+  DualDisplaySettings,
   FrameLayout,
+  GooglePhotosConfig,
   SessionState,
   UploadJobState,
 } from '@grace-booth/shared';
@@ -34,6 +37,14 @@ type RawSettingsRow = {
   camera_resolution: string;
   supabase_url: string | null;
   supabase_publishable_key: string | null;
+  dual_display_mode: string;
+  swap_displays: number;
+  qr_dismiss_seconds: number;
+  google_photos_enabled: number;
+  google_photos_email: string | null;
+  google_photos_album_id: string | null;
+  google_photos_album_title: string | null;
+  google_photos_album_share_url: string | null;
   revision: number;
   created_at: number;
   updated_at: number;
@@ -62,6 +73,14 @@ export type LocalSettings = {
   cameraResolution: CameraResolution;
   supabaseUrl: string | null;
   supabasePublishableKey: string | null;
+  dualDisplayMode: DualDisplayMode;
+  swapDisplays: boolean;
+  qrDismissSeconds: number;
+  googlePhotosEnabled: boolean;
+  googlePhotosEmail: string | null;
+  googlePhotosAlbumId: string | null;
+  googlePhotosAlbumTitle: string | null;
+  googlePhotosAlbumShareUrl: string | null;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -157,6 +176,8 @@ const SETTINGS_SELECT = `
     active_frame_id, collage_2_frame_id, google_forms_url, local_retention_days, cloud_retention_days,
     lan_enabled, lan_bind_host, lan_port, lan_tls_secret_ref,
     lan_certificate_fingerprint, camera_adapter, camera_device_id, camera_resolution,
+    supabase_url, supabase_publishable_key, dual_display_mode, swap_displays, qr_dismiss_seconds,
+    google_photos_enabled, google_photos_email, google_photos_album_id, google_photos_album_title, google_photos_album_share_url,
     revision, created_at, updated_at
   FROM settings WHERE id = 1
 `;
@@ -320,6 +341,65 @@ export class LocalRepository {
       }
       this.recordAudit('frame_change', 'success', 'frame_added', frame.updatedAt);
     })();
+  }
+
+  setGooglePhotosConfig(
+    input: GooglePhotosConfig,
+    now = Date.now(),
+  ): LocalSettings {
+    this.database.raw
+      .prepare(
+        `UPDATE settings SET
+          google_photos_enabled = ?,
+          google_photos_email = ?,
+          google_photos_album_id = ?,
+          google_photos_album_title = ?,
+          google_photos_album_share_url = ?,
+          revision = revision + 1,
+          updated_at = ?
+        WHERE id = 1`,
+      )
+      .run(
+        input.enabled ? 1 : 0,
+        input.connectedEmail,
+        input.albumId,
+        input.albumTitle,
+        input.albumShareUrl,
+        now,
+      );
+    return this.getSettings();
+  }
+
+    setDualDisplaySettings(
+    modeOrInput: DualDisplayMode | DualDisplaySettings,
+    swapDisplaysOrNow?: boolean | number,
+    qrDismissSeconds?: number,
+    now = Date.now(),
+  ): LocalSettings {
+    let mode: DualDisplayMode = 'auto';
+    let swap = false;
+    let qrDismiss = 45;
+    let timestamp = now;
+
+    if (typeof modeOrInput === 'object') {
+      mode = modeOrInput.mode;
+      swap = modeOrInput.swapDisplays;
+      qrDismiss = modeOrInput.qrDismissSeconds;
+      if (typeof swapDisplaysOrNow === 'number') timestamp = swapDisplaysOrNow;
+    } else {
+      mode = modeOrInput;
+      swap = Boolean(swapDisplaysOrNow);
+      qrDismiss = qrDismissSeconds ?? 45;
+      timestamp = now;
+    }
+
+    this.database.raw
+      .prepare(
+        `UPDATE settings SET dual_display_mode = ?, swap_displays = ?, qr_dismiss_seconds = ?,
+          revision = revision + 1, updated_at = ? WHERE id = 1`,
+      )
+      .run(mode, swap ? 1 : 0, qrDismiss, timestamp);
+    return this.getSettings();
   }
 
   listFrames(): StoredFrame[] {
@@ -1342,6 +1422,14 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     cameraResolution: row.camera_resolution === '720p' ? '720p' : '1080p',
     supabaseUrl: row.supabase_url,
     supabasePublishableKey: row.supabase_publishable_key,
+    dualDisplayMode: (row.dual_display_mode as DualDisplayMode) || 'auto',
+    swapDisplays: row.swap_displays === 1,
+    qrDismissSeconds: row.qr_dismiss_seconds || 45,
+    googlePhotosEnabled: row.google_photos_enabled === 1,
+    googlePhotosEmail: row.google_photos_email,
+    googlePhotosAlbumId: row.google_photos_album_id,
+    googlePhotosAlbumTitle: row.google_photos_album_title,
+    googlePhotosAlbumShareUrl: row.google_photos_album_share_url,
     revision: row.revision,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

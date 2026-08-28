@@ -3,6 +3,8 @@ import {
   BoothSnapshotEventSchema,
   CAMERA_FRAME_REQUEST_EVENT,
   CameraFrameRequestEventSchema,
+  QR_STATION_EVENT,
+  QrStationEventSchema,
   IpcContracts,
   type GraceBoothBridge,
   type IpcChannel,
@@ -60,8 +62,21 @@ const bridge: GraceBoothBridge = {
       return () => ipcRenderer.removeListener(CAMERA_FRAME_REQUEST_EVENT, handler);
     },
   },
+  qrStation: {
+    getState: () => invoke('qr-station:get-state', {}),
+    dismiss: () => invoke('qr-station:dismiss', {}),
+    subscribe: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
+        const parsed = QrStationEventSchema.safeParse(value);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(QR_STATION_EVENT, handler);
+      return () => ipcRenderer.removeListener(QR_STATION_EVENT, handler);
+    },
+  },
   gallery: {
     getRecent: (limit = 20) => invoke('gallery:get-recent', { limit }),
+    repairCloudPhoto: (sessionId) => invoke('gallery:repair-cloud-photo', { sessionId }),
   },
   admin: {
     getAuthStatus: () => invoke('admin:get-auth-status', {}),
@@ -72,6 +87,14 @@ const bridge: GraceBoothBridge = {
       invoke('admin:change-passcode', { currentPasscode, newPasscode }),
     getSettings: () => invoke('admin:get-settings', {}),
     saveSettings: (input) => invoke('admin:save-settings', input),
+    getGooglePhotosStatus: () => invoke('admin:google-photos:get-status', {}),
+    saveGooglePhotosConfig: (config) => invoke('admin:google-photos:save-config', config),
+    resolveGooglePhotosAlbum: (shareUrl) => invoke('admin:google-photos:resolve-album', { shareUrl }),
+    testGooglePhotosUpload: () => invoke('admin:google-photos:test-upload', {}),
+    disconnectGooglePhotos: () => invoke('admin:google-photos:disconnect', {}),
+    getDisplays: () => invoke('admin:get-displays', {}),
+    swapDisplays: () => invoke('admin:swap-displays', {}),
+    saveDualDisplaySettings: (input) => invoke('admin:save-dual-display-settings', input),
     listFrames: () => invoke('admin:list-frames', {}),
     addFrame: () => invoke('admin:add-frame', {}),
     updateFrameLayout: (input) => invoke('admin:update-frame-layout', input),
@@ -84,6 +107,7 @@ const bridge: GraceBoothBridge = {
     restartSession: (sessionId) => invoke('admin:restart-session', { sessionId }),
     connectCloud: (email, password, supabaseUrl, supabasePublishableKey) =>
       invoke('admin:connect-cloud', { email, password, supabaseUrl, supabasePublishableKey }),
+    openExternalUrl: (url) => invoke('admin:open-external-url', { url }),
   },
 };
 

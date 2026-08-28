@@ -1,5 +1,6 @@
 import {
   ArrowClockwiseIcon as ArrowClockwise,
+  CloudArrowUpIcon as CloudArrowUp,
   ImagesIcon as Images,
   MagnifyingGlassPlusIcon as MagnifyingGlassPlus,
   QrCodeIcon as QrCode,
@@ -18,6 +19,8 @@ type RecentGalleryProps = {
   operator?: boolean | undefined;
   jobs?: UploadJobSummary[] | undefined;
   onRetryJob?: ((jobId: string) => void) | undefined;
+  onRepairCloudPhoto?: ((sessionId: string) => void) | undefined;
+  repairingSessionId?: string | null | undefined;
   onClose: () => void;
 };
 
@@ -26,6 +29,8 @@ const STATUS_LABEL: Record<GalleryUploadStatus, string> = {
   uploaded: 'Uploaded',
   failed: 'Upload failed',
   'local-receipt': 'Local receipt',
+  unavailable: 'Cloud copy unavailable',
+  'verification-failed': 'Availability check failed',
 };
 
 export function RecentGallery({
@@ -35,9 +40,13 @@ export function RecentGallery({
   operator = false,
   jobs = [],
   onRetryJob,
+  onRepairCloudPhoto,
+  repairingSessionId = null,
   onClose,
 }: RecentGalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const detailDialogRef = useRef<HTMLDivElement>(null);
+  const detailTriggerRef = useRef<HTMLElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const [detailItem, setDetailItem] = useState<GalleryItem | null>(null);
 
@@ -59,11 +68,12 @@ export function RecentGallery({
         }
         return;
       }
-      if (event.key === 'Tab' && containerRef.current && !detailItem) {
+      if (event.key === 'Tab' && containerRef.current) {
+        const trapRoot = detailItem ? detailDialogRef.current : containerRef.current;
         const focusables = Array.from(
-          containerRef.current.querySelectorAll<HTMLElement>(
+          trapRoot?.querySelectorAll<HTMLElement>(
             'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-          ),
+          ) ?? [],
         );
         if (focusables.length === 0) return;
         const first = focusables[0];
@@ -80,9 +90,29 @@ export function RecentGallery({
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      previousFocusRef.current?.focus();
     };
   }, [operator, onClose, detailItem]);
+
+  useEffect(() => {
+    if (!detailItem) {
+      detailTriggerRef.current?.focus();
+      return;
+    }
+    detailDialogRef.current
+      ?.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )
+      ?.focus();
+  }, [detailItem]);
+
+  useEffect(() => {
+    return () => previousFocusRef.current?.focus();
+  }, []);
+
+  const openDetail = (item: GalleryItem, trigger: HTMLElement) => {
+    detailTriggerRef.current = trigger;
+    setDetailItem(item);
+  };
 
   const jobForSession = (sessionId: string): UploadJobSummary | null =>
     jobs.find((job) => job.sessionId === sessionId) ?? null;
@@ -136,11 +166,11 @@ export function RecentGallery({
               className={`gallery-tile gallery-tile--clickable${operator ? ' gallery-tile--operator' : ''}`}
               data-testid={`gallery-item-${index + 1}`}
               key={item.sessionId}
-              onClick={() => setDetailItem(item)}
+              onClick={(event) => openDetail(item, event.currentTarget)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setDetailItem(item);
+                  openDetail(item, e.currentTarget);
                 }
               }}
               role="button"
@@ -214,6 +244,19 @@ export function RecentGallery({
                   </Button>
                 </div>
               ) : null}
+              {operator && item.metadata.uploadStatus === 'unavailable' ? (
+                <div className="gallery-tile__action" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    icon={<CloudArrowUp aria-hidden="true" weight="bold" />}
+                    loading={repairingSessionId === item.sessionId}
+                    onClick={() => onRepairCloudPhoto?.(item.sessionId)}
+                    variant="secondary"
+                    wide
+                  >
+                    Repair cloud copy
+                  </Button>
+                </div>
+              ) : null}
             </article>
           );
         })}
@@ -238,9 +281,10 @@ export function RecentGallery({
           <div
             className="recent-detail-modal"
             onClick={(e) => e.stopPropagation()}
+            ref={detailDialogRef}
             role="document"
           >
-            <header className="recent-detail-modal__header">
+            <header className="recent-detail-modal__header" role="presentation">
               <div className="recent-detail-modal__title-group">
                 <h2>
                   <Images aria-hidden="true" weight="bold" /> Photo Strip Details
@@ -259,7 +303,11 @@ export function RecentGallery({
               </button>
             </header>
 
-            <div className="recent-detail-modal__body">
+            <div
+              aria-label="Scrollable photo details"
+              className="recent-detail-modal__body"
+              tabIndex={0}
+            >
               <div className="recent-detail-modal__strip-col">
                 <img
                   alt={`Enlarged photostrip captured at ${formatTimestamp(detailItem.metadata.capturedAt)}`}
@@ -347,10 +395,23 @@ export function RecentGallery({
                     </Button>
                   </div>
                 ) : null}
+                {operator && detailItem.metadata.uploadStatus === 'unavailable' ? (
+                  <div className="recent-detail-modal__retry-box">
+                    <Button
+                      icon={<CloudArrowUp aria-hidden="true" weight="bold" />}
+                      loading={repairingSessionId === detailItem.sessionId}
+                      onClick={() => onRepairCloudPhoto?.(detailItem.sessionId)}
+                      variant="secondary"
+                      wide
+                    >
+                      Repair cloud copy
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </div>
 
-            <footer className="recent-detail-modal__footer">
+            <footer className="recent-detail-modal__footer" role="presentation">
               <Button onClick={() => setDetailItem(null)} variant="secondary">
                 Close
               </Button>

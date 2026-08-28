@@ -122,7 +122,7 @@ function stripTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
-function isTrustedRendererUrl(value: string, expectedOrigin: string): boolean {
+export function isTrustedRendererUrl(value: string, expectedOrigin: string): boolean {
   const url = new URL(value);
   return expectedOrigin === 'app://grace-booth'
     ? url.protocol === 'app:' && url.hostname === 'grace-booth'

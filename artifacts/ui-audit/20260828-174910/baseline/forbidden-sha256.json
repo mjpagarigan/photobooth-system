@@ -1,0 +1,606 @@
+{
+  "capturedAt": "2026-08-28T17:49:14.8901848+08:00",
+  "workspace": "C:\\Users\\padil\\mj\\photobooth-system",
+  "paths": [
+    "apps/kiosk/src/main",
+    "apps/kiosk/src/preload",
+    "packages/shared",
+    "supabase",
+    "infra",
+    "wrangler.jsonc",
+    "scripts",
+    "docs"
+  ],
+  "files": [
+    {
+      "path": "apps/kiosk/src/main/auth/admin-sessions.ts",
+      "exists": true,
+      "sha256": "2decce08adbff31c52990fa7b7b5dee0b23a87470f3e1279da95817690fc6122"
+    },
+    {
+      "path": "apps/kiosk/src/main/auth/bootstrap-guard.ts",
+      "exists": true,
+      "sha256": "c24b248a8cf746d09cf8d161158fb8f3c13805e3c16a997d79b4b6212f98ccda"
+    },
+    {
+      "path": "apps/kiosk/src/main/auth/cloud-session-store.ts",
+      "exists": true,
+      "sha256": "458ae16835b83b7964a7edad515780246128cbfdbf84e4cad061527be03a99b9"
+    },
+    {
+      "path": "apps/kiosk/src/main/auth/lan-certificate-service.ts",
+      "exists": true,
+      "sha256": "6d6101bcc188f35d1663d50ff5f3d300c42e33792e5a6c8472f1af54ce87d75d"
+    },
+    {
+      "path": "apps/kiosk/src/main/auth/passcode-service.ts",
+      "exists": true,
+      "sha256": "ab3afcaf6de5fd7f87356d40eb933ff218a970c0ffea1aed3129d0219d0b35ea"
+    },
+    {
+      "path": "apps/kiosk/src/main/camera/dynamic-camera-adapter.ts",
+      "exists": true,
+      "sha256": "7d60f1efee56a855cb977d9b582408dbb7932858d688e60e05aa7bb3e89cb025"
+    },
+    {
+      "path": "apps/kiosk/src/main/camera/mock-camera-adapter.ts",
+      "exists": true,
+      "sha256": "ac454dfb4b3f432ef7dc240d4e3bf33b3438fb6d8edfb0fa2227415d09e69d24"
+    },
+    {
+      "path": "apps/kiosk/src/main/camera/renderer-frame-broker.ts",
+      "exists": true,
+      "sha256": "ce120a864598a162adbd51dd78dec572005b626b20d0ac46771a412e58739982"
+    },
+    {
+      "path": "apps/kiosk/src/main/camera/sony-camera-adapter.ts",
+      "exists": true,
+      "sha256": "80d68ccebcab84ab82fbff937c9fc09e8ebf75dc2a1e64b4567cb57094794209"
+    },
+    {
+      "path": "apps/kiosk/src/main/camera/webcam-camera-adapter.ts",
+      "exists": true,
+      "sha256": "6575d7fd6a1398f7a28f7c8c9df4a5c92352ba08856de521e134c0864db75d69"
+    },
+    {
+      "path": "apps/kiosk/src/main/cloud/delivery-client.ts",
+      "exists": true,
+      "sha256": "5ee5fc31d0da793445a9fd2a0783f21d6d492962f66709c815f12c40983b2e96"
+    },
+    {
+      "path": "apps/kiosk/src/main/cloud/e2e-delivery-client.ts",
+      "exists": true,
+      "sha256": "0db0b1f67c7d6cd73c132cf979c80624a0af1373730f2a18a75e2f6c9b3d61a6"
+    },
+    {
+      "path": "apps/kiosk/src/main/cloud/qr-service.ts",
+      "exists": true,
+      "sha256": "25ee317043ebdb355ca3d81edb4e557f9e051a2caae9bdb4568104a6258213c6"
+    },
+    {
+      "path": "apps/kiosk/src/main/cloud/ready-receipt.ts",
+      "exists": true,
+      "sha256": "8479cff2bc4ebfb9bf12e1cd9419dd72df286ab822596412183e6d9b159a92a5"
+    },
+    {
+      "path": "apps/kiosk/src/main/cloud/upload-queue.ts",
+      "exists": true,
+      "sha256": "136030934d4dfceca33e84eff19f6c4b95547a312199b276b4fe0a7ca5e2c794"
+    },
+    {
+      "path": "apps/kiosk/src/main/config.ts",
+      "exists": true,
+      "sha256": "667dd6708acb690c1c437e3b5ac68f7d3cb7c70bf495a7c4bba0633ba13c3b2a"
+    },
+    {
+      "path": "apps/kiosk/src/main/database/database.ts",
+      "exists": true,
+      "sha256": "28bcbfd092fe901668df46dde5ecc0b49a99ddfacedcd405f1aad679b383d98a"
+    },
+    {
+      "path": "apps/kiosk/src/main/database/repositories.ts",
+      "exists": true,
+      "sha256": "b388fbd7611decd90bf299fd2a37d7e4918e4fc3535881d2ea68ebb20736588c"
+    },
+    {
+      "path": "apps/kiosk/src/main/database/schema.ts",
+      "exists": true,
+      "sha256": "9f4a8cd00d4fc06180dc28e418c32f34dec6e671e2fe6647e585e5138aaecdff"
+    },
+    {
+      "path": "apps/kiosk/src/main/errors.ts",
+      "exists": true,
+      "sha256": "33b313721b040d4d6711969b731ced58824c941df1e589b37880308e535eea7a"
+    },
+    {
+      "path": "apps/kiosk/src/main/frame/frame-service.ts",
+      "exists": true,
+      "sha256": "73fd95351dc6faaffcd86430cdf94a624c5e00890813c67a28bbb1909b7ec3ce"
+    },
+    {
+      "path": "apps/kiosk/src/main/gallery/recent-gallery-service.ts",
+      "exists": true,
+      "sha256": "47dbcf60a1d6b29f5578c98191ba72481469cd9e3dfd8fe7450cbfa5b83bbe0a"
+    },
+    {
+      "path": "apps/kiosk/src/main/health-service.ts",
+      "exists": true,
+      "sha256": "6871dc42905c74e74f4783a1a39da8d0d8ab15570d970f29439ca9dada0f8e23"
+    },
+    {
+      "path": "apps/kiosk/src/main/image/crop-strategy.ts",
+      "exists": true,
+      "sha256": "0e55f719a25cd8659f9a35a1d54c5d3fde1bc0f56177a0c9ebb7218626cbfbea"
+    },
+    {
+      "path": "apps/kiosk/src/main/image/image-pipeline.ts",
+      "exists": true,
+      "sha256": "03b202a71706c877527f57dfc4437ecaa59e9676d0b5fe147f8311d675bfc43d"
+    },
+    {
+      "path": "apps/kiosk/src/main/image/image-validation.ts",
+      "exists": true,
+      "sha256": "c2b8beb7631aad5d8f6bc5a1f9f0084920d58e9b893f497c0e6bfd1dde5e13ed"
+    },
+    {
+      "path": "apps/kiosk/src/main/image/image-worker-client.ts",
+      "exists": true,
+      "sha256": "f10dc130619c57432fe5787da23161cbf4b5bbc05006d7403e939bf4530991cd"
+    },
+    {
+      "path": "apps/kiosk/src/main/image/image-worker.ts",
+      "exists": true,
+      "sha256": "3902d52f3daf314f02b4465ee05467f38050132855a411d3bfa4aa0f04b57afd"
+    },
+    {
+      "path": "apps/kiosk/src/main/image/strip-export-config.ts",
+      "exists": true,
+      "sha256": "4c5d3c46edd6b61f239e74891b3cca74f6f4a84dba00f550cfdff6123209a40c"
+    },
+    {
+      "path": "apps/kiosk/src/main/index.ts",
+      "exists": true,
+      "sha256": "6da4427ad6f9d38691752aa6bbdc980fc076687b921d3b4246c49b5ca47623d3"
+    },
+    {
+      "path": "apps/kiosk/src/main/ipc/register-ipc.ts",
+      "exists": true,
+      "sha256": "6c0d4a3ce15fc381b49d5afcb194cf01835b6ae6d49d76712f6ee06f247b4b16"
+    },
+    {
+      "path": "apps/kiosk/src/main/ipc/sender-trust.ts",
+      "exists": true,
+      "sha256": "3aba49121eab3fb84c577a0c6a06754fb47d44b8112e9e02bf04d0bafe2302ef"
+    },
+    {
+      "path": "apps/kiosk/src/main/logging.ts",
+      "exists": true,
+      "sha256": "ac0731bf056a34167b8ea7eacb2fd681fb3f15f121f959b194e8624c3b68b820"
+    },
+    {
+      "path": "apps/kiosk/src/main/native-self-test.ts",
+      "exists": true,
+      "sha256": "49e2fadd027d2484fb37438d32d30b7e9807baeaf3933d3afa6f5eb14e627afb"
+    },
+    {
+      "path": "apps/kiosk/src/main/security/protocols.ts",
+      "exists": true,
+      "sha256": "3b3c387df814d241cdcb18072da970b406c12f4ba60d2e0c1256e9d375786d1b"
+    },
+    {
+      "path": "apps/kiosk/src/main/security/window.ts",
+      "exists": true,
+      "sha256": "efd2642d9e86d9d1df6019e4d63021cd19bf7ac077ea79852b6e407968f7f716"
+    },
+    {
+      "path": "apps/kiosk/src/main/server/admin-server-manager.ts",
+      "exists": true,
+      "sha256": "396f61d26cf8e22510b8d83c40bc37926279c66d1d7f2f50efec5c94b492e7ce"
+    },
+    {
+      "path": "apps/kiosk/src/main/server/lan-ip.ts",
+      "exists": true,
+      "sha256": "29befffc660ca7ac3fc0262979e6d08681185b35d8157a76d255c23b4f2c9f01"
+    },
+    {
+      "path": "apps/kiosk/src/main/server/local-admin-server.ts",
+      "exists": true,
+      "sha256": "63cee33fecef5288d5499330e4b91dc566b01ff214ae3680021eea2436de0c4f"
+    },
+    {
+      "path": "apps/kiosk/src/main/server/network-boundary.ts",
+      "exists": true,
+      "sha256": "dabcad121526fd174388dfb65c6523f4a4399685f2f9d79b0a94a540738c5847"
+    },
+    {
+      "path": "apps/kiosk/src/main/server/offline-delivery-server.ts",
+      "exists": true,
+      "sha256": "8f79eae55bd649780307f0e73a82c55f563a99008193e29282e2f09d7f6b89d4"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/atomic-file.ts",
+      "exists": true,
+      "sha256": "f0b63b4bc8b7d2e362d0b67f5feaf426b7825a001818ec6e381090a2305cb145"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/electron-secret-protection.ts",
+      "exists": true,
+      "sha256": "e6efd7f8617c0b572e90960afefa191b55fefe4df4694963ead61566145ae8aa"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/media-service.ts",
+      "exists": true,
+      "sha256": "b824c51fb9dd82964c5cab9ca5aabd1408c5565961fa53437e8a388de868e41c"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/paths.ts",
+      "exists": true,
+      "sha256": "9d558368ff0039939d94521190102fb16a4338250edbb7e4fe81c5d17e4f801a"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/photo-vault.ts",
+      "exists": true,
+      "sha256": "ecdc5e07583dcdea6b28cd156a9fffc6b76ca13bf05a9309e12f1e7efe1eff0f"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/retention-service.ts",
+      "exists": true,
+      "sha256": "28e15c0f8e76d89f65de26ea333ca6774cc40f3d9de4ada358026e0da808a063"
+    },
+    {
+      "path": "apps/kiosk/src/main/storage/secret-store.ts",
+      "exists": true,
+      "sha256": "6d36711f8fb1fd5a513d09d7c7339a478fdf2fd7a57412fca3a6fb23ff602bb9"
+    },
+    {
+      "path": "apps/kiosk/src/main/workflow/booth-workflow.ts",
+      "exists": true,
+      "sha256": "4d58310d3480fcc42617a5c791fd577011a596303db6871bfb11637a936f86cf"
+    },
+    {
+      "path": "apps/kiosk/src/main/workflow/session-state-machine.ts",
+      "exists": true,
+      "sha256": "6ad7ba660696eb650f32657961340a3bab2f02ad06223b6b1518c9a646a1effd"
+    },
+    {
+      "path": "apps/kiosk/src/preload/index.ts",
+      "exists": true,
+      "sha256": "0a222bc86f36691d4dc398ad78d6af3fc329e61752d40236040cd1e605af183a"
+    },
+    {
+      "path": "docs/BUILD_FLOW_SUMMARY.md",
+      "exists": true,
+      "sha256": "8409bb459140a41e20206d79db64ab5d21b46d954a3554493a2f6938cd07f7b2"
+    },
+    {
+      "path": "docs/SECURITY_AND_RETENTION.md",
+      "exists": true,
+      "sha256": "9795563cd8e5a1a8cf8177471671e06634fca40ad24aa73c8dd3214d0fc0c2f2"
+    },
+    {
+      "path": "docs/SONY_CAMERA_INTEGRATION.md",
+      "exists": true,
+      "sha256": "15a7c062385605121bdd19aec7e4743a851502e8373931ff9020b9fd95e09feb"
+    },
+    {
+      "path": "docs/VERIFICATION.md",
+      "exists": true,
+      "sha256": "a0689201bfcf9a4b300d78540e619f21d7603b6566fac0b19f0ffaf6fea4d27b"
+    },
+    {
+      "path": "docs/wayfinder/map.md",
+      "exists": true,
+      "sha256": "cc47efb48484e96d279faff67f733dbff17b4fe26f51823b5ce91c45e5b62d58"
+    },
+    {
+      "path": "docs/wayfinder/tickets/01-camera-lifecycle-and-timers.md",
+      "exists": true,
+      "sha256": "ae3cd2aaaeb20afdb91d49ef2e4d354646b13077b52d917d87fb28232b5286c0"
+    },
+    {
+      "path": "docs/wayfinder/tickets/02-esc-cancel.md",
+      "exists": true,
+      "sha256": "37bf1d3983ebcf4f4bab94bf83dc44ae73e6bb57da6ee32ebdcefd1cc939f25e"
+    },
+    {
+      "path": "docs/wayfinder/tickets/03-dynamic-infinite-frames.md",
+      "exists": true,
+      "sha256": "08d45d04d2d062febe8cbe532ef7b7191d4caf84889d6534b74767f90fa1267c"
+    },
+    {
+      "path": "docs/wayfinder/tickets/04-recent-photo-viewer.md",
+      "exists": true,
+      "sha256": "7ee93d3eeb54737ecbb10ca7f329dd922042d205075c039c1f7204d136a2410d"
+    },
+    {
+      "path": "docs/wayfinder/tickets/05-cloudflare-date-filenames.md",
+      "exists": true,
+      "sha256": "72dbd0be50c0bac6be07373a153fecc81fced087143f1cd4871df314ad5dcfce"
+    },
+    {
+      "path": "docs/wayfinder/tickets/06-qr-image-load-failure.md",
+      "exists": true,
+      "sha256": "0c3bb823e5d6dd37a4d1c21cb35734205e8ea9cc4920774f2e759100af6334ef"
+    },
+    {
+      "path": "infra/r2-cors.json",
+      "exists": false,
+      "sha256": null
+    },
+    {
+      "path": "packages/shared/package.json",
+      "exists": true,
+      "sha256": "98710e94ef694ed2415f5187613b5b96b59806ec86331cf275fba0a31425b2a5"
+    },
+    {
+      "path": "packages/shared/src/camera.ts",
+      "exists": true,
+      "sha256": "4374e5c01e9cef51a06d04635b2738807a594a967c0ff98d0156caa64bfcd91a"
+    },
+    {
+      "path": "packages/shared/src/cloud.ts",
+      "exists": true,
+      "sha256": "47808891902c858c44eaa537999dfa3154f1325eb5db3e7af6ed99ea648c7b99"
+    },
+    {
+      "path": "packages/shared/src/domain.ts",
+      "exists": true,
+      "sha256": "4fc64ebe5ee5443d4aef48fee6d04ef0acc5988ae8d5187fe10f3f48ec7eaf52"
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "exists": true,
+      "sha256": "a164fe42d3b62cbfac4483d5639fc018ce4bf4356d78f51361cfe3e5ce18d110"
+    },
+    {
+      "path": "packages/shared/src/ipc.ts",
+      "exists": true,
+      "sha256": "e6e6951225a2881bd411c968a7bb7b8a1c77731cbe22d98da86f345f932baacb"
+    },
+    {
+      "path": "packages/shared/tests/schemas.test.ts",
+      "exists": true,
+      "sha256": "2ac50025ad03d47e81a99bd1b91fb0abc3aaa123ff8dc8ec1743a533aae64f61"
+    },
+    {
+      "path": "packages/shared/tsconfig.json",
+      "exists": true,
+      "sha256": "3e9e4341708df6ceffa85e0f31edfd71393fac9fbe94f93f6ea7cf902e643d20"
+    },
+    {
+      "path": "scripts/smoke-photo-delivery.mjs",
+      "exists": true,
+      "sha256": "364ddcefc484720189c7e8aa38dc109fe6c052db19d604a76cd519c2271476f4"
+    },
+    {
+      "path": "supabase/config.toml",
+      "exists": true,
+      "sha256": "179b752cd87ff430a8d58fa9db45f6c8c076ff4fbbf9639e04511eac11bfc1c2"
+    },
+    {
+      "path": "supabase/functions/_shared/constants.ts",
+      "exists": true,
+      "sha256": "c7d309ae00475e965a25912e8ad80a9062e4b9853c7bc35ae36d6b23fa1bd195"
+    },
+    {
+      "path": "supabase/functions/_shared/encoding.ts",
+      "exists": true,
+      "sha256": "904d5d93d4dd8d720b72de18e5915f45b275ca2099ffcda3ad4317db2a810116"
+    },
+    {
+      "path": "supabase/functions/_shared/env.ts",
+      "exists": true,
+      "sha256": "eca969859f4e4e01164b47fe2180f1a08f1ce9904982d3f8698a83aeb0eb60cc"
+    },
+    {
+      "path": "supabase/functions/_shared/errors.ts",
+      "exists": true,
+      "sha256": "726c074fc89c59b0dcd5c94a185a58768849871aa51c2fb9b2167d05b204c3d6"
+    },
+    {
+      "path": "supabase/functions/_shared/http.ts",
+      "exists": true,
+      "sha256": "e2a1c7498a627858aae216d696aeb62eb0c629ba0752f4eb9eace3d5af0af1aa"
+    },
+    {
+      "path": "supabase/functions/_shared/jpeg.ts",
+      "exists": true,
+      "sha256": "07458da2af85b1d88bcf12e70f84a5351f6f99961fdd2b0c0b3eea5a01694477"
+    },
+    {
+      "path": "supabase/functions/_shared/r2.ts",
+      "exists": true,
+      "sha256": "02ad0ba5ff1571d0c1af42c8304446ee4ad1e57d94681cb39a8b0f07baa37fd7"
+    },
+    {
+      "path": "supabase/functions/_shared/schemas.ts",
+      "exists": true,
+      "sha256": "0d3359979b702f887f250b876250f9f2315e07080e51c4b6fe6fd27162a256a3"
+    },
+    {
+      "path": "supabase/functions/_shared/storage-verification.ts",
+      "exists": true,
+      "sha256": "563530e4b65ab18c2b1a34c41c7237102abe4aadb9362e8566c075a1da56359a"
+    },
+    {
+      "path": "supabase/functions/_shared/supabase.ts",
+      "exists": true,
+      "sha256": "80f302044a44b911b8dd166a8e72315ce56db6ab6883536bf9c8a6da8d99471c"
+    },
+    {
+      "path": "supabase/functions/_shared/token.ts",
+      "exists": true,
+      "sha256": "63cbb59508fb1aaa8e719a9d6e72000d2a8260c30981a0f3fa00ba3b9dde5272"
+    },
+    {
+      "path": "supabase/functions/cleanup-expired/index.ts",
+      "exists": true,
+      "sha256": "8835e6fb7bbd32227e01d91b0430fb0eca89681146936a08913a4c82a68dbf29"
+    },
+    {
+      "path": "supabase/functions/confirm-upload/index.ts",
+      "exists": true,
+      "sha256": "5c8ec210caa13fe7c9a95423b7e12b419ea0f863238e7ac362f296c7b5df3287"
+    },
+    {
+      "path": "supabase/functions/create-upload/index.ts",
+      "exists": true,
+      "sha256": "184651986e63bc622851a4530a18627532324ed5b19f10270285e1d17a5f1ab2"
+    },
+    {
+      "path": "supabase/functions/deno.json",
+      "exists": true,
+      "sha256": "b5492d0f1e02c80827b8165f7eb2ad222ec9dab71eb042dab165b306746d970e"
+    },
+    {
+      "path": "supabase/functions/deno.lock",
+      "exists": true,
+      "sha256": "b5f5db71ec07a4bf742661d6be64c391df645b9842f94486e70d72c20519423d"
+    },
+    {
+      "path": "supabase/functions/integration/photo_delivery_integration_test.ts",
+      "exists": true,
+      "sha256": "c6dc3e018962927b1c79be320760fd6d24fd5266e9dd91a60fe18ace563d2db9"
+    },
+    {
+      "path": "supabase/functions/photo/index.ts",
+      "exists": true,
+      "sha256": "7b103865cd17a29cd1483e3b6d7614f8fc407c6aba7e1591c1d1e49f901581d0"
+    },
+    {
+      "path": "supabase/functions/repair-photo/index.ts",
+      "exists": true,
+      "sha256": "0ed7867b7454827b045fa7887ee9f0995567e06eaa2450386bd97eb6341cb889"
+    },
+    {
+      "path": "supabase/functions/tests/cleanup_test.ts",
+      "exists": true,
+      "sha256": "1c33f4dbdd5a748659dece2e4d1edfe8725589c664e1666482f14c42d9b75fca"
+    },
+    {
+      "path": "supabase/functions/tests/confirm_test.ts",
+      "exists": true,
+      "sha256": "04345fd704c81bd88f6a47106becc1da72eca6a9e98b0f1604e95815487a33ae"
+    },
+    {
+      "path": "supabase/functions/tests/env_test.ts",
+      "exists": true,
+      "sha256": "fd884d498d7332b0cad37320ec74fd1276477eeb3ece5442b2af306325819df6"
+    },
+    {
+      "path": "supabase/functions/tests/http_test.ts",
+      "exists": true,
+      "sha256": "c998fb4a5c63eee760ba31377aa29d7fb6f43c6bf10275376e65bbb34c7bb9ef"
+    },
+    {
+      "path": "supabase/functions/tests/jpeg_test.ts",
+      "exists": true,
+      "sha256": "70791f3d7695adf769b1608364d3a43c9fc4c728855fbbf1c1c5691c7cf3f11e"
+    },
+    {
+      "path": "supabase/functions/tests/naming_test.ts",
+      "exists": true,
+      "sha256": "219fc042ded8e6bfbb80bddb29824ff064e0e33f75c57a20211cfb76246cab07"
+    },
+    {
+      "path": "supabase/functions/tests/photo_test.ts",
+      "exists": true,
+      "sha256": "af72077876d9e885946688f612bd7ee756cfa319ec69bea88b84a003d1cb0de2"
+    },
+    {
+      "path": "supabase/functions/tests/r2_test.ts",
+      "exists": true,
+      "sha256": "286512ef6869ebd1b0161d76d764ecdceefab1ff70a03012e56198090b6c6c1e"
+    },
+    {
+      "path": "supabase/functions/tests/repair_photo_test.ts",
+      "exists": true,
+      "sha256": "ac8d4340c08fcb54c3d8fe1e55410306d42e2ac4922a3a35339365efd820ae59"
+    },
+    {
+      "path": "supabase/functions/tests/repair_storage_backends_test.ts",
+      "exists": true,
+      "sha256": "c254b702f29a3ab34aa72953c7163d153f4cce12326680f546ac107fa4fa58cc"
+    },
+    {
+      "path": "supabase/functions/tests/routing_test.ts",
+      "exists": true,
+      "sha256": "05acc6184a2f06ac7c45542bd5ea49278bfb7d919bee5f4418365a0c8cf73368"
+    },
+    {
+      "path": "supabase/functions/tests/schemas_test.ts",
+      "exists": true,
+      "sha256": "2f0b418fd56fe4a0ef2b64d1f7154ef8b668db258e330d41023bd718a22b2dfb"
+    },
+    {
+      "path": "supabase/functions/tests/token_test.ts",
+      "exists": true,
+      "sha256": "64a825f45b0e587503a72182df03179655e6750cee839e5721664c58752adb1c"
+    },
+    {
+      "path": "supabase/functions/tools/repair-storage-backends.ts",
+      "exists": true,
+      "sha256": "648baa3a7a74e020f48f919f69602cceef779b9c53fde0d4c1a134319f29a2c6"
+    },
+    {
+      "path": "supabase/migrations/20260817010000_photo_delivery.sql",
+      "exists": true,
+      "sha256": "0ce57a7e531d61a3ab3b9e59cf3b681c996588ed0d8103571975c4d50f14a20d"
+    },
+    {
+      "path": "supabase/migrations/20260817011000_storage_security.sql",
+      "exists": true,
+      "sha256": "d45623edb43fed7b343c4ae5347158ed042f0185b27c6326030b1bbd36f97e3f"
+    },
+    {
+      "path": "supabase/migrations/20260817012000_cleanup_schedule.sql",
+      "exists": true,
+      "sha256": "de3dcd8932d343ea0c0d33a741c4d7eda6fbe7c8668b2ff16f7035f7dfe71058"
+    },
+    {
+      "path": "supabase/migrations/20260824000000_storage_object_path_date_format.sql",
+      "exists": true,
+      "sha256": "81505feb82fdb461cf303093e8a3894674281863e113860ca65b835e029d8005"
+    },
+    {
+      "path": "supabase/migrations/20260824001000_fix_resume_photo_session_qualification.sql",
+      "exists": true,
+      "sha256": "d40d6082304a72d9bd5fd0b8c36da7248c1f57e2bc0ddfb2456b2a5b9911abeb"
+    },
+    {
+      "path": "supabase/migrations/20260824002000_storage_backend_and_strip_dimensions.sql",
+      "exists": true,
+      "sha256": "9f0350d0fdd251958bf0a863ca13cae0a73c098c9f28c908196989537ae26641"
+    },
+    {
+      "path": "supabase/migrations/20260824003000_remove_photo_byte_limit.sql",
+      "exists": true,
+      "sha256": "f3f9a3b290f206ac3338be629d242bf8fa711aedd8245d6b910a1dacc171c31b"
+    },
+    {
+      "path": "supabase/migrations/20260827000000_photo_storage_backend_repair.sql",
+      "exists": true,
+      "sha256": "37580494a4f26c45e7abd6df2c94f0690665e9af19ed7c740305c99420cc2210"
+    },
+    {
+      "path": "supabase/README.md",
+      "exists": true,
+      "sha256": "e16b4beb83d5b52fba17958980d7c7fbf8ff0df79b190d5fe969f9dca289ba59"
+    },
+    {
+      "path": "supabase/seed.sql",
+      "exists": true,
+      "sha256": "ba3abfdd9db2c8709e9b9acbdd8b8cdd0fff1b102f2b10e0d42a7db65b8ddc18"
+    },
+    {
+      "path": "supabase/tests/database/photo_delivery.test.sql",
+      "exists": true,
+      "sha256": "a77e759200d27c0684dac5a6b5cc1a1ff3bb19536166a5728f3641ead7e393e1"
+    },
+    {
+      "path": "wrangler.jsonc",
+      "exists": true,
+      "sha256": "53b437bc91c8a52d920ae2786bfa7c96a8217a389f173f893771fe619fe16d78"
+    }
+  ]
+}

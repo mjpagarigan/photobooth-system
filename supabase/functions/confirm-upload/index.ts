@@ -7,6 +7,7 @@ import { createR2Client, getR2ObjectBytes } from '../_shared/r2.ts';
 import { ConfirmUploadSchema, parseWithSchema } from '../_shared/schemas.ts';
 import { type AdminClient, authenticateBooth, createAdminClient } from '../_shared/supabase.ts';
 import { hashPublicToken, sha256Hex } from '../_shared/token.ts';
+import { processGooglePhotosSyncQueue } from '../sync-google-photos/index.ts';
 
 type PhotoSessionRow = {
   id: string;
@@ -178,6 +179,18 @@ export async function handler(request: Request): Promise<Response> {
     const row = Array.isArray(finalized) ? asFinalizedRow(finalized[0]) : null;
     if (finalizeError || !row) {
       throw new ApiError(503, 'unavailable', 'The upload could not be confirmed.', true);
+    }
+
+    try {
+      // @ts-ignore EdgeRuntime global
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        // @ts-ignore EdgeRuntime global
+        EdgeRuntime.waitUntil(processGooglePhotosSyncQueue(admin));
+      } else {
+        void processGooglePhotosSyncQueue(admin).catch(() => {});
+      }
+    } catch {
+      // Non-blocking fail-open
     }
 
     return jsonResponse(readyResponse(row), 200, {}, correlationId);

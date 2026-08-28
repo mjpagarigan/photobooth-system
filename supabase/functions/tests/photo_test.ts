@@ -1,4 +1,4 @@
-import { assertEquals, assertFalse, assertStringIncludes } from 'jsr:@std/assert@1.0.14';
+import { assertEquals } from 'jsr:@std/assert@1.0.14';
 import type { AdminClient } from '../_shared/supabase.ts';
 import { handler, type PhotoHandlerDependencies } from '../photo/index.ts';
 
@@ -40,6 +40,13 @@ function request(
 function adminClient(
   rows: (ResolvedRow | null)[] = [PHOTO, PHOTO],
   jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9]),
+  storageInfo: {
+    data: { size: number; contentType?: string; mimetype?: string } | null;
+    error: unknown;
+  } = {
+    data: { size: jpeg.byteLength, contentType: 'image/jpeg' },
+    error: null,
+  },
 ): { client: AdminClient; rpcCalls: () => number } {
   let calls = 0;
   const client = {
@@ -51,6 +58,9 @@ function adminClient(
     storage: {
       from() {
         return {
+          info() {
+            return Promise.resolve(storageInfo);
+          },
           download() {
             return Promise.resolve({
               data: new Blob([jpeg], { type: 'image/jpeg' }),
@@ -83,10 +93,7 @@ function dependencies(
           }),
       }) as unknown as ReturnType<PhotoHandlerDependencies['createR2Client']>,
     checkR2ObjectExists: () => Promise.resolve({ exists: true, byteSize: PHOTO.byte_size }),
-    createR2PresignedGetUrl: () =>
-      Promise.resolve(
-        'https://bucket.account.r2.cloudflarestorage.com/signed.jpg?X-Amz-Signature=one',
-      ),
+    getR2ObjectBytes: () => Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9])),
     hashPublicToken: () => Promise.resolve('a'.repeat(64)),
     photoBucket: () => 'photos',
     r2BucketName: () => 'private-photos',
@@ -115,8 +122,8 @@ Deno.test('R2 image and download requests return fresh JPEG bytes with CORS head
   assertEquals(admin.rpcCalls(), 4);
 });
 
-Deno.test('resolve remains metadata-only even when R2 delivery is configured', async () => {
-  const admin = adminClient([PHOTO]);
+Deno.test('resolve verifies the R2 object and reauthorizes before reporting ready', async () => {
+  const admin = adminClient([PHOTO, PHOTO]);
   let storageChecked = false;
   const response = await handler(
     request('resolve'),
@@ -128,13 +135,40 @@ Deno.test('resolve remains metadata-only even when R2 delivery is configured', a
     }),
   );
   assertEquals(response.status, 200);
-  assertEquals(storageChecked, false);
+  assertEquals(storageChecked, true);
   assertEquals(await response.json(), {
     status: 'ready',
     expiresAt: PHOTO.expires_at,
     googleFormsUrl: null,
   });
-  assertEquals(admin.rpcCalls(), 1);
+  assertEquals(admin.rpcCalls(), 2);
+});
+
+Deno.test('resolve returns 404 for a missing R2 object and 503 for mismatched storage', async () => {
+  for (
+    const object of [
+      { exists: false, byteSize: null },
+      { exists: true, byteSize: PHOTO.byte_size + 1 },
+    ]
+  ) {
+    const admin = adminClient([PHOTO, PHOTO]);
+    const response = await handler(
+      request('resolve'),
+      dependencies(admin.client, {
+        checkR2ObjectExists: () => Promise.resolve(object),
+      }),
+    );
+    assertEquals(response.status, object.exists ? 503 : 404);
+  }
+
+  const admin = adminClient([PHOTO, PHOTO]);
+  const failedVerification = await handler(
+    request('resolve'),
+    dependencies(admin.client, {
+      checkR2ObjectExists: () => Promise.reject(new Error('private credential detail')),
+    }),
+  );
+  assertEquals(failedVerification.status, 503);
 });
 
 Deno.test('R2 delivery rejects expired token', async () => {
@@ -152,41 +186,46 @@ Deno.test('R2 delivery rejects missing, mismatched, and freshly unauthorized obj
     ]
   ) {
     const admin = adminClient();
-    let signed = false;
     const response = await handler(
       request('image'),
       dependencies(admin.client, {
         checkR2ObjectExists: () => Promise.resolve(object),
-        createR2PresignedGetUrl: () => {
-          signed = true;
-          return Promise.resolve('https://r2.example/signed');
-        },
       }),
     );
     assertEquals(response.status, object.exists ? 503 : 404);
-    assertEquals(signed, false);
   }
 
   const reauthorization = adminClient([PHOTO, null]);
   const response = await handler(request('download'), dependencies(reauthorization.client));
   assertEquals(response.status, 404);
+
+  const vanishedAfterAuthorization = adminClient([PHOTO, PHOTO]);
+  const vanishedResponse = await handler(
+    request('image'),
+    dependencies(vanishedAfterAuthorization.client, {
+      getR2ObjectBytes: () => Promise.resolve(null),
+    }),
+  );
+  assertEquals(vanishedResponse.status, 404);
+
+  const changedAfterAuthorization = adminClient([PHOTO, PHOTO]);
+  const changedResponse = await handler(
+    request('image'),
+    dependencies(changedAfterAuthorization.client, {
+      getR2ObjectBytes: () => Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff, 0xd9])),
+    }),
+  );
+  assertEquals(changedResponse.status, 503);
 });
 
 Deno.test('photo routes reject an absent token before storage or signing', async () => {
   const admin = adminClient();
-  let signed = false;
   const response = await handler(
     request('image', {}),
-    dependencies(admin.client, {
-      createR2PresignedGetUrl: () => {
-        signed = true;
-        return Promise.resolve('https://r2.example/signed');
-      },
-    }),
+    dependencies(admin.client),
   );
   assertEquals(response.status, 400);
   assertEquals(admin.rpcCalls(), 0);
-  assertEquals(signed, false);
 });
 
 Deno.test('Supabase binary fallback remains size-checked and reauthorized', async () => {
@@ -204,4 +243,35 @@ Deno.test('Supabase binary fallback remains size-checked and reauthorized', asyn
   );
   assertEquals((await response.arrayBuffer()).byteLength, PHOTO.byte_size);
   assertEquals(admin.rpcCalls(), 2);
+});
+
+Deno.test('Supabase resolve distinguishes missing objects from metadata mismatches', async () => {
+  const supabasePhoto = { ...PHOTO, storage_backend: 'supabase' as const };
+  const cases = [
+    {
+      info: { data: null, error: { statusCode: '404', message: 'Object not found' } },
+      expectedStatus: 404,
+    },
+    {
+      info: {
+        data: { size: PHOTO.byte_size + 1, contentType: 'image/jpeg' },
+        error: null,
+      },
+      expectedStatus: 503,
+    },
+    {
+      info: {
+        data: { size: PHOTO.byte_size, contentType: 'application/octet-stream' },
+        error: null,
+      },
+      expectedStatus: 503,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const admin = adminClient([supabasePhoto, supabasePhoto], undefined, testCase.info);
+    const response = await handler(request('resolve'), dependencies(admin.client));
+    assertEquals(response.status, testCase.expectedStatus);
+    assertEquals(admin.rpcCalls(), 1);
+  }
 });

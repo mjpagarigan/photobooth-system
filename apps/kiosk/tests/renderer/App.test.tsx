@@ -61,6 +61,18 @@ const SETTINGS: AdminSettings = {
   cameraResolution: '1080p',
   supabaseUrl: null,
   supabasePublishableKey: null,
+  dualDisplay: {
+    mode: 'auto',
+    swapDisplays: false,
+    qrDismissSeconds: 45,
+  },
+  googlePhotos: {
+    connectedEmail: null,
+    albumId: null,
+    albumTitle: null,
+    albumShareUrl: null,
+    enabled: false,
+  },
   revision: 1,
 };
 
@@ -210,8 +222,38 @@ function createBridge(
       }),
       onCameraFrameRequest: vi.fn().mockReturnValue(() => undefined),
     },
+    qrStation: {
+      getState: vi.fn().mockResolvedValue(
+        ok({
+          status: 'idle' as const,
+          sessionId: null,
+          collageUrl: null,
+          qrImageUrl: null,
+          expiresAt: null,
+          durationSeconds: 45,
+          message: null,
+          canRetryUpload: false,
+        }),
+      ),
+      dismiss: vi.fn().mockResolvedValue(
+        ok({
+          status: 'idle' as const,
+          sessionId: null,
+          collageUrl: null,
+          qrImageUrl: null,
+          expiresAt: null,
+          durationSeconds: 45,
+          message: null,
+          canRetryUpload: false,
+        }),
+      ),
+      subscribe: vi.fn().mockReturnValue(() => undefined),
+    },
     gallery: {
       getRecent: getRecentMock,
+      repairCloudPhoto: vi.fn().mockResolvedValue(
+        ok({ status: 'repaired' as const, message: 'Cloud copy repaired.' }),
+      ),
     },
     admin: {
       getAuthStatus: getAuthStatusMock,
@@ -225,6 +267,17 @@ function createBridge(
       changePasscode: vi.fn().mockResolvedValue(ok({})),
       getSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
       saveSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
+      getDisplays: vi.fn().mockResolvedValue(ok([])),
+      swapDisplays: vi.fn().mockResolvedValue(ok([])),
+      saveDualDisplaySettings: vi.fn().mockResolvedValue(ok({ mode: 'auto', swapDisplays: false, qrDismissSeconds: 45 })),
+      getGooglePhotosStatus: vi.fn().mockResolvedValue(ok({
+        config: { connectedEmail: null, albumId: null, albumTitle: null, albumShareUrl: null, enabled: false },
+        stats: { syncedCount: 0, pendingCount: 0, failedCount: 0, lastSyncedAt: null },
+      })),
+      saveGooglePhotosConfig: vi.fn().mockImplementation((cfg) => Promise.resolve(ok(cfg))),
+      resolveGooglePhotosAlbum: vi.fn().mockResolvedValue(ok({ albumId: 'album_123', albumTitle: 'Sunday Service', shareUrl: 'https://photos.app.goo.gl/xyz' })),
+      testGooglePhotosUpload: vi.fn().mockResolvedValue(ok({ success: true, message: 'Google Photos album connectivity verified successfully.' })),
+      disconnectGooglePhotos: vi.fn().mockResolvedValue(ok({})),
       listFrames: vi.fn().mockResolvedValue(ok([FRAME])),
       addFrame: vi.fn().mockResolvedValue(ok(null)),
       updateFrameLayout: vi.fn().mockResolvedValue(ok(FRAME)),
@@ -236,6 +289,7 @@ function createBridge(
       getHealth: vi.fn().mockResolvedValue(ok(HEALTH)),
       restartSession: restartSessionMock,
       connectCloud: vi.fn().mockResolvedValue(ok({ message: 'Connected.' })),
+      openExternalUrl: vi.fn().mockResolvedValue(ok({})),
     },
   };
 

@@ -47,9 +47,8 @@ The QR photo-delivery chain only works when hosted artifacts come from the same 
 
 1. Apply the checked-in Supabase migrations (`supabase db push`) so `resolve_photo_session` returns `storage_backend`.
 2. Deploy the Edge Functions from that same tree.
-3. Build and deploy the public page from that same tree with `VITE_PUBLIC_PHOTO_API_URL`, `VITE_PUBLIC_PAGE_ORIGIN`, and `VITE_PUBLIC_R2_ORIGIN` all set.
-4. Apply the R2 bucket CORS policy (`pnpm r2:cors:apply` with `R2_BUCKET_NAME`, `PUBLIC_PAGE_ORIGIN`, and Cloudflare credentials set).
-5. Run the hosted smoke test (`pnpm smoke:photo` with a valid token); it names the failing layer - Function/HTTP status, R2 CORS, presigned-origin mismatch, storage-backend drift, or non-JPEG body.
+3. Build and deploy the public page from that same tree with `VITE_PUBLIC_PHOTO_API_URL` and `VITE_PUBLIC_PAGE_ORIGIN` set.
+4. Run the hosted smoke test (`pnpm smoke:photo` with a valid token); it verifies storage-aware resolution plus direct API JPEG bytes for image and download without exposing R2 URLs.
 
 ## Windows artifact
 

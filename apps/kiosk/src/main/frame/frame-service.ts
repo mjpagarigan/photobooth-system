@@ -114,7 +114,8 @@ export class FrameService {
     const seenHashes = new Map<string, StoredFrame>();
     for (const frame of initialLibrary) {
       if (seenHashes.has(frame.sha256)) {
-        const canonical = seenHashes.get(frame.sha256)!;
+        const canonical = seenHashes.get(frame.sha256);
+        if (!canonical) continue;
         this.repository.repointFramePointer(frame.id, canonical.id);
         this.repository.deleteFrameRow(frame.id);
         try {

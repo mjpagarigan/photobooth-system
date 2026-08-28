@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 C:/Users/padil/mj/photobooth-system/apps/kiosk
+
+
+ Test Files  5 passed (5)
+      Tests  46 passed (46)
+   Start at  18:32:04
+   Duration  78.00s (transform 2.09s, setup 3.58s, import 57.72s, tests 7.69s, environment 6.84s)
+

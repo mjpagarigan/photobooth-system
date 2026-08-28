@@ -5,9 +5,7 @@ const LAYERS = {
   NETWORK: 'cors/network',
   HTTP_STATUS: 'http-status',
   ORIGIN_MISMATCH: 'origin-mismatch',
-  STORAGE_BACKEND: 'storage-backend',
   NON_JPEG_BODY: 'non-jpeg-body',
-  CORS_POLICY: 'r2-cors',
 };
 
 class SmokeFailure extends Error {
@@ -61,16 +59,16 @@ function readApiBaseUrl() {
   return url.toString().replace(/\/+$/u, '');
 }
 
-function readExactOrigin(names) {
-  const value = readEnvironment(names);
+function readPageOrigin() {
+  const value = readEnvironment(['PAGE_ORIGIN', 'PUBLIC_PAGE_ORIGIN']);
   if (!value) {
-    fail(LAYERS.CONFIGURATION, `${names[0]} (or ${names[1]}) is not configured`);
+    fail(LAYERS.CONFIGURATION, 'PAGE_ORIGIN (or PUBLIC_PAGE_ORIGIN) is not configured');
   }
   let url;
   try {
     url = new URL(value);
   } catch {
-    fail(LAYERS.CONFIGURATION, `${names[0]} is not a valid absolute URL`);
+    fail(LAYERS.CONFIGURATION, 'PAGE_ORIGIN is not a valid absolute URL');
   }
   if (
     url.protocol !== 'https:' ||
@@ -80,15 +78,14 @@ function readExactOrigin(names) {
     url.username ||
     url.password
   ) {
-    fail(LAYERS.CONFIGURATION, `${names[0]} must be a bare HTTPS origin`);
+    fail(LAYERS.CONFIGURATION, 'PAGE_ORIGIN must be a bare HTTPS origin');
   }
   return url.origin;
 }
 
 async function runSmokeTest() {
   const apiBaseUrl = readApiBaseUrl();
-  const pageOrigin = readExactOrigin(['PAGE_ORIGIN', 'PUBLIC_PAGE_ORIGIN']);
-  const r2Origin = readExactOrigin(['R2_ORIGIN', 'VITE_PUBLIC_R2_ORIGIN']);
+  const pageOrigin = readPageOrigin();
   const token = readEnvironment(['SMOKE_PHOTO_TOKEN']);
   if (!token) fail(LAYERS.CONFIGURATION, 'SMOKE_PHOTO_TOKEN is not configured');
   if (!/^[A-Za-z0-9_-]{43}$/u.test(token)) {
@@ -96,10 +93,10 @@ async function runSmokeTest() {
   }
   const apiOrigin = new URL(apiBaseUrl).origin;
 
-  function postPhotoRoute(route, redirect) {
+  function postPhotoRoute(route) {
     return fetch(`${apiBaseUrl}/${route}`, {
       method: 'POST',
-      redirect,
+      redirect: 'error',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json', Origin: pageOrigin },
       body: JSON.stringify({ token }),
@@ -108,113 +105,62 @@ async function runSmokeTest() {
 
   pass(`page origin ${pageOrigin}`);
 
-  const resolveResponse = await postPhotoRoute('resolve', 'follow');
+  const resolveResponse = await postPhotoRoute('resolve');
   if (!resolveResponse) {
     fail(LAYERS.NETWORK, 'photo API unreachable (DNS, TLS, or Function CORS)');
   }
   if (resolveResponse.status !== 200) {
     fail(
       LAYERS.HTTP_STATUS,
-      `resolve returned HTTP ${resolveResponse.status} (403 page-origin gate; 404 unknown token; 503 backend)`,
+      `resolve returned HTTP ${resolveResponse.status} (403 origin; 404 missing object/token; 503 verification failure)`,
     );
   }
   const resolvePayload = await resolveResponse.json().catch(() => undefined);
   if (resolvePayload?.status !== 'ready') {
-    fail(LAYERS.HTTP_STATUS, 'resolve did not report a ready photo');
+    fail(LAYERS.HTTP_STATUS, 'resolve did not report a storage-verified ready photo');
   }
-  pass('resolve reports ready');
+  pass('resolve reports a storage-verified ready photo');
 
-  const imageResponse = await postPhotoRoute('image', 'follow');
-  if (!imageResponse) {
-    fail(LAYERS.NETWORK, 'photo API unreachable on the image route');
+  for (const route of ['image', 'download']) {
+    const response = await postPhotoRoute(route);
+    if (!response) fail(LAYERS.NETWORK, `photo API unreachable on the ${route} route`);
+    if (response.status !== 200) {
+      fail(
+        LAYERS.HTTP_STATUS,
+        `${route} returned HTTP ${response.status} (403 origin; 404 missing; 503 verification failure)`,
+      );
+    }
+    let responseOrigin;
+    try {
+      responseOrigin = new URL(response.url).origin;
+    } catch {
+      fail(LAYERS.NETWORK, `${route} response has no parseable URL`);
+    }
+    if (response.redirected || responseOrigin !== apiOrigin) {
+      fail(
+        LAYERS.ORIGIN_MISMATCH,
+        `${route} must stream directly from ${apiOrigin}; browser-visible storage redirects are not allowed`,
+      );
+    }
+    const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.toLowerCase();
+    if (contentType !== 'image/jpeg') {
+      fail(LAYERS.NON_JPEG_BODY, `${route} content-type is ${contentType ?? 'missing'}`);
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (
+      bytes.length < 5 ||
+      bytes[0] !== 0xff ||
+      bytes[1] !== 0xd8 ||
+      bytes[2] !== 0xff ||
+      bytes[bytes.length - 2] !== 0xff ||
+      bytes[bytes.length - 1] !== 0xd9
+    ) {
+      fail(LAYERS.NON_JPEG_BODY, `${route} did not return a complete JPEG`);
+    }
+    pass(`${route} streams a complete JPEG directly from the photo API`);
   }
-  if (imageResponse.status !== 200) {
-    fail(
-      LAYERS.HTTP_STATUS,
-      `image returned HTTP ${imageResponse.status} (403 page-origin gate; 404 expired; 503 unavailable)`,
-    );
-  }
-  let finalOrigin;
-  try {
-    finalOrigin = new URL(imageResponse.url).origin;
-  } catch {
-    fail(LAYERS.NETWORK, 'final image response has no parseable URL');
-  }
-  if (finalOrigin === apiOrigin) {
-    fail(
-      LAYERS.STORAGE_BACKEND,
-      'photo streamed from Supabase Storage instead of an R2 303 - storage_backend or migration drift for this token',
-    );
-  }
-  if (finalOrigin !== r2Origin) {
-    fail(
-      LAYERS.ORIGIN_MISMATCH,
-      `redirected to ${finalOrigin}, expected ${r2Origin} - build-time R2 origin does not match the presigned host`,
-    );
-  }
-  pass(`image redirected and followed to ${r2Origin}`);
 
-  const contentType = imageResponse.headers.get('content-type')?.split(';', 1)[0]?.toLowerCase();
-  if (contentType !== 'image/jpeg') {
-    fail(LAYERS.NON_JPEG_BODY, `content-type is ${contentType ?? 'missing'}, expected image/jpeg`);
-  }
-  const bytes = new Uint8Array(await imageResponse.arrayBuffer());
-  if (
-    bytes.length < 5 ||
-    bytes[0] !== 0xff ||
-    bytes[1] !== 0xd8 ||
-    bytes[2] !== 0xff ||
-    bytes[bytes.length - 2] !== 0xff ||
-    bytes[bytes.length - 1] !== 0xd9
-  ) {
-    fail(LAYERS.NON_JPEG_BODY, 'stored object is not a complete JPEG (magic-byte mismatch)');
-  }
-  pass('delivered bytes are a complete JPEG');
-
-  const manualProbe = await postPhotoRoute('image', 'manual');
-  if (manualProbe?.status !== 303) {
-    fail(
-      LAYERS.HTTP_STATUS,
-      `manual re-request returned HTTP ${manualProbe?.status ?? 'network error'}, expected 303`,
-    );
-  }
-  const locationValue = manualProbe.headers.get('location');
-  let location;
-  try {
-    location = new URL(locationValue ?? '');
-  } catch {
-    fail(LAYERS.ORIGIN_MISMATCH, '303 Location header is missing or invalid');
-  }
-  if (location.origin !== r2Origin) {
-    fail(
-      LAYERS.ORIGIN_MISMATCH,
-      `Location points at ${location.origin}, expected ${r2Origin}`,
-    );
-  }
-  const direct = await fetch(location, {
-    redirect: 'error',
-    cache: 'no-store',
-    headers: { Origin: pageOrigin },
-  }).catch(() => undefined);
-  if (!direct) {
-    fail(LAYERS.NETWORK, 'R2 presigned GET unreachable (DNS or TLS)');
-  }
-  if (direct.status !== 200) {
-    fail(
-      LAYERS.HTTP_STATUS,
-      `R2 object GET returned HTTP ${direct.status} (signature or object problem)`,
-    );
-  }
-  const allowOrigin = direct.headers.get('access-control-allow-origin')?.split(',', 1)[0]?.trim();
-  if (allowOrigin !== pageOrigin) {
-    fail(
-      LAYERS.CORS_POLICY,
-      `R2 answered without Access-Control-Allow-Origin for the page origin${allowOrigin ? ` (got ${allowOrigin})` : ''} - apply infra/r2-cors.json via pnpm r2:cors:apply`,
-    );
-  }
-  pass('R2 bucket CORS allows the page origin');
-
-  console.log('[smoke:photo] PASS - QR photo delivery chain is healthy end-to-end');
+  console.log('[smoke:photo] PASS - storage-aware QR photo delivery is healthy end-to-end');
 }
 
 try {

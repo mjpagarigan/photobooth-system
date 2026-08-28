@@ -31,6 +31,52 @@ afterEach(() => {
 });
 
 describe('Supabase delivery request compatibility', () => {
+  it('checks storage-aware availability without putting the raw token in the URL', async () => {
+    const token = 'B'.repeat(43);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      jsonResponse(
+        {
+          status: 'ready',
+          expiresAt: '2026-09-26T00:00:00.000Z',
+          googleFormsUrl: null,
+        },
+        200,
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createDeliveryClient();
+    await expect(
+      client.checkPhotoAvailability(token, 'https://photos.example.test'),
+    ).resolves.toBe('available');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe('https://project.example.test/functions/v1/photo/resolve');
+    expect(url).not.toContain(token);
+    expect(init?.headers).toMatchObject({ Origin: 'https://photos.example.test' });
+    expect(init?.body).toBe(JSON.stringify({ token }));
+  });
+
+  it('maps missing and transient photo probes to safe gallery states', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({}, 503))
+      .mockRejectedValueOnce(new Error('network details'));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createDeliveryClient();
+
+    await expect(
+      client.checkPhotoAvailability('C'.repeat(43), 'https://photos.example.test'),
+    ).resolves.toBe('unavailable');
+    await expect(
+      client.checkPhotoAvailability('D'.repeat(43), 'https://photos.example.test'),
+    ).resolves.toBe('verification-failed');
+    await expect(
+      client.checkPhotoAvailability('E'.repeat(43), 'https://photos.example.test'),
+    ).resolves.toBe('verification-failed');
+  });
+
   it('retries a legacy strict create-upload function once without capturedAt', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

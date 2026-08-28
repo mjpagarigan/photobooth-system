@@ -1,11 +1,16 @@
 import {
   type GetObjectCommandInput,
   type HeadObjectCommandInput,
+  type PutObjectCommandInput,
   S3Client,
 } from 'npm:@aws-sdk/client-s3@^3.750.0';
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1.0.14';
 import { ApiError } from '../_shared/errors.ts';
-import { checkR2ObjectExists, createR2PresignedGetUrl } from '../_shared/r2.ts';
+import {
+  checkR2ObjectExists,
+  createR2PresignedGetUrl,
+  createR2PresignedPutUrl,
+} from '../_shared/r2.ts';
 
 function signingClient(): S3Client {
   return new S3Client({
@@ -60,6 +65,37 @@ Deno.test('R2 GET signing is private, controlled, and bounded to 300 seconds', a
       () => createR2PresignedGetUrl(client, 'private/object.jpg', 'inline', 301),
       ApiError,
     );
+  } finally {
+    client.destroy();
+    if (previousBucket === undefined) Deno.env.delete('R2_BUCKET_NAME');
+    else Deno.env.set('R2_BUCKET_NAME', previousBucket);
+  }
+});
+
+Deno.test('repair PUT signing requires R2 to reject overwrites', async () => {
+  const previousBucket = Deno.env.get('R2_BUCKET_NAME');
+  Deno.env.set('R2_BUCKET_NAME', 'private-photos');
+  const client = signingClient();
+  try {
+    let commandInput: PutObjectCommandInput | undefined;
+    const signed = await createR2PresignedPutUrl(
+      client,
+      'private/object.jpg',
+      'image/jpeg',
+      300,
+      { ifNoneMatch: '*' },
+      (_client, command) => {
+        commandInput = command.input;
+        return Promise.resolve(
+          'https://account.r2.cloudflarestorage.com/private-photos/private/object.jpg?X-Amz-Signature=test',
+        );
+      },
+    );
+    assertEquals(new URL(signed).protocol, 'https:');
+    assertEquals(commandInput?.Bucket, 'private-photos');
+    assertEquals(commandInput?.Key, 'private/object.jpg');
+    assertEquals(commandInput?.ContentType, 'image/jpeg');
+    assertEquals(commandInput?.IfNoneMatch, '*');
   } finally {
     client.destroy();
     if (previousBucket === undefined) Deno.env.delete('R2_BUCKET_NAME');

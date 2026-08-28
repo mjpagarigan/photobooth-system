@@ -17,10 +17,11 @@ deploy a hosted project by itself.
   cannot choose a final object path and cannot read the bucket directly.
 - `photo/resolve`, `photo/image`, and `photo/download` accept POST with exactly `{ "token": "..." }`.
   They require the configured browser origin, reveal no internal path, and treat missing and expired
-  tokens identically. When R2 is configured, image/download HEAD the private object, compare its
-  size, reauthorize the permanent token, and return a bodyless `303` to a private presigned GET for
-  at most 300 seconds and never beyond the permanent-token expiry. The existing size-checked,
-  freshly reauthorized Supabase Storage binary response remains the fallback when R2 is absent.
+  tokens identically. Resolve verifies the row's recorded store, byte size, and JPEG content type,
+  then reauthorizes the permanent token before reporting ready. Image/download perform the same
+  verification and reauthorization and return size-checked JPEG bytes through the Function for
+  both R2 and Supabase Storage. A missing object is 404; a mismatch or verification fault is a
+  retryable 503.
 - Cleanup atomically moves expired or abandoned rows into a terminal `deleting` state before any
   Storage call, removes each private object, then records deletion. A claimed session can never race
   back to `ready`. Failed items retain their lease until timeout so later batches are not starved.
@@ -61,26 +62,8 @@ The three R2 credential values are server-only Edge Function secrets. `R2_BUCKET
 private bucket. R2 configuration is all-or-nothing: all four values route new sessions to R2, no
 values keep new sessions on Supabase Storage, and a partial configuration fails closed. Each row
 records its backend so existing Supabase objects remain readable, confirmable, and cleanable after
-the R2 cutover. Do not configure `R2_PUBLIC_DOMAIN`; delivery uses the R2 S3 API origin because R2
-presigned URLs do not work on custom domains.
-
-Configure the private R2 bucket with this exact browser CORS rule, replacing only the approved
-public page origin:
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": [],
-    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
-    "MaxAgeSeconds": 300
-  }
-]
-```
-
-Do not add `PUT`, `POST`, wildcard origins, wildcard headers, or additional exposed headers. Browser
-access to presigned R2 URLs still requires this bucket policy.
+the R2 cutover. Do not configure `R2_PUBLIC_DOMAIN`; public delivery is proxied through the Edge
+Function and the browser never receives an R2 URL. No browser-facing R2 CORS policy is required.
 
 `PUBLIC_TOKEN_DERIVATION_KEY` accepts standard base64, base64url, or hexadecimal encoding and must
 decode to at least 32 random bytes. Keep it backed up as a production secret. Do not rotate it while
@@ -101,6 +84,24 @@ $keyBytes = [byte[]]::new(32)
 For local Function serving, put the same names in the ignored `supabase/.env.local` file and use the
 local URL and local server key printed by Supabase CLI. A localhost `PUBLIC_PAGE_ORIGIN` may use
 HTTP; non-local origins require HTTPS.
+
+## Storage-backend recovery
+
+After the repair migration and Functions are deployed, run the administrator inventory from the
+repository root. It is dry-run-only unless all apply guards are supplied:
+
+```powershell
+pnpm repair:storage-backends
+pnpm repair:storage-backends -- --apply --batch-id <new-uuid> --confirm-count <r2-verified-count>
+pnpm repair:storage-backends -- --rollback-batch <batch-uuid>
+```
+
+The report contains classification totals and hashed metadata-snapshot fingerprints only. Review
+the complete dry run before approving an apply. Apply rescans the complete inventory before its
+first guarded RPC, changes only `r2-verified` rows, and records every change in the service-role-only
+ledger. Rollback restores only ledger-matching backend metadata and never deletes storage objects.
+`missing-both` items must be recovered individually from the original kiosk through the operator
+Recent Photos control.
 
 ## Hosted project setup after approval
 

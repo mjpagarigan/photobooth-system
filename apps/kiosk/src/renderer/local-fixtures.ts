@@ -12,6 +12,7 @@ export const LOCAL_FIXTURES = {
   mockPhotos: ['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg'],
   recoveryBackground: '/backgrounds/recovery.jpg',
   shutterAudio: '/audio/shutter.wav',
+  ministryIdleBackground: '/backgrounds/ministry-idle.jpg',
 } as const;
 
 export const DEFAULT_FRAME_LAYOUT = [

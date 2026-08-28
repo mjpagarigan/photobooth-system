@@ -25,7 +25,8 @@ import { registerIpcHandlers } from './ipc/register-ipc.js';
 import { createApplicationLogger } from './logging.js';
 import { runNativeSelfTest } from './native-self-test.js';
 import { installProtocolHandlers, registerPrivilegedSchemes } from './security/protocols.js';
-import { createKioskWindow, getRendererTarget } from './security/window.js';
+import { DisplayManager } from './security/display-manager.js';
+import { getRendererTarget } from './security/window.js';
 import { AdminServerManager } from './server/admin-server-manager.js';
 import type { LocalAdminDependencies } from './server/local-admin-server.js';
 import { OfflineDeliveryServer } from './server/offline-delivery-server.js';
@@ -159,6 +160,7 @@ async function startApplication(): Promise<void> {
     uploadQueue,
     qrService,
     imageProcessor,
+    delivery,
   });
   const workflow = new BoothWorkflow(
     repository,
@@ -212,6 +214,13 @@ async function startApplication(): Promise<void> {
   await workflow.initialize();
 
   const target = getRendererTarget(app.isPackaged, process.env.ELECTRON_RENDERER_URL);
+  const displayManager = new DisplayManager(
+    appPath,
+    app.isPackaged,
+    process.env.ELECTRON_RENDERER_URL,
+    repository,
+  );
+
   const removeIpcHandlers = registerIpcHandlers({
     workflow,
     camera,
@@ -225,14 +234,14 @@ async function startApplication(): Promise<void> {
     uploadQueue,
     cameraFrames,
     recentGallery,
+    displayManager,
     rendererOrigin: target.origin,
-    onNetworkSettingsChanged: () => serverManager.requestReconfigure(),
+    onNetworkSettingsChanged: () => serverManager?.requestReconfigure(),
   });
-  const { window } = await createKioskWindow(
-    appPath,
-    app.isPackaged,
-    process.env.ELECTRON_RENDERER_URL,
-  );
+
+  const { captureWindow } = await displayManager.initialize();
+  const window = captureWindow;
+
   cameraFrames.attach((request) => {
     if (!window.isDestroyed()) window.webContents.send(CAMERA_FRAME_REQUEST_EVENT, request);
   });
@@ -256,6 +265,7 @@ async function startApplication(): Promise<void> {
     shutdownStarted = true;
     clearInterval(dailyCleanup);
     removeIpcHandlers();
+    displayManager.close();
     void Promise.allSettled([
       workflow.close(),
       serverManager.close(),

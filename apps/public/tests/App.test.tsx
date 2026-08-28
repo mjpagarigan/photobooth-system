@@ -28,6 +28,13 @@ describe('public photo page', () => {
     vi.mocked(api.fetchPhotoDownload).mockResolvedValue(jpeg);
   });
 
+  it('gives the scrollable loading document a keyboard-reachable region', () => {
+    vi.mocked(api.resolvePhoto).mockImplementation(() => new Promise(() => undefined));
+    render(<App />);
+
+    expect(screen.getByRole('main', { name: 'Loading photo' })).toHaveAttribute('tabindex', '0');
+  });
+
   it('shows loading, the action panel before the photostrip in DOM, and the Join a Ministry link', async () => {
     const { container } = render(<App />);
     expect(screen.getByText('Your moment is almost here.')).toBeInTheDocument();

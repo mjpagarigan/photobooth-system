@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 
 import type {
+  AuthorizePhotoRepairRequest,
+  AuthorizePhotoRepairResponse,
+  ConfirmPhotoRepairRequest,
   ConfirmUploadResponse,
   CreateUploadRequest,
   CreateUploadResponse,
   ResumeUploadResponse,
+  PhotoAvailability,
 } from '@grace-booth/shared';
 
 import { DeliveryFailure, type DeliveryClient } from './delivery-client.js';
@@ -86,6 +90,30 @@ export class E2eDeliveryClient implements DeliveryClient {
       publicPageOrigin: 'https://photos.e2e.invalid',
       publicPath: '/photo',
     };
+  }
+
+  checkPhotoAvailability(): Promise<PhotoAvailability> {
+    return Promise.resolve('available');
+  }
+
+  authorizePhotoRepair(
+    request: AuthorizePhotoRepairRequest,
+  ): Promise<AuthorizePhotoRepairResponse> {
+    return Promise.resolve({
+      action: 'authorize',
+      repairBatchId: '22222222-2222-4222-8222-222222222222',
+      upload: {
+        storagePath: `${request.photoSessionId}/collage.jpg`,
+        uploadUrl: 'https://repair.e2e.invalid/photo.jpg',
+        requiredHeaders: { 'content-type': 'image/jpeg', 'if-none-match': '*' },
+        validForSeconds: 300,
+      },
+    });
+  }
+
+  confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse> {
+    void request;
+    return this.confirmUpload();
   }
 
   health(): Promise<{ healthy: boolean; code: string | null; message: string }> {

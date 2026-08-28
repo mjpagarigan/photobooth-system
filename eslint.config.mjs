@@ -60,6 +60,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {

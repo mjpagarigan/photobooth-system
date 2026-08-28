@@ -216,6 +216,49 @@ test('review fits and remains accessible at portrait viewport', async ({ page })
   expect(seriousOrCritical).toEqual([]);
 });
 
+test('operator frame editor remains reachable at portrait viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto('/?visual=admin-frame');
+  await expect(page.getByTestId('frame-editor')).toBeVisible();
+  await waitForVisualAssets(page);
+
+  const width = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+  }));
+  expect(width.document).toBeLessThanOrEqual(width.viewport);
+
+  for (const locator of [
+    page.getByRole('button', { name: /save configuration/i }),
+    page.getByRole('region', { name: /visual frame layout preview/i }),
+    page.getByRole('complementary', { name: /selected photo slot settings/i }),
+  ]) {
+    await locator.scrollIntoViewIfNeeded();
+    await expect(locator).toBeVisible();
+    const bounds = await locator.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(768);
+  }
+});
+
+test('camera setup is a bounded, structured dialog', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/?visual=attract');
+  await page.getByRole('button', { name: 'Camera Setup' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Camera Configuration' });
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.y).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1280);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(720);
+  await expect(page.locator('.camera-source-card')).toHaveCount(3);
+  await expect(page.locator('.camera-preview-box')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close' })).toBeFocused();
+});
+
 test('review fits and remains accessible at large desktop viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/?visual=review');

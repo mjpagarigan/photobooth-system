@@ -1,0 +1,19 @@
+{
+  "hashManifestEqual": false,
+  "statusBytesEqual": false,
+  "patchBytesEqual": false,
+  "baselineFiles": 118,
+  "finalFiles": 119,
+  "changedPaths": [
+    "apps/kiosk/src/main/database/repositories.ts",
+    "apps/kiosk/src/main/database/schema.ts",
+    "apps/kiosk/src/main/index.ts",
+    "apps/kiosk/src/main/ipc/register-ipc.ts",
+    "apps/kiosk/src/main/security/display-manager.ts",
+    "apps/kiosk/src/main/security/window.ts",
+    "apps/kiosk/src/main/workflow/booth-workflow.ts",
+    "apps/kiosk/src/preload/index.ts",
+    "packages/shared/src/domain.ts",
+    "packages/shared/src/ipc.ts"
+  ]
+}

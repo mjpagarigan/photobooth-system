@@ -6,6 +6,7 @@ import type {
   CameraAdapter,
   CaptureResult,
   GuestErrorCode,
+  QrStationState,
   SessionState,
 } from '@grace-booth/shared';
 
@@ -27,11 +28,24 @@ const CANCELLABLE_STATES: readonly SessionState[] = ['countdown', 'capturing', '
 export type BoothWorkflowOptions = {
   shotCountdownsMs: readonly [number, number, number];
   cameraPreviewEnabled?: boolean;
+  isDualDisplayActive?: () => boolean;
   now?: () => number;
 };
 
 export class BoothWorkflow {
   private readonly listeners = new Set<(snapshot: BoothSnapshot) => void>();
+  private readonly qrListeners = new Set<(state: QrStationState) => void>();
+  private qrStationState: QrStationState = {
+    status: 'idle',
+    sessionId: null,
+    collageUrl: null,
+    qrImageUrl: null,
+    expiresAt: null,
+    durationSeconds: 45,
+    message: null,
+    canRetryUpload: false,
+  };
+  private qrDismissTimer: NodeJS.Timeout | null = null;
   private activeSessionId: string | null = null;
   private countdownEndsAt: number | null = null;
   private countdownTimer: NodeJS.Timeout | null = null;
@@ -102,6 +116,40 @@ export class BoothWorkflow {
   subscribe(listener: (snapshot: BoothSnapshot) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  subscribeQrStation(listener: (state: QrStationState) => void): () => void {
+    this.qrListeners.add(listener);
+    return () => this.qrListeners.delete(listener);
+  }
+
+  getQrStationState(): QrStationState {
+    return this.qrStationState;
+  }
+
+  dismissQrStation(): QrStationState {
+    if (this.qrDismissTimer) {
+      clearTimeout(this.qrDismissTimer);
+      this.qrDismissTimer = null;
+    }
+    this.qrStationState = {
+      status: 'idle',
+      sessionId: null,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: null,
+      durationSeconds: 45,
+      message: null,
+      canRetryUpload: false,
+    };
+    this.emitQrStation();
+    return this.qrStationState;
+  }
+
+  isDualDisplayActive(): boolean {
+    if (this.options.isDualDisplayActive) return this.options.isDualDisplayActive();
+    const settings = this.repository.getSettings();
+    return settings.dualDisplayMode === 'enabled';
   }
 
   getSnapshot(): BoothSnapshot {
@@ -200,9 +248,17 @@ export class BoothWorkflow {
       },
       this.now(),
     );
-    this.emit();
+    const dualActive = this.isDualDisplayActive();
+    if (dualActive) {
+      this.activeSessionId = null;
+      this.emit();
+    } else {
+      this.emit();
+    }
     void this.processCollage(session.id);
-    return this.getSnapshot();
+    return dualActive
+      ? attractSnapshot(this.options.cameraPreviewEnabled ?? false)
+      : this.getSnapshot();
   }
 
   retryUpload(): BoothSnapshot {
@@ -290,6 +346,10 @@ export class BoothWorkflow {
   async close(): Promise<void> {
     this.closed = true;
     if (this.countdownTimer) clearTimeout(this.countdownTimer);
+    if (this.qrDismissTimer) {
+      clearTimeout(this.qrDismissTimer);
+      this.qrDismissTimer = null;
+    }
     this.uploadQueue.stop();
     await Promise.all([this.camera.disconnect(), this.imageProcessor.close()]);
   }
@@ -488,6 +548,21 @@ export class BoothWorkflow {
         // Handled if already transitioned
       }
     }
+    const sessionAssets = this.repository.listCurrentAssets(sessionId);
+    const collage = sessionAssets.find((asset) => asset.kind === 'collage');
+    if (collage) {
+      this.qrStationState = {
+        status: 'error',
+        sessionId,
+        collageUrl: mediaUrl(collage.id),
+        qrImageUrl: null,
+        expiresAt: null,
+        durationSeconds: 45,
+        message: 'Upload failed. You can finish offline or retry.',
+        canRetryUpload: true,
+      };
+      this.emitQrStation();
+    }
     this.emitIfActive(sessionId);
   }
 
@@ -503,6 +578,29 @@ export class BoothWorkflow {
     if (current.state === 'ready') {
       this.transition(current, 'qr_ready', {}, this.now());
     }
+    const sessionAssets = this.repository.listCurrentAssets(sessionId);
+    const collage = sessionAssets.find((asset) => asset.kind === 'collage');
+    const settings = this.repository.getSettings();
+    const duration = settings.qrDismissSeconds || 45;
+    const expiresAt = this.now() + duration * 1000;
+    this.qrStationState = {
+      status: 'active',
+      sessionId,
+      collageUrl: collage ? mediaUrl(collage.id) : null,
+      qrImageUrl: qr.imageDataUrl,
+      expiresAt,
+      durationSeconds: duration,
+      message: null,
+      canRetryUpload: false,
+    };
+    if (this.qrDismissTimer) {
+      clearTimeout(this.qrDismissTimer);
+      this.qrDismissTimer = null;
+    }
+    this.qrDismissTimer = setTimeout(() => {
+      this.dismissQrStation();
+    }, duration * 1000);
+    this.emitQrStation();
     this.emitIfActive(sessionId);
   }
 
@@ -552,6 +650,10 @@ export class BoothWorkflow {
 
   private emitIfActive(sessionId: string): void {
     if (this.activeSessionId === sessionId) this.emit();
+  }
+
+  private emitQrStation(): void {
+    for (const listener of this.qrListeners) listener(this.qrStationState);
   }
 
   private emit(): void {

@@ -73,6 +73,18 @@ const SETTINGS: AdminSettings = {
   cameraResolution: '1080p',
   supabaseUrl: null,
   supabasePublishableKey: null,
+  dualDisplay: {
+    mode: 'auto',
+    swapDisplays: false,
+    qrDismissSeconds: 45,
+  },
+  googlePhotos: {
+    connectedEmail: 'ministry@grace.org',
+    albumId: 'mock_album_123',
+    albumTitle: 'Sunday Service Live Stream',
+    albumShareUrl: 'https://photos.app.goo.gl/example',
+    enabled: true,
+  },
   revision: 3,
 };
 

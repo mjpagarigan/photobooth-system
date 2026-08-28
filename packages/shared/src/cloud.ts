@@ -94,6 +94,65 @@ export const ConfirmUploadResponseSchema = z
   .strict();
 export type ConfirmUploadResponse = z.infer<typeof ConfirmUploadResponseSchema>;
 
+export const PhotoAvailabilitySchema = z.enum([
+  'available',
+  'unavailable',
+  'verification-failed',
+]);
+export type PhotoAvailability = z.infer<typeof PhotoAvailabilitySchema>;
+
+export const PhotoRepairMetadataSchema = z
+  .object({
+    byteSize: z.number().int().positive(),
+    sha256: Sha256HexSchema,
+    width: z.number().int().min(1).max(6_000),
+    height: z.number().int().min(1).max(6_000),
+  })
+  .strict();
+export type PhotoRepairMetadata = z.infer<typeof PhotoRepairMetadataSchema>;
+
+export const AuthorizePhotoRepairRequestSchema = z
+  .object({
+    action: z.literal('authorize'),
+    photoSessionId: OpaqueIdSchema,
+    publicToken: PublicTokenSchema,
+    metadata: PhotoRepairMetadataSchema,
+  })
+  .strict();
+export type AuthorizePhotoRepairRequest = z.infer<typeof AuthorizePhotoRepairRequestSchema>;
+
+export const AuthorizePhotoRepairResponseSchema = z
+  .object({
+    action: z.literal('authorize'),
+    repairBatchId: OpaqueIdSchema,
+    upload: z
+      .object({
+        storagePath: z.string().min(1).max(500),
+        uploadUrl: z.url(),
+        requiredHeaders: z
+          .object({
+            'content-type': z.literal('image/jpeg'),
+            'if-none-match': z.literal('*'),
+          })
+          .strict(),
+        validForSeconds: z.literal(300),
+      })
+      .strict(),
+  })
+  .strict();
+export type AuthorizePhotoRepairResponse = z.infer<typeof AuthorizePhotoRepairResponseSchema>;
+
+export const ConfirmPhotoRepairRequestSchema = z
+  .object({
+    action: z.literal('confirm'),
+    photoSessionId: OpaqueIdSchema,
+    publicToken: PublicTokenSchema,
+    repairBatchId: OpaqueIdSchema,
+    metadata: PhotoRepairMetadataSchema,
+  })
+  .strict();
+export type ConfirmPhotoRepairRequest = z.infer<typeof ConfirmPhotoRepairRequestSchema>;
+
 export const BoothAuthSessionSchema = z
   .object({
     accessToken: z.string().min(1),

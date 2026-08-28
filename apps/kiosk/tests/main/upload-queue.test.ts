@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  AuthorizePhotoRepairResponse,
   ConfirmUploadResponse,
   CreateUploadResponse,
   ResumeUploadResponse,
+  PhotoAvailability,
 } from '@grace-booth/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -282,6 +284,18 @@ class TransientDelivery implements DeliveryClient {
     });
   }
 
+  checkPhotoAvailability(): Promise<PhotoAvailability> {
+    return Promise.resolve('available');
+  }
+
+  authorizePhotoRepair(): Promise<AuthorizePhotoRepairResponse> {
+    return Promise.reject(new Error('not used'));
+  }
+
+  confirmPhotoRepair(): Promise<ConfirmUploadResponse> {
+    return this.confirmUpload();
+  }
+
   health(): Promise<{ healthy: boolean; code: string | null; message: string }> {
     return Promise.resolve({ healthy: true, code: null, message: 'ready' });
   }
@@ -339,6 +353,15 @@ class UnconfiguredDelivery implements DeliveryClient {
     return Promise.reject(new DeliveryFailure('auth', 'cloud_unconfigured', 'Unconfigured'));
   }
   confirmUpload(): Promise<ConfirmUploadResponse> {
+    return Promise.reject(new DeliveryFailure('auth', 'cloud_unconfigured', 'Unconfigured'));
+  }
+  checkPhotoAvailability(): Promise<PhotoAvailability> {
+    return Promise.resolve('verification-failed');
+  }
+  authorizePhotoRepair(): Promise<AuthorizePhotoRepairResponse> {
+    return Promise.reject(new DeliveryFailure('auth', 'cloud_unconfigured', 'Unconfigured'));
+  }
+  confirmPhotoRepair(): Promise<ConfirmUploadResponse> {
     return Promise.reject(new DeliveryFailure('auth', 'cloud_unconfigured', 'Unconfigured'));
   }
   health(): Promise<{ healthy: boolean; code: string | null; message: string }> {

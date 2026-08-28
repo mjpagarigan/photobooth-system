@@ -24,6 +24,16 @@ export const settings = sqliteTable('settings', {
   cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
   supabaseUrl: text('supabase_url'),
   supabasePublishableKey: text('supabase_publishable_key'),
+  dualDisplayMode: text('dual_display_mode', { enum: ['auto', 'enabled', 'disabled'] })
+    .notNull()
+    .default('auto'),
+  swapDisplays: integer('swap_displays', { mode: 'boolean' }).notNull().default(false),
+  qrDismissSeconds: integer('qr_dismiss_seconds').notNull().default(45),
+  googlePhotosEnabled: integer('google_photos_enabled', { mode: 'boolean' }).notNull().default(false),
+  googlePhotosEmail: text('google_photos_email'),
+  googlePhotosAlbumId: text('google_photos_album_id'),
+  googlePhotosAlbumTitle: text('google_photos_album_title'),
+  googlePhotosAlbumShareUrl: text('google_photos_album_share_url'),
   revision: integer('revision').notNull(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

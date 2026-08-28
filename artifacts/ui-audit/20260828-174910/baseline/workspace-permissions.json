@@ -1,0 +1,12 @@
+{
+  "workspace": "C:\\Users\\padil\\mj\\photobooth-system",
+  "owner": "LAPTOP-GSLG702R\\padil",
+  "accessRules": [
+    "LAPTOP-GSLG702R\\CodexSandboxUsers:Modify, Synchronize:Allow",
+    "S-1-5-21-2791425771-2745501704-3011258226-778537780:Modify, Synchronize:Allow",
+    "LAPTOP-GSLG702R\\CodexSandboxUsers:ReadAndExecute, Synchronize:Allow",
+    "NT AUTHORITY\\SYSTEM:FullControl:Allow",
+    "BUILTIN\\Administrators:FullControl:Allow",
+    "LAPTOP-GSLG702R\\padil:FullControl:Allow"
+  ]
+}

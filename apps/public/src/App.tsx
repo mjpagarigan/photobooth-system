@@ -7,6 +7,7 @@ import {
   WarningOctagonIcon as WarningOctagon,
 } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState } from 'react';
+import { Button, Skeleton } from '@grace-booth/ui';
 import {
   fetchPhotoDownload,
   fetchPhotoImage,
@@ -38,7 +39,7 @@ function Brand(): React.JSX.Element {
 
 function PageFrame({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="page-frame">
+    <div className="page-frame isolate relative min-h-screen">
       <header className="site-header">
         <Brand />
         <span className="header-badge">ARCHIVE // DISPATCH</span>
@@ -54,13 +55,20 @@ function PageFrame({ children }: { children: React.ReactNode }): React.JSX.Eleme
 
 function LoadingView(): React.JSX.Element {
   return (
-    <main className="photo-layout" aria-live="polite" aria-busy="true" data-state="loading">
+    <main
+      aria-label="Loading photo"
+      aria-live="polite"
+      aria-busy="true"
+      className="photo-layout"
+      data-state="loading"
+      tabIndex={0}
+    >
       <section className="detail-panel loading-panel">
         <p className="eyebrow">RETRIEVING ENCRYPTED ARCHIVE</p>
         <h1>Your moment is almost here.</h1>
         <p>Opening and decrypting the keepsake connected to this QR token.</p>
-        <div className="skeleton-line wide" />
-        <div className="skeleton-line" />
+        <Skeleton className="h-4 w-full max-w-sm my-2" />
+        <Skeleton className="h-4 w-3/4 max-w-xs my-2" />
         <span className="sr-only">Loading photo</span>
       </section>
       <section className="photo-stage skeleton-stage" aria-label="Loading your photo">
@@ -92,10 +100,14 @@ function ErrorView({
           Verify the complete QR URL was opened. Tokens expire automatically after 30 days.
         </p>
         {retryable ? (
-          <button className="primary-button compact-button" type="button" onClick={onRetry}>
-            <ArrowClockwise size={18} weight="bold" aria-hidden="true" />
+          <Button
+            className="compact-button mt-4"
+            icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+            onClick={onRetry}
+            type="button"
+          >
             <span>Try again</span>
-          </button>
+          </Button>
         ) : null}
       </section>
     </main>
@@ -154,15 +166,17 @@ function ReadyView({
         </div>
 
         <div className="action-stack">
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => void downloadPhoto()}
+          <Button
+            className="primary-button w-full"
             disabled={downloadState === 'working'}
+            icon={<DownloadSimple aria-hidden="true" weight="bold" />}
+            loading={downloadState === 'working'}
+            onClick={() => void downloadPhoto()}
+            size="lg"
+            type="button"
           >
-            <DownloadSimple size={20} weight="bold" aria-hidden="true" />
             <span>{downloadState === 'working' ? 'Preparing download…' : 'Download photo'}</span>
-          </button>
+          </Button>
           <a
             className="secondary-button"
             href="https://volunteer-management.ccf.org.ph/recruitment/form"

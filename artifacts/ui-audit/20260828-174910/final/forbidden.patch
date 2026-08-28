@@ -1,0 +1,2348 @@
+diff --git a/apps/kiosk/src/main/cloud/delivery-client.ts b/apps/kiosk/src/main/cloud/delivery-client.ts
+index 5358a25..91887ec 100644
+--- a/apps/kiosk/src/main/cloud/delivery-client.ts
++++ b/apps/kiosk/src/main/cloud/delivery-client.ts
+@@ -1,14 +1,19 @@
+ import {
++  AuthorizePhotoRepairResponseSchema,
+   BoothAuthSessionSchema,
+   ConfirmUploadResponseSchema,
+   CreateUploadResponseSchema,
+   ResumeUploadResponseSchema,
+   type ConfirmUploadRequest,
+   type ConfirmUploadResponse,
++  type AuthorizePhotoRepairRequest,
++  type AuthorizePhotoRepairResponse,
++  type ConfirmPhotoRepairRequest,
+   type CreateUploadRequest,
+   type CreateUploadResponse,
+   type ResumeUploadRequest,
+   type ResumeUploadResponse,
++  type PhotoAvailability,
+ } from '@grace-booth/shared';
+ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+ 
+@@ -16,6 +21,7 @@ import type { CloudSessionStore } from '../auth/cloud-session-store.js';
+ import { AppError } from '../errors.js';
+ 
+ const REQUEST_TIMEOUT_MS = 30_000;
++const PHOTO_AVAILABILITY_TIMEOUT_MS = 5_000;
+ 
+ export type DeliveryClient = {
+   isConfigured(): boolean;
+@@ -24,8 +30,19 @@ export type DeliveryClient = {
+   connect(email: string, password: string): Promise<void>;
+   createUpload(request: CreateUploadRequest): Promise<CreateUploadResponse>;
+   resumeUpload(request: ResumeUploadRequest): Promise<ResumeUploadResponse>;
+-  uploadSigned(path: string, token: string, bytes: Uint8Array, uploadUrl?: string): Promise<void>;
++  uploadSigned(
++    path: string,
++    token: string,
++    bytes: Uint8Array,
++    uploadUrl?: string,
++    requiredHeaders?: Readonly<Record<string, string>>,
++  ): Promise<void>;
+   confirmUpload(request: ConfirmUploadRequest): Promise<ConfirmUploadResponse>;
++  checkPhotoAvailability(publicToken: string, publicPageOrigin: string): Promise<PhotoAvailability>;
++  authorizePhotoRepair(
++    request: AuthorizePhotoRepairRequest,
++  ): Promise<AuthorizePhotoRepairResponse>;
++  confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse>;
+   health(): Promise<{ healthy: boolean; code: string | null; message: string }>;
+ };
+ 
+@@ -154,6 +171,7 @@ export class SupabaseDeliveryClient implements DeliveryClient {
+     token: string,
+     bytes: Uint8Array,
+     uploadUrl?: string,
++    requiredHeaders?: Readonly<Record<string, string>>,
+   ): Promise<void> {
+     if (uploadUrl) {
+       try {
+@@ -161,6 +179,7 @@ export class SupabaseDeliveryClient implements DeliveryClient {
+           method: 'PUT',
+           headers: {
+             'content-type': 'image/jpeg',
++            ...requiredHeaders,
+           },
+           body: bytes,
+         });
+@@ -193,6 +212,60 @@ export class SupabaseDeliveryClient implements DeliveryClient {
+     return ConfirmUploadResponseSchema.parse(await this.invokeFunction('confirm-upload', request));
+   }
+ 
++  async checkPhotoAvailability(
++    publicToken: string,
++    publicPageOrigin: string,
++  ): Promise<PhotoAvailability> {
++    const url = this.options.url;
++    const publishableKey = this.options.publishableKey;
++    if (!url || !publishableKey) return 'verification-failed';
++    let origin: string;
++    try {
++      const parsed = new URL(publicPageOrigin);
++      if (parsed.protocol !== 'https:' || parsed.origin !== publicPageOrigin) {
++        return 'verification-failed';
++      }
++      origin = parsed.origin;
++    } catch {
++      return 'verification-failed';
++    }
++
++    const controller = new AbortController();
++    const timeout = setTimeout(() => controller.abort(), PHOTO_AVAILABILITY_TIMEOUT_MS);
++    try {
++      const response = await fetch(`${url}/functions/v1/photo/resolve`, {
++        method: 'POST',
++        headers: {
++          Origin: origin,
++          apikey: publishableKey,
++          'content-type': 'application/json',
++        },
++        body: JSON.stringify({ token: publicToken }),
++        signal: controller.signal,
++      });
++      if (response.status === 404) return 'unavailable';
++      if (!response.ok) return 'verification-failed';
++      const payload = (await response.json().catch(() => null)) as { status?: unknown } | null;
++      return payload?.status === 'ready' ? 'available' : 'verification-failed';
++    } catch {
++      return 'verification-failed';
++    } finally {
++      clearTimeout(timeout);
++    }
++  }
++
++  async authorizePhotoRepair(
++    request: AuthorizePhotoRepairRequest,
++  ): Promise<AuthorizePhotoRepairResponse> {
++    return AuthorizePhotoRepairResponseSchema.parse(
++      await this.invokeFunction('repair-photo', request),
++    );
++  }
++
++  async confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse> {
++    return ConfirmUploadResponseSchema.parse(await this.invokeFunction('repair-photo', request));
++  }
++
+   async health(): Promise<{ healthy: boolean; code: string | null; message: string }> {
+     if (!this.client)
+       return { healthy: false, code: 'cloud_unconfigured', message: 'Cloud is not configured.' };
+diff --git a/apps/kiosk/src/main/cloud/e2e-delivery-client.ts b/apps/kiosk/src/main/cloud/e2e-delivery-client.ts
+index 9f5cefb..3380616 100644
+--- a/apps/kiosk/src/main/cloud/e2e-delivery-client.ts
++++ b/apps/kiosk/src/main/cloud/e2e-delivery-client.ts
+@@ -1,10 +1,14 @@
+ import { createHash } from 'node:crypto';
+ 
+ import type {
++  AuthorizePhotoRepairRequest,
++  AuthorizePhotoRepairResponse,
++  ConfirmPhotoRepairRequest,
+   ConfirmUploadResponse,
+   CreateUploadRequest,
+   CreateUploadResponse,
+   ResumeUploadResponse,
++  PhotoAvailability,
+ } from '@grace-booth/shared';
+ 
+ import { DeliveryFailure, type DeliveryClient } from './delivery-client.js';
+@@ -88,6 +92,30 @@ export class E2eDeliveryClient implements DeliveryClient {
+     };
+   }
+ 
++  checkPhotoAvailability(): Promise<PhotoAvailability> {
++    return Promise.resolve('available');
++  }
++
++  authorizePhotoRepair(
++    request: AuthorizePhotoRepairRequest,
++  ): Promise<AuthorizePhotoRepairResponse> {
++    return Promise.resolve({
++      action: 'authorize',
++      repairBatchId: '22222222-2222-4222-8222-222222222222',
++      upload: {
++        storagePath: `${request.photoSessionId}/collage.jpg`,
++        uploadUrl: 'https://repair.e2e.invalid/photo.jpg',
++        requiredHeaders: { 'content-type': 'image/jpeg', 'if-none-match': '*' },
++        validForSeconds: 300,
++      },
++    });
++  }
++
++  confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse> {
++    void request;
++    return this.confirmUpload();
++  }
++
+   health(): Promise<{ healthy: boolean; code: string | null; message: string }> {
+     return Promise.resolve({
+       healthy: true,
+diff --git a/apps/kiosk/src/main/database/repositories.ts b/apps/kiosk/src/main/database/repositories.ts
+index 80eb246..fc8a257 100644
+--- a/apps/kiosk/src/main/database/repositories.ts
++++ b/apps/kiosk/src/main/database/repositories.ts
+@@ -1,6 +1,7 @@
+ import type {
+   CameraAdapterKind,
+   CameraResolution,
++  DualDisplayMode,
+   FrameLayout,
+   SessionState,
+   UploadJobState,
+@@ -34,6 +35,9 @@ type RawSettingsRow = {
+   camera_resolution: string;
+   supabase_url: string | null;
+   supabase_publishable_key: string | null;
++  dual_display_mode: string;
++  swap_displays: number;
++  qr_dismiss_seconds: number;
+   revision: number;
+   created_at: number;
+   updated_at: number;
+@@ -62,6 +66,9 @@ export type LocalSettings = {
+   cameraResolution: CameraResolution;
+   supabaseUrl: string | null;
+   supabasePublishableKey: string | null;
++  dualDisplayMode: DualDisplayMode;
++  swapDisplays: boolean;
++  qrDismissSeconds: number;
+   revision: number;
+   createdAt: number;
+   updatedAt: number;
+@@ -157,6 +164,7 @@ const SETTINGS_SELECT = `
+     active_frame_id, collage_2_frame_id, google_forms_url, local_retention_days, cloud_retention_days,
+     lan_enabled, lan_bind_host, lan_port, lan_tls_secret_ref,
+     lan_certificate_fingerprint, camera_adapter, camera_device_id, camera_resolution,
++    supabase_url, supabase_publishable_key, dual_display_mode, swap_displays, qr_dismiss_seconds,
+     revision, created_at, updated_at
+   FROM settings WHERE id = 1
+ `;
+@@ -292,6 +300,22 @@ export class LocalRepository {
+     return this.getSettings();
+   }
+ 
++  setDualDisplaySettings(
++    mode: DualDisplayMode,
++    swapDisplays: boolean,
++    qrDismissSeconds: number,
++    now = Date.now(),
++  ): LocalSettings {
++    this.database.raw
++      .prepare(
++        `UPDATE settings SET dual_display_mode = ?, swap_displays = ?, qr_dismiss_seconds = ?,
++          revision = revision + 1, updated_at = ? WHERE id = 1`,
++      )
++      .run(mode, swapDisplays ? 1 : 0, qrDismissSeconds, now);
++    this.recordAudit('settings_change', 'success', 'dual_display_settings_updated', now);
++    return this.getSettings();
++  }
++
+   addFrame(frame: Omit<StoredFrame, 'slots'>, slots: FrameLayout, optionIndex: 1 | 2 = 1): void {
+     const validatedSlots = FrameLayoutSchema.parse(slots);
+     const targetColumn = optionIndex === 2 ? 'collage_2_frame_id' : 'active_frame_id';
+@@ -1342,6 +1366,9 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
+     cameraResolution: row.camera_resolution === '720p' ? '720p' : '1080p',
+     supabaseUrl: row.supabase_url,
+     supabasePublishableKey: row.supabase_publishable_key,
++    dualDisplayMode: (row.dual_display_mode as DualDisplayMode) || 'auto',
++    swapDisplays: row.swap_displays === 1,
++    qrDismissSeconds: row.qr_dismiss_seconds || 45,
+     revision: row.revision,
+     createdAt: row.created_at,
+     updatedAt: row.updated_at,
+diff --git a/apps/kiosk/src/main/database/schema.ts b/apps/kiosk/src/main/database/schema.ts
+index a73d8ef..37f542d 100644
+--- a/apps/kiosk/src/main/database/schema.ts
++++ b/apps/kiosk/src/main/database/schema.ts
+@@ -24,6 +24,11 @@ export const settings = sqliteTable('settings', {
+   cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
+   supabaseUrl: text('supabase_url'),
+   supabasePublishableKey: text('supabase_publishable_key'),
++  dualDisplayMode: text('dual_display_mode', { enum: ['auto', 'enabled', 'disabled'] })
++    .notNull()
++    .default('auto'),
++  swapDisplays: integer('swap_displays', { mode: 'boolean' }).notNull().default(false),
++  qrDismissSeconds: integer('qr_dismiss_seconds').notNull().default(45),
+   revision: integer('revision').notNull(),
+   createdAt: integer('created_at').notNull(),
+   updatedAt: integer('updated_at').notNull(),
+diff --git a/apps/kiosk/src/main/frame/frame-service.ts b/apps/kiosk/src/main/frame/frame-service.ts
+index fd7fe39..d508eb6 100644
+--- a/apps/kiosk/src/main/frame/frame-service.ts
++++ b/apps/kiosk/src/main/frame/frame-service.ts
+@@ -114,7 +114,8 @@ export class FrameService {
+     const seenHashes = new Map<string, StoredFrame>();
+     for (const frame of initialLibrary) {
+       if (seenHashes.has(frame.sha256)) {
+-        const canonical = seenHashes.get(frame.sha256)!;
++        const canonical = seenHashes.get(frame.sha256);
++        if (!canonical) continue;
+         this.repository.repointFramePointer(frame.id, canonical.id);
+         this.repository.deleteFrameRow(frame.id);
+         try {
+diff --git a/apps/kiosk/src/main/gallery/recent-gallery-service.ts b/apps/kiosk/src/main/gallery/recent-gallery-service.ts
+index 2acaf78..df36d46 100644
+--- a/apps/kiosk/src/main/gallery/recent-gallery-service.ts
++++ b/apps/kiosk/src/main/gallery/recent-gallery-service.ts
+@@ -1,11 +1,19 @@
+-import type { GalleryItem, GalleryUploadStatus } from '@grace-booth/shared';
++import { createHash, timingSafeEqual } from 'node:crypto';
++
++import type {
++  GalleryCloudRepairResult,
++  GalleryItem,
++  GalleryUploadStatus,
++} from '@grace-booth/shared';
+ 
+ import { validateReadyReceipt } from '../cloud/ready-receipt.js';
+ import type { QrService } from '../cloud/qr-service.js';
+ import type { UploadQueue } from '../cloud/upload-queue.js';
++import type { DeliveryClient } from '../cloud/delivery-client.js';
+ import type { LocalRepository, StoredSession } from '../database/repositories.js';
+ import type { ImageProcessor } from '../image/image-worker-client.js';
+ import type { PhotoVault } from '../storage/photo-vault.js';
++import { AppError } from '../errors.js';
+ 
+ export type RecentGalleryDependencies = {
+   repository: LocalRepository;
+@@ -13,6 +21,13 @@ export type RecentGalleryDependencies = {
+   uploadQueue: Pick<UploadQueue, 'readDeliverySecret'>;
+   qrService: QrService;
+   imageProcessor: ImageProcessor;
++  delivery: Pick<DeliveryClient, 'checkPhotoAvailability'> &
++    Partial<
++      Pick<
++        DeliveryClient,
++        'authorizePhotoRepair' | 'uploadSigned' | 'confirmPhotoRepair'
++      >
++    >;
+ };
+ 
+ const PREVIEW_LONG_EDGE = 360;
+@@ -21,6 +36,7 @@ type SessionDelivery = {
+   qrDataUrl: string | null;
+   cloudExpiresAt: number | null;
+   lanReceiptOnly: boolean;
++  availability: 'uploaded' | 'unavailable' | 'verification-failed';
+ };
+ 
+ /**
+@@ -28,14 +44,109 @@ type SessionDelivery = {
+  * assets and thumbnailed off the main thread by the shared image worker.
+  */
+ export class RecentGalleryService {
++  private readonly repairsInFlight = new Set<string>();
++
+   constructor(private readonly dependencies: RecentGalleryDependencies) {}
+ 
+   async getRecent(limit = 20): Promise<GalleryItem[]> {
+     const sessions = this.dependencies.repository.listRecentSessionsWithCollage(limit);
+-    const items = await Promise.all(sessions.map((session) => this.buildItem(session)));
++    const items = await mapConcurrent(sessions, 4, (session) => this.buildItem(session));
+     return items.filter((item): item is GalleryItem => item !== null);
+   }
+ 
++  async repairCloudPhoto(sessionId: string): Promise<GalleryCloudRepairResult> {
++    if (this.repairsInFlight.has(sessionId)) {
++      throw new AppError(
++        'repair_conflict',
++        'Cloud recovery is already running for this photo.',
++        true,
++      );
++    }
++    this.repairsInFlight.add(sessionId);
++    try {
++      const { repository, vault, uploadQueue, delivery } = this.dependencies;
++      const session = repository.getSession(sessionId);
++      const collageAssetId = session?.collageAssetId;
++      const publicSecretRef = session?.publicSecretRef;
++      if (!collageAssetId || !publicSecretRef) {
++        return originalBoothRequired();
++      }
++      const collage = repository.getAsset(collageAssetId);
++      if (collage?.kind !== 'collage' || collage.cleanupState !== 'active') {
++        return originalBoothRequired();
++      }
++
++      let bytes: Buffer;
++      try {
++        bytes = vault.read(collage.encryptedPath);
++      } catch {
++        return originalBoothRequired();
++      }
++      const actualHash = createHash('sha256').update(bytes).digest('hex');
++      if (
++        bytes.byteLength !== collage.byteSize ||
++        !/^[a-f0-9]{64}$/u.test(collage.sha256) ||
++        !timingSafeEqual(Buffer.from(actualHash, 'hex'), Buffer.from(collage.sha256, 'hex'))
++      ) {
++        return originalBoothRequired();
++      }
++
++      let secret: ReturnType<RecentGalleryDependencies['uploadQueue']['readDeliverySecret']>;
++      try {
++        secret = uploadQueue.readDeliverySecret(publicSecretRef);
++      } catch {
++        return originalBoothRequired();
++      }
++      if (
++        !secret.ready ||
++        (session.cloudPhotoSessionId !== null &&
++          secret.photoSessionId !== session.cloudPhotoSessionId)
++      ) {
++        return originalBoothRequired();
++      }
++      validateReadyReceipt(secret.photoSessionId, secret.publicToken, secret.ready);
++      if (!delivery.authorizePhotoRepair || !delivery.uploadSigned || !delivery.confirmPhotoRepair) {
++        throw new AppError(
++          'repair_unavailable',
++          'Cloud recovery is unavailable on this booth version.',
++          true,
++        );
++      }
++      const metadata = {
++        byteSize: collage.byteSize,
++        sha256: collage.sha256,
++        width: collage.width,
++        height: collage.height,
++      };
++      const authorization = await delivery.authorizePhotoRepair({
++        action: 'authorize',
++        photoSessionId: secret.photoSessionId,
++        publicToken: secret.publicToken,
++        metadata,
++      });
++      await delivery.uploadSigned(
++        authorization.upload.storagePath,
++        'r2_repair_presigned',
++        bytes,
++        authorization.upload.uploadUrl,
++        authorization.upload.requiredHeaders,
++      );
++      await delivery.confirmPhotoRepair({
++        action: 'confirm',
++        photoSessionId: secret.photoSessionId,
++        publicToken: secret.publicToken,
++        repairBatchId: authorization.repairBatchId,
++        metadata,
++      });
++      return {
++        status: 'repaired',
++        message: 'Cloud copy repaired. Recent Photos has been refreshed.',
++      };
++    } finally {
++      this.repairsInFlight.delete(sessionId);
++    }
++  }
++
+   private async buildItem(session: StoredSession): Promise<GalleryItem | null> {
+     try {
+       if (!session.collageAssetId) return null;
+@@ -57,7 +168,14 @@ export class RecentGalleryService {
+       try {
+         delivery = await this.resolveDelivery(session);
+       } catch {
+-        delivery = null;
++        delivery = session.publicSecretRef
++          ? {
++              qrDataUrl: null,
++              cloudExpiresAt: session.expiresAt,
++              lanReceiptOnly: false,
++              availability: 'verification-failed',
++            }
++          : null;
+       }
+ 
+       return {
+@@ -72,7 +190,7 @@ export class RecentGalleryService {
+             job?.state === 'succeeded'
+               ? delivery?.lanReceiptOnly
+                 ? 'local-receipt'
+-                : 'uploaded'
++                : (delivery?.availability ?? 'verification-failed')
+               : jobStatus(job?.state ?? 'queued'),
+           cloudExpiresAt: delivery?.cloudExpiresAt ?? null,
+         },
+@@ -88,18 +206,35 @@ export class RecentGalleryService {
+       qrDataUrl: null,
+       cloudExpiresAt: null,
+       lanReceiptOnly: false,
++      availability: 'verification-failed',
+     };
+     if (!session.publicSecretRef) return empty;
+     const secret = this.dependencies.uploadQueue.readDeliverySecret(session.publicSecretRef);
+     if (!secret.ready) return empty;
+     const receipt = validateReadyReceipt(secret.photoSessionId, secret.publicToken, secret.ready);
+-    const rendered = await this.dependencies.qrService.render(receipt).catch(() => null);
+     const expiresAtMs = Date.parse(receipt.expiresAt);
++    const lanReceiptOnly = receipt.publicPageOrigin.startsWith('http://');
++    if (!lanReceiptOnly) {
++      const availability = await this.dependencies.delivery.checkPhotoAvailability(
++        receipt.publicToken,
++        receipt.publicPageOrigin,
++      );
++      if (availability !== 'available') {
++        return {
++          qrDataUrl: null,
++          cloudExpiresAt: Number.isFinite(expiresAtMs) ? expiresAtMs : null,
++          lanReceiptOnly: false,
++          availability: availability === 'unavailable' ? 'unavailable' : 'verification-failed',
++        };
++      }
++    }
++    const rendered = await this.dependencies.qrService.render(receipt).catch(() => null);
+     return {
+       qrDataUrl: rendered?.imageDataUrl ?? null,
+       cloudExpiresAt: Number.isFinite(expiresAtMs) ? expiresAtMs : null,
+       // Offline receipts point at the LAN listener (http://), cloud receipts at HTTPS origins.
+-      lanReceiptOnly: receipt.publicPageOrigin.startsWith('http://'),
++      lanReceiptOnly,
++      availability: rendered ? 'uploaded' : 'verification-failed',
+     };
+   }
+ }
+@@ -118,3 +253,28 @@ type UploadQueueJobState =
+   | 'failed'
+   | 'succeeded'
+   | 'cancelled';
++
++async function mapConcurrent<T, R>(
++  values: readonly T[],
++  limit: number,
++  mapper: (value: T) => Promise<R>,
++): Promise<R[]> {
++  const results = new Array<R>(values.length);
++  const queue = values.map((value, index) => ({ index, value }));
++  const workers = Array.from({ length: Math.min(limit, values.length) }, async () => {
++    for (;;) {
++      const entry = queue.shift();
++      if (!entry) return;
++      results[entry.index] = await mapper(entry.value);
++    }
++  });
++  await Promise.all(workers);
++  return results;
++}
++
++function originalBoothRequired(): GalleryCloudRepairResult {
++  return {
++    status: 'original-booth-required',
++    message: 'Recovery requires the original booth.',
++  };
++}
+diff --git a/apps/kiosk/src/main/index.ts b/apps/kiosk/src/main/index.ts
+index 703556f..350ae93 100644
+--- a/apps/kiosk/src/main/index.ts
++++ b/apps/kiosk/src/main/index.ts
+@@ -25,7 +25,8 @@ import { registerIpcHandlers } from './ipc/register-ipc.js';
+ import { createApplicationLogger } from './logging.js';
+ import { runNativeSelfTest } from './native-self-test.js';
+ import { installProtocolHandlers, registerPrivilegedSchemes } from './security/protocols.js';
+-import { createKioskWindow, getRendererTarget } from './security/window.js';
++import { DisplayManager } from './security/display-manager.js';
++import { getRendererTarget } from './security/window.js';
+ import { AdminServerManager } from './server/admin-server-manager.js';
+ import type { LocalAdminDependencies } from './server/local-admin-server.js';
+ import { OfflineDeliveryServer } from './server/offline-delivery-server.js';
+@@ -159,6 +160,7 @@ async function startApplication(): Promise<void> {
+     uploadQueue,
+     qrService,
+     imageProcessor,
++    delivery,
+   });
+   const workflow = new BoothWorkflow(
+     repository,
+@@ -212,6 +214,13 @@ async function startApplication(): Promise<void> {
+   await workflow.initialize();
+ 
+   const target = getRendererTarget(app.isPackaged, process.env.ELECTRON_RENDERER_URL);
++  const displayManager = new DisplayManager(
++    appPath,
++    app.isPackaged,
++    process.env.ELECTRON_RENDERER_URL,
++    repository,
++  );
++
+   const removeIpcHandlers = registerIpcHandlers({
+     workflow,
+     camera,
+@@ -225,14 +234,14 @@ async function startApplication(): Promise<void> {
+     uploadQueue,
+     cameraFrames,
+     recentGallery,
++    displayManager,
+     rendererOrigin: target.origin,
+-    onNetworkSettingsChanged: () => serverManager.requestReconfigure(),
++    onNetworkSettingsChanged: () => serverManager?.requestReconfigure(),
+   });
+-  const { window } = await createKioskWindow(
+-    appPath,
+-    app.isPackaged,
+-    process.env.ELECTRON_RENDERER_URL,
+-  );
++
++  const { captureWindow } = await displayManager.initialize();
++  const window = captureWindow;
++
+   cameraFrames.attach((request) => {
+     if (!window.isDestroyed()) window.webContents.send(CAMERA_FRAME_REQUEST_EVENT, request);
+   });
+@@ -256,6 +265,7 @@ async function startApplication(): Promise<void> {
+     shutdownStarted = true;
+     clearInterval(dailyCleanup);
+     removeIpcHandlers();
++    displayManager.close();
+     void Promise.allSettled([
+       workflow.close(),
+       serverManager.close(),
+diff --git a/apps/kiosk/src/main/ipc/register-ipc.ts b/apps/kiosk/src/main/ipc/register-ipc.ts
+index 178e392..d114eab 100644
+--- a/apps/kiosk/src/main/ipc/register-ipc.ts
++++ b/apps/kiosk/src/main/ipc/register-ipc.ts
+@@ -3,6 +3,7 @@ import { basename } from 'node:path';
+ 
+ import {
+   BOOTH_SNAPSHOT_EVENT,
++  QR_STATION_EVENT,
+   IpcContracts,
+   type AdminSettings,
+   type IpcChannel,
+@@ -34,6 +35,7 @@ import type { FrameService } from '../frame/frame-service.js';
+ import type { HealthService } from '../health-service.js';
+ import { assertPrivateIpv4 } from '../server/network-boundary.js';
+ import type { BoothWorkflow } from '../workflow/booth-workflow.js';
++import type { DisplayManager } from '../security/display-manager.js';
+ import { assertTrustedIpcSender } from './sender-trust.js';
+ 
+ export type IpcDependencies = {
+@@ -49,6 +51,7 @@ export type IpcDependencies = {
+   uploadQueue: UploadQueue;
+   cameraFrames: RendererFrameBroker;
+   recentGallery: RecentGalleryService;
++  displayManager?: DisplayManager;
+   rendererOrigin: string;
+   onNetworkSettingsChanged(): void;
+ };
+@@ -76,6 +79,32 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
+     dependencies.adminSessions.requireRenderer(event.sender.id);
+   };
+ 
++  register('qr-station:get-state', () => dependencies.workflow.getQrStationState());
++  register('qr-station:dismiss', () => dependencies.workflow.dismissQrStation());
++  register('admin:get-displays', (event) => {
++    requireAdmin(event);
++    return dependencies.displayManager?.getDisplays() ?? [];
++  });
++  register('admin:swap-displays', (event) => {
++    requireAdmin(event);
++    return dependencies.displayManager ? dependencies.displayManager.swapDisplays() : [];
++  });
++  register('admin:save-dual-display-settings', (event, input) => {
++    requireAdmin(event);
++    const settings = {
++      mode: input.mode ?? 'auto',
++      swapDisplays: input.swapDisplays ?? false,
++      qrDismissSeconds: input.qrDismissSeconds ?? 45,
++    };
++    return dependencies.displayManager
++      ? dependencies.displayManager.setDualDisplaySettings(settings)
++      : dependencies.repository.setDualDisplaySettings(
++          settings.mode,
++          settings.swapDisplays,
++          settings.qrDismissSeconds,
++        );
++  });
++
+   register('booth:get-snapshot', () => dependencies.workflow.getSnapshot());
+   register('booth:start', () => {
+     assertOperatorBootstrapComplete(dependencies.passcodes.isConfigured());
+@@ -276,13 +305,19 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
+     return { message: 'The dedicated booth cloud account is connected.' };
+   });
+ 
+-  const unsubscribe = dependencies.workflow.subscribe((snapshot) => {
++  const unsubscribeSnapshot = dependencies.workflow.subscribe((snapshot) => {
+     for (const window of BrowserWindow.getAllWindows()) {
+       if (!window.isDestroyed()) window.webContents.send(BOOTH_SNAPSHOT_EVENT, snapshot);
+     }
+   });
++  const unsubscribeQr = dependencies.workflow.subscribeQrStation((state) => {
++    for (const window of BrowserWindow.getAllWindows()) {
++      if (!window.isDestroyed()) window.webContents.send(QR_STATION_EVENT, state);
++    }
++  });
+   return () => {
+-    unsubscribe();
++    unsubscribeSnapshot();
++    unsubscribeQr();
+     for (const channel of channels) ipcMain.removeHandler(channel);
+   };
+ }
+@@ -316,6 +351,11 @@ async function adminSettings(
+     cameraResolution: settings.cameraResolution,
+     supabaseUrl: settings.supabaseUrl,
+     supabasePublishableKey: settings.supabasePublishableKey,
++    dualDisplay: {
++      mode: settings.dualDisplayMode,
++      swapDisplays: settings.swapDisplays,
++      qrDismissSeconds: settings.qrDismissSeconds,
++    },
+     revision: settings.revision,
+   };
+ }
+diff --git a/apps/kiosk/src/main/security/window.ts b/apps/kiosk/src/main/security/window.ts
+index 3832566..7607231 100644
+--- a/apps/kiosk/src/main/security/window.ts
++++ b/apps/kiosk/src/main/security/window.ts
+@@ -122,7 +122,7 @@ function stripTrailingSlash(value: string): string {
+   return value.endsWith('/') ? value.slice(0, -1) : value;
+ }
+ 
+-function isTrustedRendererUrl(value: string, expectedOrigin: string): boolean {
++export function isTrustedRendererUrl(value: string, expectedOrigin: string): boolean {
+   const url = new URL(value);
+   return expectedOrigin === 'app://grace-booth'
+     ? url.protocol === 'app:' && url.hostname === 'grace-booth'
+diff --git a/apps/kiosk/src/main/workflow/booth-workflow.ts b/apps/kiosk/src/main/workflow/booth-workflow.ts
+index 8711a89..196b3dd 100644
+--- a/apps/kiosk/src/main/workflow/booth-workflow.ts
++++ b/apps/kiosk/src/main/workflow/booth-workflow.ts
+@@ -6,6 +6,7 @@ import type {
+   CameraAdapter,
+   CaptureResult,
+   GuestErrorCode,
++  QrStationState,
+   SessionState,
+ } from '@grace-booth/shared';
+ 
+@@ -27,11 +28,24 @@ const CANCELLABLE_STATES: readonly SessionState[] = ['countdown', 'capturing', '
+ export type BoothWorkflowOptions = {
+   shotCountdownsMs: readonly [number, number, number];
+   cameraPreviewEnabled?: boolean;
++  isDualDisplayActive?: () => boolean;
+   now?: () => number;
+ };
+ 
+ export class BoothWorkflow {
+   private readonly listeners = new Set<(snapshot: BoothSnapshot) => void>();
++  private readonly qrListeners = new Set<(state: QrStationState) => void>();
++  private qrStationState: QrStationState = {
++    status: 'idle',
++    sessionId: null,
++    collageUrl: null,
++    qrImageUrl: null,
++    expiresAt: null,
++    durationSeconds: 45,
++    message: null,
++    canRetryUpload: false,
++  };
++  private qrDismissTimer: NodeJS.Timeout | null = null;
+   private activeSessionId: string | null = null;
+   private countdownEndsAt: number | null = null;
+   private countdownTimer: NodeJS.Timeout | null = null;
+@@ -104,6 +118,40 @@ export class BoothWorkflow {
+     return () => this.listeners.delete(listener);
+   }
+ 
++  subscribeQrStation(listener: (state: QrStationState) => void): () => void {
++    this.qrListeners.add(listener);
++    return () => this.qrListeners.delete(listener);
++  }
++
++  getQrStationState(): QrStationState {
++    return this.qrStationState;
++  }
++
++  dismissQrStation(): QrStationState {
++    if (this.qrDismissTimer) {
++      clearTimeout(this.qrDismissTimer);
++      this.qrDismissTimer = null;
++    }
++    this.qrStationState = {
++      status: 'idle',
++      sessionId: null,
++      collageUrl: null,
++      qrImageUrl: null,
++      expiresAt: null,
++      durationSeconds: 45,
++      message: null,
++      canRetryUpload: false,
++    };
++    this.emitQrStation();
++    return this.qrStationState;
++  }
++
++  isDualDisplayActive(): boolean {
++    if (this.options.isDualDisplayActive) return this.options.isDualDisplayActive();
++    const settings = this.repository.getSettings();
++    return settings.dualDisplayMode === 'enabled';
++  }
++
+   getSnapshot(): BoothSnapshot {
+     const cameraPreviewEnabled = this.options.cameraPreviewEnabled ?? false;
+     const session = this.activeSessionId ? this.repository.getSession(this.activeSessionId) : null;
+@@ -200,9 +248,17 @@ export class BoothWorkflow {
+       },
+       this.now(),
+     );
+-    this.emit();
++    const dualActive = this.isDualDisplayActive();
++    if (dualActive) {
++      this.activeSessionId = null;
++      this.emit();
++    } else {
++      this.emit();
++    }
+     void this.processCollage(session.id);
+-    return this.getSnapshot();
++    return dualActive
++      ? attractSnapshot(this.options.cameraPreviewEnabled ?? false)
++      : this.getSnapshot();
+   }
+ 
+   retryUpload(): BoothSnapshot {
+@@ -290,6 +346,10 @@ export class BoothWorkflow {
+   async close(): Promise<void> {
+     this.closed = true;
+     if (this.countdownTimer) clearTimeout(this.countdownTimer);
++    if (this.qrDismissTimer) {
++      clearTimeout(this.qrDismissTimer);
++      this.qrDismissTimer = null;
++    }
+     this.uploadQueue.stop();
+     await Promise.all([this.camera.disconnect(), this.imageProcessor.close()]);
+   }
+@@ -488,6 +548,21 @@ export class BoothWorkflow {
+         // Handled if already transitioned
+       }
+     }
++    const sessionAssets = this.repository.listCurrentAssets(sessionId);
++    const collage = sessionAssets.find((asset) => asset.kind === 'collage');
++    if (collage) {
++      this.qrStationState = {
++        status: 'error',
++        sessionId,
++        collageUrl: mediaUrl(collage.id),
++        qrImageUrl: null,
++        expiresAt: null,
++        durationSeconds: 45,
++        message: 'Upload failed. You can finish offline or retry.',
++        canRetryUpload: true,
++      };
++      this.emitQrStation();
++    }
+     this.emitIfActive(sessionId);
+   }
+ 
+@@ -503,6 +578,29 @@ export class BoothWorkflow {
+     if (current.state === 'ready') {
+       this.transition(current, 'qr_ready', {}, this.now());
+     }
++    const sessionAssets = this.repository.listCurrentAssets(sessionId);
++    const collage = sessionAssets.find((asset) => asset.kind === 'collage');
++    const settings = this.repository.getSettings();
++    const duration = settings.qrDismissSeconds || 45;
++    const expiresAt = this.now() + duration * 1000;
++    this.qrStationState = {
++      status: 'active',
++      sessionId,
++      collageUrl: collage ? mediaUrl(collage.id) : null,
++      qrImageUrl: qr.imageDataUrl,
++      expiresAt,
++      durationSeconds: duration,
++      message: null,
++      canRetryUpload: false,
++    };
++    if (this.qrDismissTimer) {
++      clearTimeout(this.qrDismissTimer);
++      this.qrDismissTimer = null;
++    }
++    this.qrDismissTimer = setTimeout(() => {
++      this.dismissQrStation();
++    }, duration * 1000);
++    this.emitQrStation();
+     this.emitIfActive(sessionId);
+   }
+ 
+@@ -554,6 +652,10 @@ export class BoothWorkflow {
+     if (this.activeSessionId === sessionId) this.emit();
+   }
+ 
++  private emitQrStation(): void {
++    for (const listener of this.qrListeners) listener(this.qrStationState);
++  }
++
+   private emit(): void {
+     const snapshot = this.getSnapshot();
+     for (const listener of this.listeners) listener(snapshot);
+diff --git a/apps/kiosk/src/preload/index.ts b/apps/kiosk/src/preload/index.ts
+index 27bbae4..e77477e 100644
+--- a/apps/kiosk/src/preload/index.ts
++++ b/apps/kiosk/src/preload/index.ts
+@@ -3,6 +3,8 @@ import {
+   BoothSnapshotEventSchema,
+   CAMERA_FRAME_REQUEST_EVENT,
+   CameraFrameRequestEventSchema,
++  QR_STATION_EVENT,
++  QrStationEventSchema,
+   IpcContracts,
+   type GraceBoothBridge,
+   type IpcChannel,
+@@ -60,8 +62,21 @@ const bridge: GraceBoothBridge = {
+       return () => ipcRenderer.removeListener(CAMERA_FRAME_REQUEST_EVENT, handler);
+     },
+   },
++  qrStation: {
++    getState: () => invoke('qr-station:get-state', {}),
++    dismiss: () => invoke('qr-station:dismiss', {}),
++    subscribe: (listener) => {
++      const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
++        const parsed = QrStationEventSchema.safeParse(value);
++        if (parsed.success) listener(parsed.data);
++      };
++      ipcRenderer.on(QR_STATION_EVENT, handler);
++      return () => ipcRenderer.removeListener(QR_STATION_EVENT, handler);
++    },
++  },
+   gallery: {
+     getRecent: (limit = 20) => invoke('gallery:get-recent', { limit }),
++    repairCloudPhoto: (sessionId) => invoke('gallery:repair-cloud-photo', { sessionId }),
+   },
+   admin: {
+     getAuthStatus: () => invoke('admin:get-auth-status', {}),
+@@ -72,6 +87,9 @@ const bridge: GraceBoothBridge = {
+       invoke('admin:change-passcode', { currentPasscode, newPasscode }),
+     getSettings: () => invoke('admin:get-settings', {}),
+     saveSettings: (input) => invoke('admin:save-settings', input),
++    getDisplays: () => invoke('admin:get-displays', {}),
++    swapDisplays: () => invoke('admin:swap-displays', {}),
++    saveDualDisplaySettings: (input) => invoke('admin:save-dual-display-settings', input),
+     listFrames: () => invoke('admin:list-frames', {}),
+     addFrame: () => invoke('admin:add-frame', {}),
+     updateFrameLayout: (input) => invoke('admin:update-frame-layout', input),
+diff --git a/docs/BUILD_FLOW_SUMMARY.md b/docs/BUILD_FLOW_SUMMARY.md
+index 4d689d6..720747a 100644
+--- a/docs/BUILD_FLOW_SUMMARY.md
++++ b/docs/BUILD_FLOW_SUMMARY.md
+@@ -86,8 +86,8 @@ Pinned foundation: Node 24, pnpm 11, Electron 43.4, electron-vite 5, Vite 7.3, R
+ - Added `create-upload`, `confirm-upload`, POST-only photo resolution/image/download actions, and idempotent leased cleanup.
+ - Added exact expiry at confirmation time plus 720 hours, independent of later cleanup timing.
+ - Added the Cloudflare Pages public page. QR targets are `https://<public-origin>/photo#<token>`, so the fragment
+-  does not reach access logs. The page sends the token only in validated POST bodies and follows
+-  authenticated bodyless 303 delivery redirects only to the configured private R2 S3 API origin.
++  does not reach access logs. The page sends the token only in validated POST bodies and accepts
++  direct JPEG bytes only from the configured photo API origin.
+ - Added exact-origin CORS, no-store behavior, restrictive CSP, no analytics, and no third-party public-page requests.
+ - Added a separate server-only `PUBLIC_TOKEN_DERIVATION_KEY` for stable, domain-separated HMAC-SHA256 token derivation across concurrent or lost-response retries. PostgreSQL stores only SHA-256 of the derived raw token.
+ - Locked production Supabase region documentation to Singapore.
+@@ -198,10 +198,9 @@ A fresh run in the current restricted Codex session reconfirmed formatting, lint
+ - No Supabase project has been created. Production must use the locked Singapore region.
+ - Supabase migrations, private Storage, Vault values, Cron/`pg_net`, booth identity allow-listing, and Edge Functions have not been deployed.
+ - No Cloudflare Pages deployment, production-origin change, or DNS mutation is performed automatically.
+-- Hosted CORS/origin and end-to-end cloud smoke tests cannot run until both services exist.
+-- Production builds fail closed unless `VITE_PUBLIC_PHOTO_API_URL`, `VITE_PUBLIC_PAGE_ORIGIN`, and
+-  the actual presigned S3 `VITE_PUBLIC_R2_ORIGIN` are set. The build emits the exact Cloudflare
+-  Pages CSP and SPA routing into `apps/public/dist`.
++- Hosted origin and end-to-end cloud smoke tests cannot run until both services exist.
++- Production builds fail closed unless `VITE_PUBLIC_PHOTO_API_URL` and `VITE_PUBLIC_PAGE_ORIGIN`
++  are set. The build emits the exact Cloudflare Pages CSP and SPA routing into `apps/public/dist`.
+ - `PUBLIC_TOKEN_DERIVATION_KEY`, `CLEANUP_SECRET`, Supabase server keys, and Vault values must be generated and stored operationally; none are included in the repository.
+ 
+ ### Database/live Function testing
+diff --git a/docs/SECURITY_AND_RETENTION.md b/docs/SECURITY_AND_RETENTION.md
+index 7f084d1..d9dea3c 100644
+--- a/docs/SECURITY_AND_RETENTION.md
++++ b/docs/SECURITY_AND_RETENTION.md
+@@ -69,30 +69,12 @@ The derivation key is independent of the cleanup and Supabase server keys. Routi
+ 
+ The QR target is `https://<approved-public-origin>/photo#<token>`. URL fragments do not reach Cloudflare Pages or Supabase request paths. The public page sends the token only in strict POST bodies to `/photo/resolve`, `/photo/image`, and `/photo/download`. The application, page, and Functions never log those bodies. Unknown, expired, and deleted tokens receive the same public response shape; malformed requests fail validation before lookup.
+ 
+-For private R2 delivery, image/download authorization HEADs and size-checks the object, rechecks the
+-permanent token immediately before signing, and returns only a bodyless `303 See Other`. The signed
+-GET is valid for at most 300 seconds and is clamped to the remaining permanent-token lifetime. The
+-browser deliberately follows the redirect, accepts redirected JPEG bytes only from the configured
+-R2 S3 API origin, and renders a blob URL. Signed URLs, credentials, authorization headers, tokens,
+-and object paths are never logged or placed in application state, storage, analytics, or DOM text.
+-
+-The private bucket's complete browser CORS configuration is:
+-
+-```json
+-[
+-  {
+-    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
+-    "AllowedMethods": ["GET", "HEAD"],
+-    "AllowedHeaders": [],
+-    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
+-    "MaxAgeSeconds": 300
+-  }
+-]
+-```
+-
+-No wildcard origin/header, write method, or additional exposed response header is permitted. The
+-public CSP lists the exact Supabase photo API and actual R2 presigned S3 origins in `connect-src`;
+-`img-src` remains `'self' blob:` because the page never renders R2 URLs directly.
++For private delivery, resolve and image/download verify the object in the backend recorded on the
++row, validate size and JPEG metadata, then recheck token authorization. Image/download return bytes
++through the Edge Function; the browser rejects redirects and non-API response origins and renders a
++blob URL. R2 URLs, credentials, authorization headers, tokens, and object paths are never placed in
++browser state, storage, analytics, logs, or DOM text. The public CSP therefore lists only the exact
++Supabase photo API in `connect-src`; no browser-facing R2 CORS rule is needed.
+ 
+ The bearer token grants access to one photo until its exact expiry. Anyone who receives the QR or copied URL can use it during that period. The public page therefore uses `no-store`, a restrictive CSP, no analytics, no third-party renderer requests, no referrer leakage, and no token in paths or query strings.
+ 
+diff --git a/docs/VERIFICATION.md b/docs/VERIFICATION.md
+index a51d989..6efd214 100644
+--- a/docs/VERIFICATION.md
++++ b/docs/VERIFICATION.md
+@@ -47,9 +47,8 @@ The QR photo-delivery chain only works when hosted artifacts come from the same
+ 
+ 1. Apply the checked-in Supabase migrations (`supabase db push`) so `resolve_photo_session` returns `storage_backend`.
+ 2. Deploy the Edge Functions from that same tree.
+-3. Build and deploy the public page from that same tree with `VITE_PUBLIC_PHOTO_API_URL`, `VITE_PUBLIC_PAGE_ORIGIN`, and `VITE_PUBLIC_R2_ORIGIN` all set.
+-4. Apply the R2 bucket CORS policy (`pnpm r2:cors:apply` with `R2_BUCKET_NAME`, `PUBLIC_PAGE_ORIGIN`, and Cloudflare credentials set).
+-5. Run the hosted smoke test (`pnpm smoke:photo` with a valid token); it names the failing layer - Function/HTTP status, R2 CORS, presigned-origin mismatch, storage-backend drift, or non-JPEG body.
++3. Build and deploy the public page from that same tree with `VITE_PUBLIC_PHOTO_API_URL` and `VITE_PUBLIC_PAGE_ORIGIN` set.
++4. Run the hosted smoke test (`pnpm smoke:photo` with a valid token); it verifies storage-aware resolution plus direct API JPEG bytes for image and download without exposing R2 URLs.
+ 
+ ## Windows artifact
+ 
+diff --git a/infra/r2-cors.json b/infra/r2-cors.json
+deleted file mode 100644
+index a8e337d..0000000
+--- a/infra/r2-cors.json
++++ /dev/null
+@@ -1,9 +0,0 @@
+-[
+-  {
+-    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
+-    "AllowedMethods": ["GET", "HEAD"],
+-    "AllowedHeaders": [],
+-    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
+-    "MaxAgeSeconds": 300
+-  }
+-]
+diff --git a/packages/shared/src/cloud.ts b/packages/shared/src/cloud.ts
+index f3ad8c2..955fbd3 100644
+--- a/packages/shared/src/cloud.ts
++++ b/packages/shared/src/cloud.ts
+@@ -94,6 +94,65 @@ export const ConfirmUploadResponseSchema = z
+   .strict();
+ export type ConfirmUploadResponse = z.infer<typeof ConfirmUploadResponseSchema>;
+ 
++export const PhotoAvailabilitySchema = z.enum([
++  'available',
++  'unavailable',
++  'verification-failed',
++]);
++export type PhotoAvailability = z.infer<typeof PhotoAvailabilitySchema>;
++
++export const PhotoRepairMetadataSchema = z
++  .object({
++    byteSize: z.number().int().positive(),
++    sha256: Sha256HexSchema,
++    width: z.number().int().min(1).max(6_000),
++    height: z.number().int().min(1).max(6_000),
++  })
++  .strict();
++export type PhotoRepairMetadata = z.infer<typeof PhotoRepairMetadataSchema>;
++
++export const AuthorizePhotoRepairRequestSchema = z
++  .object({
++    action: z.literal('authorize'),
++    photoSessionId: OpaqueIdSchema,
++    publicToken: PublicTokenSchema,
++    metadata: PhotoRepairMetadataSchema,
++  })
++  .strict();
++export type AuthorizePhotoRepairRequest = z.infer<typeof AuthorizePhotoRepairRequestSchema>;
++
++export const AuthorizePhotoRepairResponseSchema = z
++  .object({
++    action: z.literal('authorize'),
++    repairBatchId: OpaqueIdSchema,
++    upload: z
++      .object({
++        storagePath: z.string().min(1).max(500),
++        uploadUrl: z.url(),
++        requiredHeaders: z
++          .object({
++            'content-type': z.literal('image/jpeg'),
++            'if-none-match': z.literal('*'),
++          })
++          .strict(),
++        validForSeconds: z.literal(300),
++      })
++      .strict(),
++  })
++  .strict();
++export type AuthorizePhotoRepairResponse = z.infer<typeof AuthorizePhotoRepairResponseSchema>;
++
++export const ConfirmPhotoRepairRequestSchema = z
++  .object({
++    action: z.literal('confirm'),
++    photoSessionId: OpaqueIdSchema,
++    publicToken: PublicTokenSchema,
++    repairBatchId: OpaqueIdSchema,
++    metadata: PhotoRepairMetadataSchema,
++  })
++  .strict();
++export type ConfirmPhotoRepairRequest = z.infer<typeof ConfirmPhotoRepairRequestSchema>;
++
+ export const BoothAuthSessionSchema = z
+   .object({
+     accessToken: z.string().min(1),
+diff --git a/packages/shared/src/domain.ts b/packages/shared/src/domain.ts
+index 57c718a..d1fa593 100644
+--- a/packages/shared/src/domain.ts
++++ b/packages/shared/src/domain.ts
+@@ -134,6 +134,49 @@ export const FrameSummarySchema = z
+   .strict();
+ export type FrameSummary = z.infer<typeof FrameSummarySchema>;
+ 
++export const DualDisplayModeSchema = z.enum(['auto', 'enabled', 'disabled']);
++export type DualDisplayMode = z.infer<typeof DualDisplayModeSchema>;
++
++export const DualDisplaySettingsSchema = z
++  .object({
++    mode: DualDisplayModeSchema.default('auto'),
++    swapDisplays: z.boolean().default(false),
++    qrDismissSeconds: z.number().int().min(10).max(300).default(45),
++  })
++  .strict();
++export type DualDisplaySettings = z.infer<typeof DualDisplaySettingsSchema>;
++
++export const DisplayInfoSchema = z
++  .object({
++    id: z.number(),
++    label: z.string(),
++    bounds: z
++      .object({
++        x: z.number(),
++        y: z.number(),
++        width: z.number(),
++        height: z.number(),
++      })
++      .strict(),
++    isPrimary: z.boolean(),
++  })
++  .strict();
++export type DisplayInfo = z.infer<typeof DisplayInfoSchema>;
++
++export const QrStationStateSchema = z
++  .object({
++    status: z.enum(['idle', 'active', 'error']),
++    sessionId: OpaqueIdSchema.nullable(),
++    collageUrl: z.string().nullable(),
++    qrImageUrl: z.string().nullable(),
++    expiresAt: UtcMillisSchema.nullable(),
++    durationSeconds: z.number().int().positive(),
++    message: z.string().nullable(),
++    canRetryUpload: z.boolean().default(false),
++  })
++  .strict();
++export type QrStationState = z.infer<typeof QrStationStateSchema>;
++
+ export const AdminSettingsSchema = z
+   .object({
+     googleFormsUrl: OptionalGoogleFormsUrlSchema,
+@@ -147,6 +190,11 @@ export const AdminSettingsSchema = z
+     cameraResolution: z.enum(['720p', '1080p']).default('1080p'),
+     supabaseUrl: z.url().max(500).nullable().default(null),
+     supabasePublishableKey: z.string().max(1_000).nullable().default(null),
++    dualDisplay: DualDisplaySettingsSchema.optional().default({
++      mode: 'auto',
++      swapDisplays: false,
++      qrDismissSeconds: 45,
++    }),
+     revision: z.number().int().nonnegative(),
+   })
+   .strict();
+@@ -212,7 +260,14 @@ export const UploadJobStateSchema = z.enum([
+ ]);
+ export type UploadJobState = z.infer<typeof UploadJobStateSchema>;
+ 
+-export const GalleryUploadStatusSchema = z.enum(['pending', 'uploaded', 'failed', 'local-receipt']);
++export const GalleryUploadStatusSchema = z.enum([
++  'pending',
++  'uploaded',
++  'failed',
++  'local-receipt',
++  'unavailable',
++  'verification-failed',
++]);
+ export type GalleryUploadStatus = z.infer<typeof GalleryUploadStatusSchema>;
+ 
+ export const GalleryItemMetadataSchema = z
+@@ -236,6 +291,14 @@ export const GalleryItemSchema = z
+   .strict();
+ export type GalleryItem = z.infer<typeof GalleryItemSchema>;
+ 
++export const GalleryCloudRepairResultSchema = z
++  .object({
++    status: z.enum(['repaired', 'original-booth-required']),
++    message: z.string().min(1).max(300),
++  })
++  .strict();
++export type GalleryCloudRepairResult = z.infer<typeof GalleryCloudRepairResultSchema>;
++
+ export const UploadJobSummarySchema = z
+   .object({
+     id: OpaqueIdSchema,
+diff --git a/packages/shared/src/ipc.ts b/packages/shared/src/ipc.ts
+index 92cecec..0637561 100644
+--- a/packages/shared/src/ipc.ts
++++ b/packages/shared/src/ipc.ts
+@@ -12,22 +12,30 @@ import {
+   AdminHealthSchema,
+   AdminSettingsSchema,
+   BoothSnapshotSchema,
++  DisplayInfoSchema,
++  DualDisplaySettingsSchema,
+   EmptyResponseSchema,
+   FrameLayoutSchema,
+   FrameSummarySchema,
+   GalleryItemSchema,
++  GalleryCloudRepairResultSchema,
+   OpaqueIdSchema,
+   OptionalGoogleFormsUrlSchema,
++  QrStationStateSchema,
+   UploadJobSummarySchema,
+   rpcResultSchema,
+   type AdminAuthStatus,
+   type AdminHealth,
+   type AdminSettings,
+   type BoothSnapshot,
++  type DisplayInfo,
++  type DualDisplaySettings,
+   type EmptyResponse,
+   type FrameLayout,
+   type FrameSummary,
+   type GalleryItem,
++  type GalleryCloudRepairResult,
++  type QrStationState,
+   type RpcResult,
+   type UploadJobSummary,
+ } from './domain.js';
+@@ -104,6 +112,14 @@ export const IpcContracts = {
+       .strict(),
+     response: rpcResultSchema(EmptyResponseSchema),
+   },
++  'qr-station:get-state': {
++    request: EmptyRequestSchema,
++    response: rpcResultSchema(QrStationStateSchema),
++  },
++  'qr-station:dismiss': {
++    request: EmptyRequestSchema,
++    response: rpcResultSchema(QrStationStateSchema),
++  },
+   'gallery:get-recent': {
+     request: z
+       .object({
+@@ -112,6 +128,10 @@ export const IpcContracts = {
+       .strict(),
+     response: rpcResultSchema(z.array(GalleryItemSchema)),
+   },
++  'gallery:repair-cloud-photo': {
++    request: z.object({ sessionId: OpaqueIdSchema }).strict(),
++    response: rpcResultSchema(GalleryCloudRepairResultSchema),
++  },
+   'admin:get-auth-status': {
+     request: EmptyRequestSchema,
+     response: rpcResultSchema(AdminAuthStatusSchema),
+@@ -148,6 +168,18 @@ export const IpcContracts = {
+       .strict(),
+     response: rpcResultSchema(AdminSettingsSchema),
+   },
++  'admin:get-displays': {
++    request: EmptyRequestSchema,
++    response: rpcResultSchema(z.array(DisplayInfoSchema)),
++  },
++  'admin:swap-displays': {
++    request: EmptyRequestSchema,
++    response: rpcResultSchema(z.array(DisplayInfoSchema)),
++  },
++  'admin:save-dual-display-settings': {
++    request: DualDisplaySettingsSchema,
++    response: rpcResultSchema(DualDisplaySettingsSchema),
++  },
+   'admin:list-frames': {
+     request: EmptyRequestSchema,
+     response: rpcResultSchema(z.array(FrameSummarySchema)),
+@@ -228,6 +260,10 @@ export const IpcContracts = {
+ export const BOOTH_SNAPSHOT_EVENT = 'booth:snapshot-changed' as const;
+ export const BoothSnapshotEventSchema = BoothSnapshotSchema;
+ 
++export const QR_STATION_EVENT = 'booth:qr-station-changed' as const;
++export const QrStationEventSchema = QrStationStateSchema;
++export type QrStationEvent = z.infer<typeof QrStationEventSchema>;
++
+ export const CAMERA_FRAME_REQUEST_EVENT = 'booth:camera-frame-requested' as const;
+ export const CameraFrameRequestEventSchema = z
+   .object({ captureId: OpaqueIdSchema, deadlineAt: z.number().int().positive() })
+@@ -258,8 +294,14 @@ export type GraceBoothBridge = {
+     subscribe(listener: (snapshot: BoothSnapshot) => void): () => void;
+     onCameraFrameRequest(listener: (request: CameraFrameRequestEvent) => void): () => void;
+   };
++  qrStation: {
++    getState(): Promise<RpcResult<QrStationState>>;
++    dismiss(): Promise<RpcResult<QrStationState>>;
++    subscribe(listener: (state: QrStationState) => void): () => void;
++  };
+   gallery: {
+     getRecent(limit?: number): Promise<RpcResult<GalleryItem[]>>;
++    repairCloudPhoto(sessionId: string): Promise<RpcResult<GalleryCloudRepairResult>>;
+   };
+   admin: {
+     getAuthStatus(): Promise<RpcResult<AdminAuthStatus>>;
+@@ -275,6 +317,9 @@ export type GraceBoothBridge = {
+       lanPort: number;
+       expectedRevision: number;
+     }): Promise<RpcResult<AdminSettings>>;
++    getDisplays(): Promise<RpcResult<DisplayInfo[]>>;
++    swapDisplays(): Promise<RpcResult<DisplayInfo[]>>;
++    saveDualDisplaySettings(input: DualDisplaySettings): Promise<RpcResult<DualDisplaySettings>>;
+     listFrames(): Promise<RpcResult<FrameSummary[]>>;
+     addFrame(): Promise<RpcResult<FrameSummary | null>>;
+     updateFrameLayout(input: {
+diff --git a/scripts/smoke-photo-delivery.mjs b/scripts/smoke-photo-delivery.mjs
+index 8f8d1a7..2952e58 100644
+--- a/scripts/smoke-photo-delivery.mjs
++++ b/scripts/smoke-photo-delivery.mjs
+@@ -5,9 +5,7 @@ const LAYERS = {
+   NETWORK: 'cors/network',
+   HTTP_STATUS: 'http-status',
+   ORIGIN_MISMATCH: 'origin-mismatch',
+-  STORAGE_BACKEND: 'storage-backend',
+   NON_JPEG_BODY: 'non-jpeg-body',
+-  CORS_POLICY: 'r2-cors',
+ };
+ 
+ class SmokeFailure extends Error {
+@@ -61,16 +59,16 @@ function readApiBaseUrl() {
+   return url.toString().replace(/\/+$/u, '');
+ }
+ 
+-function readExactOrigin(names) {
+-  const value = readEnvironment(names);
++function readPageOrigin() {
++  const value = readEnvironment(['PAGE_ORIGIN', 'PUBLIC_PAGE_ORIGIN']);
+   if (!value) {
+-    fail(LAYERS.CONFIGURATION, `${names[0]} (or ${names[1]}) is not configured`);
++    fail(LAYERS.CONFIGURATION, 'PAGE_ORIGIN (or PUBLIC_PAGE_ORIGIN) is not configured');
+   }
+   let url;
+   try {
+     url = new URL(value);
+   } catch {
+-    fail(LAYERS.CONFIGURATION, `${names[0]} is not a valid absolute URL`);
++    fail(LAYERS.CONFIGURATION, 'PAGE_ORIGIN is not a valid absolute URL');
+   }
+   if (
+     url.protocol !== 'https:' ||
+@@ -80,15 +78,14 @@ function readExactOrigin(names) {
+     url.username ||
+     url.password
+   ) {
+-    fail(LAYERS.CONFIGURATION, `${names[0]} must be a bare HTTPS origin`);
++    fail(LAYERS.CONFIGURATION, 'PAGE_ORIGIN must be a bare HTTPS origin');
+   }
+   return url.origin;
+ }
+ 
+ async function runSmokeTest() {
+   const apiBaseUrl = readApiBaseUrl();
+-  const pageOrigin = readExactOrigin(['PAGE_ORIGIN', 'PUBLIC_PAGE_ORIGIN']);
+-  const r2Origin = readExactOrigin(['R2_ORIGIN', 'VITE_PUBLIC_R2_ORIGIN']);
++  const pageOrigin = readPageOrigin();
+   const token = readEnvironment(['SMOKE_PHOTO_TOKEN']);
+   if (!token) fail(LAYERS.CONFIGURATION, 'SMOKE_PHOTO_TOKEN is not configured');
+   if (!/^[A-Za-z0-9_-]{43}$/u.test(token)) {
+@@ -96,10 +93,10 @@ async function runSmokeTest() {
+   }
+   const apiOrigin = new URL(apiBaseUrl).origin;
+ 
+-  function postPhotoRoute(route, redirect) {
++  function postPhotoRoute(route) {
+     return fetch(`${apiBaseUrl}/${route}`, {
+       method: 'POST',
+-      redirect,
++      redirect: 'error',
+       cache: 'no-store',
+       headers: { 'Content-Type': 'application/json', Origin: pageOrigin },
+       body: JSON.stringify({ token }),
+@@ -108,113 +105,62 @@ async function runSmokeTest() {
+ 
+   pass(`page origin ${pageOrigin}`);
+ 
+-  const resolveResponse = await postPhotoRoute('resolve', 'follow');
++  const resolveResponse = await postPhotoRoute('resolve');
+   if (!resolveResponse) {
+     fail(LAYERS.NETWORK, 'photo API unreachable (DNS, TLS, or Function CORS)');
+   }
+   if (resolveResponse.status !== 200) {
+     fail(
+       LAYERS.HTTP_STATUS,
+-      `resolve returned HTTP ${resolveResponse.status} (403 page-origin gate; 404 unknown token; 503 backend)`,
++      `resolve returned HTTP ${resolveResponse.status} (403 origin; 404 missing object/token; 503 verification failure)`,
+     );
+   }
+   const resolvePayload = await resolveResponse.json().catch(() => undefined);
+   if (resolvePayload?.status !== 'ready') {
+-    fail(LAYERS.HTTP_STATUS, 'resolve did not report a ready photo');
+-  }
+-  pass('resolve reports ready');
+-
+-  const imageResponse = await postPhotoRoute('image', 'follow');
+-  if (!imageResponse) {
+-    fail(LAYERS.NETWORK, 'photo API unreachable on the image route');
+-  }
+-  if (imageResponse.status !== 200) {
+-    fail(
+-      LAYERS.HTTP_STATUS,
+-      `image returned HTTP ${imageResponse.status} (403 page-origin gate; 404 expired; 503 unavailable)`,
+-    );
+-  }
+-  let finalOrigin;
+-  try {
+-    finalOrigin = new URL(imageResponse.url).origin;
+-  } catch {
+-    fail(LAYERS.NETWORK, 'final image response has no parseable URL');
+-  }
+-  if (finalOrigin === apiOrigin) {
+-    fail(
+-      LAYERS.STORAGE_BACKEND,
+-      'photo streamed from Supabase Storage instead of an R2 303 - storage_backend or migration drift for this token',
+-    );
+-  }
+-  if (finalOrigin !== r2Origin) {
+-    fail(
+-      LAYERS.ORIGIN_MISMATCH,
+-      `redirected to ${finalOrigin}, expected ${r2Origin} - build-time R2 origin does not match the presigned host`,
+-    );
+-  }
+-  pass(`image redirected and followed to ${r2Origin}`);
+-
+-  const contentType = imageResponse.headers.get('content-type')?.split(';', 1)[0]?.toLowerCase();
+-  if (contentType !== 'image/jpeg') {
+-    fail(LAYERS.NON_JPEG_BODY, `content-type is ${contentType ?? 'missing'}, expected image/jpeg`);
+-  }
+-  const bytes = new Uint8Array(await imageResponse.arrayBuffer());
+-  if (
+-    bytes.length < 5 ||
+-    bytes[0] !== 0xff ||
+-    bytes[1] !== 0xd8 ||
+-    bytes[2] !== 0xff ||
+-    bytes[bytes.length - 2] !== 0xff ||
+-    bytes[bytes.length - 1] !== 0xd9
+-  ) {
+-    fail(LAYERS.NON_JPEG_BODY, 'stored object is not a complete JPEG (magic-byte mismatch)');
+-  }
+-  pass('delivered bytes are a complete JPEG');
+-
+-  const manualProbe = await postPhotoRoute('image', 'manual');
+-  if (manualProbe?.status !== 303) {
+-    fail(
+-      LAYERS.HTTP_STATUS,
+-      `manual re-request returned HTTP ${manualProbe?.status ?? 'network error'}, expected 303`,
+-    );
+-  }
+-  const locationValue = manualProbe.headers.get('location');
+-  let location;
+-  try {
+-    location = new URL(locationValue ?? '');
+-  } catch {
+-    fail(LAYERS.ORIGIN_MISMATCH, '303 Location header is missing or invalid');
+-  }
+-  if (location.origin !== r2Origin) {
+-    fail(
+-      LAYERS.ORIGIN_MISMATCH,
+-      `Location points at ${location.origin}, expected ${r2Origin}`,
+-    );
+-  }
+-  const direct = await fetch(location, {
+-    redirect: 'error',
+-    cache: 'no-store',
+-    headers: { Origin: pageOrigin },
+-  }).catch(() => undefined);
+-  if (!direct) {
+-    fail(LAYERS.NETWORK, 'R2 presigned GET unreachable (DNS or TLS)');
+-  }
+-  if (direct.status !== 200) {
+-    fail(
+-      LAYERS.HTTP_STATUS,
+-      `R2 object GET returned HTTP ${direct.status} (signature or object problem)`,
+-    );
+-  }
+-  const allowOrigin = direct.headers.get('access-control-allow-origin')?.split(',', 1)[0]?.trim();
+-  if (allowOrigin !== pageOrigin) {
+-    fail(
+-      LAYERS.CORS_POLICY,
+-      `R2 answered without Access-Control-Allow-Origin for the page origin${allowOrigin ? ` (got ${allowOrigin})` : ''} - apply infra/r2-cors.json via pnpm r2:cors:apply`,
+-    );
+-  }
+-  pass('R2 bucket CORS allows the page origin');
+-
+-  console.log('[smoke:photo] PASS - QR photo delivery chain is healthy end-to-end');
++    fail(LAYERS.HTTP_STATUS, 'resolve did not report a storage-verified ready photo');
++  }
++  pass('resolve reports a storage-verified ready photo');
++
++  for (const route of ['image', 'download']) {
++    const response = await postPhotoRoute(route);
++    if (!response) fail(LAYERS.NETWORK, `photo API unreachable on the ${route} route`);
++    if (response.status !== 200) {
++      fail(
++        LAYERS.HTTP_STATUS,
++        `${route} returned HTTP ${response.status} (403 origin; 404 missing; 503 verification failure)`,
++      );
++    }
++    let responseOrigin;
++    try {
++      responseOrigin = new URL(response.url).origin;
++    } catch {
++      fail(LAYERS.NETWORK, `${route} response has no parseable URL`);
++    }
++    if (response.redirected || responseOrigin !== apiOrigin) {
++      fail(
++        LAYERS.ORIGIN_MISMATCH,
++        `${route} must stream directly from ${apiOrigin}; browser-visible storage redirects are not allowed`,
++      );
++    }
++    const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.toLowerCase();
++    if (contentType !== 'image/jpeg') {
++      fail(LAYERS.NON_JPEG_BODY, `${route} content-type is ${contentType ?? 'missing'}`);
++    }
++    const bytes = new Uint8Array(await response.arrayBuffer());
++    if (
++      bytes.length < 5 ||
++      bytes[0] !== 0xff ||
++      bytes[1] !== 0xd8 ||
++      bytes[2] !== 0xff ||
++      bytes[bytes.length - 2] !== 0xff ||
++      bytes[bytes.length - 1] !== 0xd9
++    ) {
++      fail(LAYERS.NON_JPEG_BODY, `${route} did not return a complete JPEG`);
++    }
++    pass(`${route} streams a complete JPEG directly from the photo API`);
++  }
++
++  console.log('[smoke:photo] PASS - storage-aware QR photo delivery is healthy end-to-end');
+ }
+ 
+ try {
+diff --git a/supabase/README.md b/supabase/README.md
+index 599e4b2..00afc03 100644
+--- a/supabase/README.md
++++ b/supabase/README.md
+@@ -17,10 +17,11 @@ deploy a hosted project by itself.
+   cannot choose a final object path and cannot read the bucket directly.
+ - `photo/resolve`, `photo/image`, and `photo/download` accept POST with exactly `{ "token": "..." }`.
+   They require the configured browser origin, reveal no internal path, and treat missing and expired
+-  tokens identically. When R2 is configured, image/download HEAD the private object, compare its
+-  size, reauthorize the permanent token, and return a bodyless `303` to a private presigned GET for
+-  at most 300 seconds and never beyond the permanent-token expiry. The existing size-checked,
+-  freshly reauthorized Supabase Storage binary response remains the fallback when R2 is absent.
++  tokens identically. Resolve verifies the row's recorded store, byte size, and JPEG content type,
++  then reauthorizes the permanent token before reporting ready. Image/download perform the same
++  verification and reauthorization and return size-checked JPEG bytes through the Function for
++  both R2 and Supabase Storage. A missing object is 404; a mismatch or verification fault is a
++  retryable 503.
+ - Cleanup atomically moves expired or abandoned rows into a terminal `deleting` state before any
+   Storage call, removes each private object, then records deletion. A claimed session can never race
+   back to `ready`. Failed items retain their lease until timeout so later batches are not starved.
+@@ -61,26 +62,8 @@ The three R2 credential values are server-only Edge Function secrets. `R2_BUCKET
+ private bucket. R2 configuration is all-or-nothing: all four values route new sessions to R2, no
+ values keep new sessions on Supabase Storage, and a partial configuration fails closed. Each row
+ records its backend so existing Supabase objects remain readable, confirmable, and cleanable after
+-the R2 cutover. Do not configure `R2_PUBLIC_DOMAIN`; delivery uses the R2 S3 API origin because R2
+-presigned URLs do not work on custom domains.
+-
+-Configure the private R2 bucket with this exact browser CORS rule, replacing only the approved
+-public page origin:
+-
+-```json
+-[
+-  {
+-    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
+-    "AllowedMethods": ["GET", "HEAD"],
+-    "AllowedHeaders": [],
+-    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
+-    "MaxAgeSeconds": 300
+-  }
+-]
+-```
+-
+-Do not add `PUT`, `POST`, wildcard origins, wildcard headers, or additional exposed headers. Browser
+-access to presigned R2 URLs still requires this bucket policy.
++the R2 cutover. Do not configure `R2_PUBLIC_DOMAIN`; public delivery is proxied through the Edge
++Function and the browser never receives an R2 URL. No browser-facing R2 CORS policy is required.
+ 
+ `PUBLIC_TOKEN_DERIVATION_KEY` accepts standard base64, base64url, or hexadecimal encoding and must
+ decode to at least 32 random bytes. Keep it backed up as a production secret. Do not rotate it while
+@@ -102,6 +85,24 @@ For local Function serving, put the same names in the ignored `supabase/.env.loc
+ local URL and local server key printed by Supabase CLI. A localhost `PUBLIC_PAGE_ORIGIN` may use
+ HTTP; non-local origins require HTTPS.
+ 
++## Storage-backend recovery
++
++After the repair migration and Functions are deployed, run the administrator inventory from the
++repository root. It is dry-run-only unless all apply guards are supplied:
++
++```powershell
++pnpm repair:storage-backends
++pnpm repair:storage-backends -- --apply --batch-id <new-uuid> --confirm-count <r2-verified-count>
++pnpm repair:storage-backends -- --rollback-batch <batch-uuid>
++```
++
++The report contains classification totals and hashed metadata-snapshot fingerprints only. Review
++the complete dry run before approving an apply. Apply rescans the complete inventory before its
++first guarded RPC, changes only `r2-verified` rows, and records every change in the service-role-only
++ledger. Rollback restores only ledger-matching backend metadata and never deletes storage objects.
++`missing-both` items must be recovered individually from the original kiosk through the operator
++Recent Photos control.
++
+ ## Hosted project setup after approval
+ 
+ Apply these only after the project, region, production domain, and deployment have been approved:
+diff --git a/supabase/config.toml b/supabase/config.toml
+index 4d82983..e4cb4fa 100644
+--- a/supabase/config.toml
++++ b/supabase/config.toml
+@@ -63,6 +63,9 @@ verify_jwt = true
+ [functions.photo]
+ verify_jwt = false
+ 
++[functions.repair-photo]
++verify_jwt = true
++
+ [functions.cleanup-expired]
+ verify_jwt = false
+ 
+diff --git a/supabase/functions/_shared/r2.ts b/supabase/functions/_shared/r2.ts
+index ebc273e..65a4ce7 100644
+--- a/supabase/functions/_shared/r2.ts
++++ b/supabase/functions/_shared/r2.ts
+@@ -26,14 +26,18 @@ export async function createR2PresignedPutUrl(
+   key: string,
+   contentType: string,
+   expiresInSeconds: number,
++  options: { ifNoneMatch?: '*' } = {},
++  signer: R2PutUrlSigner = (signingClient, command, signingOptions) =>
++    getSignedUrl(signingClient, command, signingOptions),
+ ): Promise<string> {
+   try {
+     const command = new PutObjectCommand({
+       Bucket: r2BucketName(),
+       Key: key,
+       ContentType: contentType,
++      IfNoneMatch: options.ifNoneMatch,
+     });
+-    return await getSignedUrl(client, command, { expiresIn: expiresInSeconds });
++    return await signer(client, command, { expiresIn: expiresInSeconds });
+   } catch {
+     throw new ApiError(
+       503,
+@@ -44,6 +48,12 @@ export async function createR2PresignedPutUrl(
+   }
+ }
+ 
++export type R2PutUrlSigner = (
++  client: S3Client,
++  command: PutObjectCommand,
++  options: { expiresIn: number },
++) => Promise<string>;
++
+ export type R2DownloadDisposition = 'inline' | 'attachment';
+ 
+ const CONTROLLED_DOWNLOAD_FILENAME = 'mat-photobooth-keepsake.jpg';
+@@ -119,10 +129,9 @@ export async function checkR2ObjectExists(
+     const parsedContentLength = contentLength === null ? Number.NaN : Number(contentLength);
+     return {
+       exists: true,
+-      byteSize:
+-        Number.isSafeInteger(parsedContentLength) && parsedContentLength >= 0
+-          ? parsedContentLength
+-          : null,
++      byteSize: Number.isSafeInteger(parsedContentLength) && parsedContentLength >= 0
++        ? parsedContentLength
++        : null,
+     };
+   } catch {
+     throw new ApiError(
+diff --git a/supabase/functions/_shared/schemas.ts b/supabase/functions/_shared/schemas.ts
+index ca137d1..4f33bba 100644
+--- a/supabase/functions/_shared/schemas.ts
++++ b/supabase/functions/_shared/schemas.ts
+@@ -71,6 +71,39 @@ export const ConfirmUploadSchema = z
+   })
+   .strict();
+ 
++const RepairPhotoMetadataSchema = z
++  .object({
++    byteSize: z.number().int().positive(),
++    sha256: z.string().regex(SHA256_HEX_PATTERN),
++    width: z.number().int().min(1).max(MAX_EDGE_PIXELS),
++    height: z.number().int().min(1).max(MAX_EDGE_PIXELS),
++  })
++  .strict();
++
++const AuthorizePhotoRepairSchema = z
++  .object({
++    action: z.literal('authorize'),
++    photoSessionId: z.uuid(),
++    publicToken: z.string().regex(PUBLIC_TOKEN_PATTERN),
++    metadata: RepairPhotoMetadataSchema,
++  })
++  .strict();
++
++const ConfirmPhotoRepairSchema = z
++  .object({
++    action: z.literal('confirm'),
++    photoSessionId: z.uuid(),
++    publicToken: z.string().regex(PUBLIC_TOKEN_PATTERN),
++    repairBatchId: z.uuid(),
++    metadata: RepairPhotoMetadataSchema,
++  })
++  .strict();
++
++export const RepairPhotoSchema = z.discriminatedUnion('action', [
++  AuthorizePhotoRepairSchema,
++  ConfirmPhotoRepairSchema,
++]);
++
+ export const PublicPhotoTokenSchema = z
+   .object({ token: z.string().regex(PUBLIC_TOKEN_PATTERN) })
+   .strict();
+diff --git a/supabase/functions/deno.json b/supabase/functions/deno.json
+index 16f579f..59663df 100644
+--- a/supabase/functions/deno.json
++++ b/supabase/functions/deno.json
+@@ -17,8 +17,9 @@
+     }
+   },
+   "tasks": {
+-    "check": "deno check create-upload/index.ts confirm-upload/index.ts photo/index.ts cleanup-expired/index.ts integration/photo_delivery_integration_test.ts",
++    "check": "deno check create-upload/index.ts confirm-upload/index.ts photo/index.ts repair-photo/index.ts cleanup-expired/index.ts tools/repair-storage-backends.ts integration/photo_delivery_integration_test.ts",
+     "test": "deno test --allow-env tests",
+-    "test:integration": "deno test --allow-env --allow-net integration/photo_delivery_integration_test.ts"
++    "test:integration": "deno test --allow-env --allow-net integration/photo_delivery_integration_test.ts",
++    "repair:storage-backends": "deno run --allow-env --allow-net tools/repair-storage-backends.ts"
+   }
+ }
+diff --git a/supabase/functions/photo/index.ts b/supabase/functions/photo/index.ts
+index 51c0540..de59f7f 100644
+--- a/supabase/functions/photo/index.ts
++++ b/supabase/functions/photo/index.ts
+@@ -1,6 +1,4 @@
+-import { GetObjectCommand } from 'npm:@aws-sdk/client-s3@^3.750.0';
+ import { ApiError } from '../_shared/errors.ts';
+-import { SIGNED_DOWNLOAD_VALID_FOR_SECONDS } from '../_shared/constants.ts';
+ import { isR2Configured, photoBucket, publicPageOrigin, r2BucketName } from '../_shared/env.ts';
+ import {
+   assertExactOrigin,
+@@ -11,8 +9,9 @@ import {
+   requestId,
+   withBaseHeaders,
+ } from '../_shared/http.ts';
+-import { checkR2ObjectExists, createR2Client, createR2PresignedGetUrl } from '../_shared/r2.ts';
++import { checkR2ObjectExists, createR2Client, getR2ObjectBytes } from '../_shared/r2.ts';
+ import { parseWithSchema, PublicPhotoTokenSchema } from '../_shared/schemas.ts';
++import { throwForStorageVerification, verifyStoredPhoto } from '../_shared/storage-verification.ts';
+ import { type AdminClient, createAdminClient } from '../_shared/supabase.ts';
+ import { hashPublicToken } from '../_shared/token.ts';
+ 
+@@ -73,7 +72,7 @@ export type PhotoHandlerDependencies = {
+   isR2Configured: typeof isR2Configured;
+   createR2Client: typeof createR2Client;
+   checkR2ObjectExists: typeof checkR2ObjectExists;
+-  createR2PresignedGetUrl: typeof createR2PresignedGetUrl;
++  getR2ObjectBytes: typeof getR2ObjectBytes;
+   hashPublicToken: typeof hashPublicToken;
+   photoBucket: typeof photoBucket;
+   r2BucketName: typeof r2BucketName;
+@@ -86,7 +85,7 @@ const DEFAULT_DEPENDENCIES: PhotoHandlerDependencies = {
+   isR2Configured,
+   createR2Client,
+   checkR2ObjectExists,
+-  createR2PresignedGetUrl,
++  getR2ObjectBytes,
+   hashPublicToken,
+   photoBucket,
+   r2BucketName,
+@@ -104,6 +103,23 @@ function isStorageNotFound(error: unknown): boolean {
+   );
+ }
+ 
++function isSameAuthorizedPhoto(
++  initial: ResolvedPhoto,
++  current: ResolvedPhoto,
++  now: number,
++): boolean {
++  const expiresAt = Date.parse(current.expires_at);
++  return (
++    current.id === initial.id &&
++    current.storage_object_path === initial.storage_object_path &&
++    current.storage_backend === initial.storage_backend &&
++    current.content_type === initial.content_type &&
++    Number(current.byte_size) === Number(initial.byte_size) &&
++    Number.isFinite(expiresAt) &&
++    expiresAt > now
++  );
++}
++
+ function assertPreflight(request: Request): void {
+   if (request.headers.get('access-control-request-method') !== 'POST') {
+     throw new ApiError(400, 'invalid_request', 'The preflight request is invalid.');
+@@ -150,6 +166,15 @@ export async function handler(
+     const admin = dependencies.createAdminClient();
+     const photo = await resolvePhoto(admin, tokenHash);
+ 
++    if (!isSameAuthorizedPhoto(photo, photo, dependencies.now())) {
++      throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
++    }
++    throwForStorageVerification(await verifyStoredPhoto(admin, photo, dependencies));
++    const stillAuthorized = await resolvePhoto(admin, tokenHash);
++    if (!isSameAuthorizedPhoto(photo, stillAuthorized, dependencies.now())) {
++      throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
++    }
++
+     if (route === 'resolve') {
+       return jsonResponse(
+         {
+@@ -164,37 +189,12 @@ export async function handler(
+     }
+ 
+     if (photo.storage_backend === 'r2') {
+-      if (!dependencies.isR2Configured()) {
+-        throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
+-      }
+       const r2 = dependencies.createR2Client();
+-      const object = await dependencies.checkR2ObjectExists(r2, photo.storage_object_path);
+-      if (!object.exists) {
++      const bytes = await dependencies.getR2ObjectBytes(r2, photo.storage_object_path);
++      if (!bytes) {
+         throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
+       }
+-      if (object.byteSize !== Number(photo.byte_size)) {
+-        throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
+-      }
+-      const stillAuthorized = await resolvePhoto(admin, tokenHash);
+-      const expiresAt = Date.parse(stillAuthorized.expires_at);
+-      if (
+-        stillAuthorized.id !== photo.id ||
+-        stillAuthorized.storage_object_path !== photo.storage_object_path ||
+-        stillAuthorized.storage_backend !== photo.storage_backend ||
+-        Number(stillAuthorized.byte_size) !== Number(photo.byte_size) ||
+-        !Number.isFinite(expiresAt) ||
+-        expiresAt <= dependencies.now()
+-      ) {
+-        throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
+-      }
+-
+-      const getCommand = new GetObjectCommand({
+-        Bucket: dependencies.r2BucketName(),
+-        Key: photo.storage_object_path,
+-      });
+-      const r2Response = await r2.send(getCommand);
+-      const bytes = await r2Response.Body?.transformToByteArray();
+-      if (!bytes || bytes.byteLength !== Number(photo.byte_size)) {
++      if (bytes.byteLength !== Number(photo.byte_size)) {
+         throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
+       }
+ 
+@@ -229,19 +229,6 @@ export async function handler(
+       throw new ApiError(503, 'unavailable', 'Photo delivery is temporarily unavailable.', true);
+     }
+ 
+-    const stillAuthorized = await resolvePhoto(admin, tokenHash);
+-    const reauthorizedExpiry = Date.parse(stillAuthorized.expires_at);
+-    if (
+-      stillAuthorized.id !== photo.id ||
+-      stillAuthorized.storage_object_path !== photo.storage_object_path ||
+-      stillAuthorized.storage_backend !== photo.storage_backend ||
+-      Number(stillAuthorized.byte_size) !== Number(photo.byte_size) ||
+-      !Number.isFinite(reauthorizedExpiry) ||
+-      reauthorizedExpiry <= dependencies.now()
+-    ) {
+-      throw new ApiError(404, 'not_found', 'This photo is unavailable or has expired.');
+-    }
+-
+     const disposition = route === 'download'
+       ? 'attachment; filename="mat-photobooth-keepsake.jpg"'
+       : 'inline; filename="mat-photobooth-keepsake.jpg"';
+diff --git a/supabase/functions/tests/photo_test.ts b/supabase/functions/tests/photo_test.ts
+index 022eb64..ca74482 100644
+--- a/supabase/functions/tests/photo_test.ts
++++ b/supabase/functions/tests/photo_test.ts
+@@ -1,4 +1,4 @@
+-import { assertEquals, assertFalse, assertStringIncludes } from 'jsr:@std/assert@1.0.14';
++import { assertEquals } from 'jsr:@std/assert@1.0.14';
+ import type { AdminClient } from '../_shared/supabase.ts';
+ import { handler, type PhotoHandlerDependencies } from '../photo/index.ts';
+ 
+@@ -40,6 +40,13 @@ function request(
+ function adminClient(
+   rows: (ResolvedRow | null)[] = [PHOTO, PHOTO],
+   jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9]),
++  storageInfo: {
++    data: { size: number; contentType?: string; mimetype?: string } | null;
++    error: unknown;
++  } = {
++    data: { size: jpeg.byteLength, contentType: 'image/jpeg' },
++    error: null,
++  },
+ ): { client: AdminClient; rpcCalls: () => number } {
+   let calls = 0;
+   const client = {
+@@ -51,6 +58,9 @@ function adminClient(
+     storage: {
+       from() {
+         return {
++          info() {
++            return Promise.resolve(storageInfo);
++          },
+           download() {
+             return Promise.resolve({
+               data: new Blob([jpeg], { type: 'image/jpeg' }),
+@@ -83,10 +93,7 @@ function dependencies(
+           }),
+       }) as unknown as ReturnType<PhotoHandlerDependencies['createR2Client']>,
+     checkR2ObjectExists: () => Promise.resolve({ exists: true, byteSize: PHOTO.byte_size }),
+-    createR2PresignedGetUrl: () =>
+-      Promise.resolve(
+-        'https://bucket.account.r2.cloudflarestorage.com/signed.jpg?X-Amz-Signature=one',
+-      ),
++    getR2ObjectBytes: () => Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9])),
+     hashPublicToken: () => Promise.resolve('a'.repeat(64)),
+     photoBucket: () => 'photos',
+     r2BucketName: () => 'private-photos',
+@@ -115,8 +122,8 @@ Deno.test('R2 image and download requests return fresh JPEG bytes with CORS head
+   assertEquals(admin.rpcCalls(), 4);
+ });
+ 
+-Deno.test('resolve remains metadata-only even when R2 delivery is configured', async () => {
+-  const admin = adminClient([PHOTO]);
++Deno.test('resolve verifies the R2 object and reauthorizes before reporting ready', async () => {
++  const admin = adminClient([PHOTO, PHOTO]);
+   let storageChecked = false;
+   const response = await handler(
+     request('resolve'),
+@@ -128,13 +135,40 @@ Deno.test('resolve remains metadata-only even when R2 delivery is configured', a
+     }),
+   );
+   assertEquals(response.status, 200);
+-  assertEquals(storageChecked, false);
++  assertEquals(storageChecked, true);
+   assertEquals(await response.json(), {
+     status: 'ready',
+     expiresAt: PHOTO.expires_at,
+     googleFormsUrl: null,
+   });
+-  assertEquals(admin.rpcCalls(), 1);
++  assertEquals(admin.rpcCalls(), 2);
++});
++
++Deno.test('resolve returns 404 for a missing R2 object and 503 for mismatched storage', async () => {
++  for (
++    const object of [
++      { exists: false, byteSize: null },
++      { exists: true, byteSize: PHOTO.byte_size + 1 },
++    ]
++  ) {
++    const admin = adminClient([PHOTO, PHOTO]);
++    const response = await handler(
++      request('resolve'),
++      dependencies(admin.client, {
++        checkR2ObjectExists: () => Promise.resolve(object),
++      }),
++    );
++    assertEquals(response.status, object.exists ? 503 : 404);
++  }
++
++  const admin = adminClient([PHOTO, PHOTO]);
++  const failedVerification = await handler(
++    request('resolve'),
++    dependencies(admin.client, {
++      checkR2ObjectExists: () => Promise.reject(new Error('private credential detail')),
++    }),
++  );
++  assertEquals(failedVerification.status, 503);
+ });
+ 
+ Deno.test('R2 delivery rejects expired token', async () => {
+@@ -152,41 +186,46 @@ Deno.test('R2 delivery rejects missing, mismatched, and freshly unauthorized obj
+     ]
+   ) {
+     const admin = adminClient();
+-    let signed = false;
+     const response = await handler(
+       request('image'),
+       dependencies(admin.client, {
+         checkR2ObjectExists: () => Promise.resolve(object),
+-        createR2PresignedGetUrl: () => {
+-          signed = true;
+-          return Promise.resolve('https://r2.example/signed');
+-        },
+       }),
+     );
+     assertEquals(response.status, object.exists ? 503 : 404);
+-    assertEquals(signed, false);
+   }
+ 
+   const reauthorization = adminClient([PHOTO, null]);
+   const response = await handler(request('download'), dependencies(reauthorization.client));
+   assertEquals(response.status, 404);
++
++  const vanishedAfterAuthorization = adminClient([PHOTO, PHOTO]);
++  const vanishedResponse = await handler(
++    request('image'),
++    dependencies(vanishedAfterAuthorization.client, {
++      getR2ObjectBytes: () => Promise.resolve(null),
++    }),
++  );
++  assertEquals(vanishedResponse.status, 404);
++
++  const changedAfterAuthorization = adminClient([PHOTO, PHOTO]);
++  const changedResponse = await handler(
++    request('image'),
++    dependencies(changedAfterAuthorization.client, {
++      getR2ObjectBytes: () => Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff, 0xd9])),
++    }),
++  );
++  assertEquals(changedResponse.status, 503);
+ });
+ 
+ Deno.test('photo routes reject an absent token before storage or signing', async () => {
+   const admin = adminClient();
+-  let signed = false;
+   const response = await handler(
+     request('image', {}),
+-    dependencies(admin.client, {
+-      createR2PresignedGetUrl: () => {
+-        signed = true;
+-        return Promise.resolve('https://r2.example/signed');
+-      },
+-    }),
++    dependencies(admin.client),
+   );
+   assertEquals(response.status, 400);
+   assertEquals(admin.rpcCalls(), 0);
+-  assertEquals(signed, false);
+ });
+ 
+ Deno.test('Supabase binary fallback remains size-checked and reauthorized', async () => {
+@@ -205,3 +244,34 @@ Deno.test('Supabase binary fallback remains size-checked and reauthorized', asyn
+   assertEquals((await response.arrayBuffer()).byteLength, PHOTO.byte_size);
+   assertEquals(admin.rpcCalls(), 2);
+ });
++
++Deno.test('Supabase resolve distinguishes missing objects from metadata mismatches', async () => {
++  const supabasePhoto = { ...PHOTO, storage_backend: 'supabase' as const };
++  const cases = [
++    {
++      info: { data: null, error: { statusCode: '404', message: 'Object not found' } },
++      expectedStatus: 404,
++    },
++    {
++      info: {
++        data: { size: PHOTO.byte_size + 1, contentType: 'image/jpeg' },
++        error: null,
++      },
++      expectedStatus: 503,
++    },
++    {
++      info: {
++        data: { size: PHOTO.byte_size, contentType: 'application/octet-stream' },
++        error: null,
++      },
++      expectedStatus: 503,
++    },
++  ];
++
++  for (const testCase of cases) {
++    const admin = adminClient([supabasePhoto, supabasePhoto], undefined, testCase.info);
++    const response = await handler(request('resolve'), dependencies(admin.client));
++    assertEquals(response.status, testCase.expectedStatus);
++    assertEquals(admin.rpcCalls(), 1);
++  }
++});
+diff --git a/supabase/functions/tests/r2_test.ts b/supabase/functions/tests/r2_test.ts
+index f6f94b2..0906793 100644
+--- a/supabase/functions/tests/r2_test.ts
++++ b/supabase/functions/tests/r2_test.ts
+@@ -1,11 +1,16 @@
+ import {
+   type GetObjectCommandInput,
+   type HeadObjectCommandInput,
++  type PutObjectCommandInput,
+   S3Client,
+ } from 'npm:@aws-sdk/client-s3@^3.750.0';
+ import { assertEquals, assertRejects } from 'jsr:@std/assert@1.0.14';
+ import { ApiError } from '../_shared/errors.ts';
+-import { checkR2ObjectExists, createR2PresignedGetUrl } from '../_shared/r2.ts';
++import {
++  checkR2ObjectExists,
++  createR2PresignedGetUrl,
++  createR2PresignedPutUrl,
++} from '../_shared/r2.ts';
+ 
+ function signingClient(): S3Client {
+   return new S3Client({
+@@ -67,6 +72,37 @@ Deno.test('R2 GET signing is private, controlled, and bounded to 300 seconds', a
+   }
+ });
+ 
++Deno.test('repair PUT signing requires R2 to reject overwrites', async () => {
++  const previousBucket = Deno.env.get('R2_BUCKET_NAME');
++  Deno.env.set('R2_BUCKET_NAME', 'private-photos');
++  const client = signingClient();
++  try {
++    let commandInput: PutObjectCommandInput | undefined;
++    const signed = await createR2PresignedPutUrl(
++      client,
++      'private/object.jpg',
++      'image/jpeg',
++      300,
++      { ifNoneMatch: '*' },
++      (_client, command) => {
++        commandInput = command.input;
++        return Promise.resolve(
++          'https://account.r2.cloudflarestorage.com/private-photos/private/object.jpg?X-Amz-Signature=test',
++        );
++      },
++    );
++    assertEquals(new URL(signed).protocol, 'https:');
++    assertEquals(commandInput?.Bucket, 'private-photos');
++    assertEquals(commandInput?.Key, 'private/object.jpg');
++    assertEquals(commandInput?.ContentType, 'image/jpeg');
++    assertEquals(commandInput?.IfNoneMatch, '*');
++  } finally {
++    client.destroy();
++    if (previousBucket === undefined) Deno.env.delete('R2_BUCKET_NAME');
++    else Deno.env.set('R2_BUCKET_NAME', previousBucket);
++  }
++});
++
+ Deno.test('R2 HEAD verification uses native fetch for bodyless responses', async () => {
+   const previousBucket = Deno.env.get('R2_BUCKET_NAME');
+   Deno.env.set('R2_BUCKET_NAME', 'private-photos');
+diff --git a/supabase/tests/database/photo_delivery.test.sql b/supabase/tests/database/photo_delivery.test.sql
+index 9ed1a3f..93c02e3 100644
+--- a/supabase/tests/database/photo_delivery.test.sql
++++ b/supabase/tests/database/photo_delivery.test.sql
+@@ -2,7 +2,7 @@ begin;
+ 
+ create extension if not exists pgtap with schema extensions;
+ 
+-select plan(69);
++select plan(86);
+ 
+ set local timezone = 'America/Denver';
+ 
+@@ -137,6 +137,23 @@ select has_function(
+   array['uuid', 'uuid'],
+   'cleanup completion exists'
+ );
++select has_table(
++  'public',
++  'photo_storage_backend_repairs',
++  'storage-backend repair ledger exists'
++);
++select has_function(
++  'public',
++  'repair_photo_storage_backend',
++  array['uuid', 'uuid', 'text', 'bigint', 'text', 'timestamp with time zone', 'photo_session_status', 'text', 'text'],
++  'guarded storage-backend repair exists'
++);
++select has_function(
++  'public',
++  'rollback_photo_storage_backend_repair',
++  array['uuid'],
++  'ledger-based batch rollback exists'
++);
+ select ok(exists(select 1 from storage.buckets where id = 'photos'), 'photos bucket exists');
+ select is(
+   (select public from storage.buckets where id = 'photos'),
+@@ -469,6 +486,181 @@ select is(
+   'finalize is idempotent'
+ );
+ 
++select ok(
++  (
++    select relrowsecurity and relforcerowsecurity
++    from pg_class
++    where oid = 'public.photo_storage_backend_repairs'::regclass
++  ),
++  'repair ledger forces RLS'
++);
++select ok(
++  not has_table_privilege('anon', 'public.photo_storage_backend_repairs', 'SELECT'),
++  'anon cannot read the repair ledger'
++);
++
++select is(
++  public.repair_photo_storage_backend(
++    '13131313-1313-4313-8313-131313131313',
++    '22222222-2222-4222-8222-222222222222',
++    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
++    999999,
++    repeat('cd', 32),
++    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++    'ready'::public.photo_session_status,
++    'supabase',
++    'admin-r2-verification'
++  ),
++  'stale',
++  'metadata drift prevents repair while the row still has the expected backend'
++);
++select is(
++  public.repair_photo_storage_backend(
++    '14141414-1414-4414-8414-141414141414',
++    '22222222-2222-4222-8222-222222222222',
++    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
++    1000000,
++    repeat('cd', 32),
++    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++    'ready'::public.photo_session_status,
++    'r2',
++    'admin-r2-verification'
++  ),
++  'stale',
++  'a non-Supabase caller snapshot cannot start a repair'
++);
++
++select is(
++  public.repair_photo_storage_backend(
++    '12121212-1212-4212-8212-121212121212',
++    '22222222-2222-4222-8222-222222222222',
++    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
++    1000000,
++    repeat('cd', 32),
++    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++    'ready'::public.photo_session_status,
++    'supabase',
++    'admin-r2-verification'
++  ),
++  'updated',
++  'an exact ready and unexpired snapshot can be repaired'
++);
++select is(
++  (select storage_backend from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++  'r2',
++  'repair changes only the selected backend'
++);
++select is(
++  (
++    select jsonb_build_object(
++      'path', storage_object_path,
++      'bytes', byte_size,
++      'hash', encode(content_sha256, 'hex'),
++      'status', status,
++      'expiry', expires_at,
++      'token', encode(public_token_hash, 'hex'),
++      'owner', owner_user_id,
++      'created', created_at,
++      'ready', ready_at
++    )
++    from public.photo_sessions
++    where id = '22222222-2222-4222-8222-222222222222'
++  ),
++  (
++    select jsonb_build_object(
++      'path', storage_object_path,
++      'bytes', byte_size,
++      'hash', encode(content_sha256, 'hex'),
++      'status', status,
++      'expiry', expires_at,
++      'token', encode(public_token_hash, 'hex'),
++      'owner', owner_user_id,
++      'created', created_at,
++      'ready', ready_at
++    )
++    from public.photo_storage_backend_repairs
++    where batch_id = '12121212-1212-4212-8212-121212121212'
++      and photo_session_id = '22222222-2222-4222-8222-222222222222'
++  ),
++  'the repair ledger preserves the guarded metadata snapshot'
++);
++select is(
++  (
++    select count(*)
++    from public.photo_storage_backend_repairs
++    where batch_id = '12121212-1212-4212-8212-121212121212'
++  ),
++  1::bigint,
++  'successful repair creates one ledger record'
++);
++select is(
++  public.repair_photo_storage_backend(
++    '12121212-1212-4212-8212-121212121212',
++    '22222222-2222-4222-8222-222222222222',
++    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
++    1000000,
++    repeat('cd', 32),
++    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++    'ready'::public.photo_session_status,
++    'supabase',
++    'admin-r2-verification'
++  ),
++  'already_applied',
++  'repeating the same batch is idempotent'
++);
++select is(
++  public.rollback_photo_storage_backend_repair('12121212-1212-4212-8212-121212121212'),
++  1,
++  'a matching ledger batch rolls back one repair'
++);
++select is(
++  (select storage_backend from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++  'supabase',
++  'rollback restores the recorded backend'
++);
++select ok(
++  (
++    select rolled_back_at is not null and rollback_state = 'rolled_back'
++    from public.photo_storage_backend_repairs
++    where batch_id = '12121212-1212-4212-8212-121212121212'
++      and photo_session_id = '22222222-2222-4222-8222-222222222222'
++  ),
++  'rollback is recorded without deleting the ledger entry'
++);
++select is(
++  public.rollback_photo_storage_backend_repair('12121212-1212-4212-8212-121212121212'),
++  0,
++  'repeating a rollback is safe'
++);
++
++update public.photo_sessions
++set
++  ready_at = statement_timestamp() - interval '721 hours',
++  expires_at = statement_timestamp() - interval '1 hour'
++where id = '22222222-2222-4222-8222-222222222222';
++
++select is(
++  public.repair_photo_storage_backend(
++    '15151515-1515-4515-8515-151515151515',
++    '22222222-2222-4222-8222-222222222222',
++    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
++    1000000,
++    repeat('cd', 32),
++    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
++    'ready'::public.photo_session_status,
++    'supabase',
++    'admin-r2-verification'
++  ),
++  'stale',
++  'expired rows cannot be repaired'
++);
++
++update public.photo_sessions
++set
++  ready_at = statement_timestamp(),
++  expires_at = statement_timestamp() + interval '720 hours'
++where id = '22222222-2222-4222-8222-222222222222';
++
+ select is(
+   (
+     select count(*)

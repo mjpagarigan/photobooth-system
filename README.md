@@ -9,6 +9,7 @@ The Electron renderer is sandboxed and context-isolated. Local photos are encryp
 - `apps/kiosk` — Electron 43 and React 19 kiosk, local storage, capture workflow, frame editor, QR delivery, and Windows packaging.
 - `apps/public` — public React download page for guest photo links.
 - `packages/shared` — shared Zod schemas, IPC contracts, and domain types.
+- `packages/ui` — `@grace-booth/ui` shared component library powered by Base UI and Tailwind CSS v4 design tokens.
 - `supabase` — database migrations, private Storage policies, Edge Functions, and retention jobs.
 - `tests/e2e` — Electron and visual Playwright coverage.
 
@@ -106,6 +107,37 @@ LAN admin access is disabled by default. Enable it only on a trusted private net
 5. **Processing** creates the selected collage locally and performs delivery.
 6. **All set!** shows the complete photostrip and a scannable QR code.
 7. **Done** ends the session and returns to the attract screen.
+
+## Dual-monitor & multi-display setup
+
+Grace Booth supports dual-display operation to separate the interactive capture experience from the public QR delivery screen.
+
+- **Screen 1 (Primary / Guest Viewfinder)**: Displays the Attract loop, interactive countdowns, live camera viewfinder, and collage review stage.
+- **Screen 2 (Secondary / QR Delivery Display)**: Dedicated guest-facing display showing the completed photostrip and high-contrast QR code for instant smartphone scanning, freeing up the primary screen for the next group.
+
+### Display configuration options
+
+Open **Admin > Settings & Health > Dual-Monitor Setup**:
+
+1. **Dual Display Mode**:
+   - `Auto`: Automatically enables dual-screen mode whenever 2 or more physical displays are detected.
+   - `Force Enabled`: Keeps the secondary delivery window active.
+   - `Disabled`: Restricts the application to single-monitor operation.
+2. **Display Swapping**: Click **Swap Displays** to quickly interchange the primary capture window and secondary delivery window without reconfiguring Windows display settings.
+3. **QR Auto-Dismiss Duration**: Set the timer (30s, 45s default, 60s, or 90s) after which the secondary delivery screen automatically clears to protect privacy and prepare for subsequent guest sessions.
+
+## Google Photos live album sync
+
+Grace Booth can automatically upload completed high-resolution photostrips directly to a designated Google Photos shared album in real time.
+
+### Setting up Google Photos sync
+
+1. Open **Admin > Settings & Health > Google Photos Shared Album Sync**.
+2. Check **Enable Google Photos Live Sync**.
+3. Under **Google Account Authorization**, initiate authorization with your event/ministry Google Account.
+4. Select an existing album or create a new event album directly from the operator dashboard.
+5. Once connected, every finalized photostrip is queued and uploaded in the background to the Google Photos album, generating an instantly shareable album link for organizers and attendees.
+6. Local offline storage and Supabase cloud delivery operate in parallel; temporary internet interruptions are buffered and retried automatically.
 
 ## Build and package the Windows kiosk
 
@@ -210,15 +242,14 @@ For a custom deployment using a different Supabase project, the project owner—
 
 Never distribute or enter a Supabase secret/service-role key in a desktop application. A production backend requires:
 
-- The repository Supabase migrations applied to the project.
+- The repository Supabase migrations applied to the project, including the repair ledger and guarded repair/rollback RPCs.
 - A private `photos` Storage bucket accepting JPEG files.
-- The `create-upload`, `confirm-upload`, `photo`, and `cleanup-expired` Edge Functions deployed.
+- The `create-upload`, `confirm-upload`, `photo`, `repair-photo`, and `cleanup-expired` Edge Functions deployed.
 - Function secrets for `PUBLIC_TOKEN_DERIVATION_KEY`, `PUBLIC_PAGE_ORIGIN`, `PHOTO_BUCKET`, and `CLEANUP_SECRET`.
-- Private R2 Function secrets (`R2_ACCOUNT_ID`, access key, secret key, and bucket name), plus the
-  exact GET/HEAD-only bucket CORS policy documented in `supabase/README.md`.
+- Private R2 Function secrets (`R2_ACCOUNT_ID`, access key, secret key, and bucket name). R2 remains
+  server-only; the browser does not require bucket CORS access.
 - A dedicated confirmed Supabase Auth user enrolled in `booth_devices`.
-- The public download application deployed at the same `PUBLIC_PAGE_ORIGIN` used by the functions,
-  with `VITE_PUBLIC_R2_ORIGIN` set to the actual presigned R2 S3 API origin.
+- The public download application deployed at the same `PUBLIC_PAGE_ORIGIN` used by the functions.
 
 For backend development and deployment details, see [`supabase/README.md`](supabase/README.md).
 

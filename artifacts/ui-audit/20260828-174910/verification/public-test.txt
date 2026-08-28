@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.10 C:/Users/padil/mj/photobooth-system/apps/public
+
+
+ Test Files  4 passed (4)
+      Tests  18 passed (18)
+   Start at  18:32:04
+   Duration  30.03s (transform 1.61s, setup 6.13s, import 23.39s, tests 1.46s, environment 12.22s)
+

@@ -3,7 +3,6 @@ import { fetchPhotoDownload, fetchPhotoImage, PhotoApiError, resolvePhoto } from
 
 const token = 'A'.repeat(43);
 const apiOrigin = 'https://api.example.test';
-const r2Origin = 'https://bucket.account.r2.cloudflarestorage.com';
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === 'string') return input;
@@ -69,7 +68,7 @@ describe('photo API client', () => {
   });
 
   it('uses separate controlled image and download POST routes', async () => {
-    vi.mocked(fetch).mockImplementation(() => Promise.resolve(jpegResponse(r2Origin, true)));
+    vi.mocked(fetch).mockImplementation(() => Promise.resolve(jpegResponse(apiOrigin, false)));
 
     await fetchPhotoImage(token);
     await fetchPhotoDownload(token);
@@ -83,10 +82,9 @@ describe('photo API client', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
   });
 
-  it('accepts only the configured R2 origin after a redirect', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jpegResponse(r2Origin, true));
-    await expect(fetchPhotoImage(token)).resolves.toBeInstanceOf(Blob);
-
+  it('rejects browser-visible redirects and non-API response origins', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jpegResponse(apiOrigin, true));
+    await expect(fetchPhotoImage(token)).rejects.toThrow('could not load');
     vi.mocked(fetch).mockResolvedValueOnce(jpegResponse('https://attacker.example', true));
     const error = await fetchPhotoImage(token).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(PhotoApiError);
@@ -94,11 +92,11 @@ describe('photo API client', () => {
     expect((error as PhotoApiError).retryable).toBe(true);
   });
 
-  it('accepts a non-redirected binary fallback only from the photo API origin', async () => {
+  it('accepts direct bytes only from the photo API origin', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jpegResponse(apiOrigin, false));
     await expect(fetchPhotoImage(token)).resolves.toBeInstanceOf(Blob);
 
-    vi.mocked(fetch).mockResolvedValueOnce(jpegResponse(r2Origin, false));
+    vi.mocked(fetch).mockResolvedValueOnce(jpegResponse('https://bucket.example', false));
     await expect(fetchPhotoImage(token)).rejects.toThrow('could not load');
   });
 
@@ -106,13 +104,13 @@ describe('photo API client', () => {
     const bytes = new Uint8Array([0x3c, 0x68, 0x74, 0x6d, 0x6c, 0x3e]);
     vi.mocked(fetch).mockResolvedValueOnce(
       responseAt(
-        `${r2Origin}/private/photo.html`,
+        `${apiOrigin}/private/photo.html`,
         bytes,
         {
           status: 200,
           headers: { 'Content-Type': 'text/html;charset=utf-8', 'Content-Length': String(bytes.byteLength) },
         },
-        true,
+        false,
       ),
     );
 
@@ -123,7 +121,7 @@ describe('photo API client', () => {
 
   it('rejects empty bodies even when the headers claim a JPEG', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      responseAt(`${r2Origin}/private/photo.jpg`, new Uint8Array(0), { status: 200, headers: { 'Content-Type': 'image/jpeg' } }, true),
+      responseAt(`${apiOrigin}/private/photo.jpg`, new Uint8Array(0), { status: 200, headers: { 'Content-Type': 'image/jpeg' } }, false),
     );
 
     const error = await fetchPhotoDownload(token).catch((caught: unknown) => caught);
@@ -135,7 +133,7 @@ describe('photo API client', () => {
     const invalid = new Uint8Array([0xff, 0xd8, 0x00, 0x00, 0xff, 0xd9]);
     vi.mocked(fetch).mockResolvedValue(
       responseAt(
-        `${r2Origin}/private/photo.jpg`,
+        `${apiOrigin}/private/photo.jpg`,
         invalid,
         {
           status: 200,
@@ -144,7 +142,7 @@ describe('photo API client', () => {
             'Content-Length': String(invalid.byteLength),
           },
         },
-        true,
+        false,
       ),
     );
 
@@ -160,7 +158,7 @@ describe('photo API client', () => {
     bytes.set([0xff, 0xd9], bytes.length - 2);
     vi.mocked(fetch).mockResolvedValue(
       responseAt(
-        `${r2Origin}/private/large-photo.jpg`,
+        `${apiOrigin}/private/large-photo.jpg`,
         bytes,
         {
           status: 200,
@@ -169,7 +167,7 @@ describe('photo API client', () => {
             'Content-Length': String(bytes.byteLength),
           },
         },
-        true,
+        false,
       ),
     );
 

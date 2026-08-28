@@ -1,0 +1,3 @@
+$ eslint . --max-warnings=0 && pnpm functions:lint
+$ deno lint --config supabase/functions/deno.json supabase/functions
+Checked 31 files

@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/assert@1": "1.0.14",
     "jsr:@std/assert@1.0.14": "1.0.14",
     "jsr:@std/internal@^1.0.10": "1.0.14",
     "npm:@aws-sdk/client-s3@^3.750.0": "3.1114.0",

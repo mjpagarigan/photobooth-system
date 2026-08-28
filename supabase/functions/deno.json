@@ -17,8 +17,9 @@
     }
   },
   "tasks": {
-    "check": "deno check create-upload/index.ts confirm-upload/index.ts photo/index.ts cleanup-expired/index.ts integration/photo_delivery_integration_test.ts",
+    "check": "deno check create-upload/index.ts confirm-upload/index.ts photo/index.ts repair-photo/index.ts cleanup-expired/index.ts sync-google-photos/index.ts google-photos-auth/index.ts tools/repair-storage-backends.ts integration/photo_delivery_integration_test.ts",
     "test": "deno test --allow-env tests",
-    "test:integration": "deno test --allow-env --allow-net integration/photo_delivery_integration_test.ts"
+    "test:integration": "deno test --allow-env --allow-net integration/photo_delivery_integration_test.ts",
+    "repair:storage-backends": "deno run --allow-env --allow-net tools/repair-storage-backends.ts"
   }
 }

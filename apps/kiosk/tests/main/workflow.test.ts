@@ -507,6 +507,146 @@ describe('guest session cancellation', () => {
   });
 });
 
+describe('dual display handoff', () => {
+  it('resets Screen 1 immediately to attract after acceptPhotos and delivers QR on QR station', async () => {
+    const queue = new FakeUploadQueue();
+    const camera = new BufferCamera();
+    const testStore = createTestStore();
+    store = testStore;
+    queue.testStore = testStore;
+
+    const frameService = {
+      ensureDefaultFrame: () => Promise.resolve(undefined),
+      ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+      getFrameOptions: () => [null, null],
+      getFrameSummaries: () => [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Default Frame',
+          width: 1200,
+          height: 3600,
+          byteSize: 1000,
+          mediaUrl: 'grace-booth-media://asset/test',
+          slots: [],
+          revision: 0,
+        },
+      ],
+      listFrames: () => [],
+      toSummary: (f: StoredFrame) => ({
+        id: f.id,
+        name: f.name,
+        width: 1200,
+        height: 3600,
+        byteSize: 1000,
+        mediaUrl: 'grace-booth-media://asset/test',
+        slots: [],
+        revision: 0,
+      }),
+    } as unknown as FrameService;
+
+    const imageProcessor: ImageProcessor = {
+      process: () =>
+        Promise.resolve({
+          bytes: Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x01, 0x02]),
+          width: 1200,
+          height: 3600,
+          byteSize: 6,
+          timing: {
+            validationMs: 1,
+            slotsMs: 1,
+            compositeMs: 1,
+            totalMs: 5,
+          },
+        }),
+      validateSourceJpeg: () => Promise.resolve({ width: 100, height: 100 }),
+      normalizeFramePng: () => Promise.resolve({ bytes: Buffer.from([]), width: 1200, height: 3600 }),
+      createThumbnail: () => Promise.resolve({ bytes: Buffer.from([]), width: 300, height: 900 }),
+      close: () => Promise.resolve(),
+    };
+
+    const qrService = {
+      render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+    } as unknown as QrService;
+
+    workflow = new BoothWorkflow(
+      testStore.repository,
+      testStore.vault,
+      camera,
+      frameService,
+      imageProcessor,
+      queue as unknown as UploadQueue,
+      qrService,
+      {
+        shotCountdownsMs: [0, 0, 0],
+        now: () => 1_000,
+        isDualDisplayActive: () => true,
+      },
+    );
+
+    await workflow.initialize();
+    testStore.repository.setDualDisplaySettings('enabled', false, 45);
+
+    // Initial state is attract
+    expect(workflow.getSnapshot()).toMatchObject({ screen: 'attract', state: null });
+    expect(workflow.getQrStationState()).toMatchObject({ status: 'idle' });
+
+    // Start session and complete 3 captures
+    const startSnap = await workflow.start();
+    const sessionId = startSnap.sessionId!;
+
+    // Directly put session into review state with 3 captures
+    testStore.database.raw
+      .prepare(
+        "UPDATE sessions SET state = 'review', capture_count = 3, selected_frame_id = '22222222-2222-4222-8222-222222222222' WHERE id = ?",
+      )
+      .run(sessionId);
+
+    testStore.repository.addFrame(
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Default Frame',
+        width: 1200,
+        height: 3600,
+        byteSize: 1000,
+        encryptedPath: 'test',
+        sha256: 'a'.repeat(64),
+        sortOrder: 0,
+        revision: 0,
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+      [
+        { slotIndex: 1, name: 'Photo 1', x: 0.1, y: 0.1, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+        { slotIndex: 2, name: 'Photo 2', x: 0.1, y: 0.4, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+        { slotIndex: 3, name: 'Photo 3', x: 0.1, y: 0.7, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+      ],
+    );
+
+    // Accept photos
+    const afterAccept = workflow.acceptPhotos('22222222-2222-4222-8222-222222222222');
+
+    // Screen 1 is IMMEDIATELY reset to attract
+    expect(afterAccept.screen).toBe('attract');
+    expect(afterAccept.state).toBeNull();
+    expect(workflow.getSnapshot().screen).toBe('attract');
+
+    // Simulate completion of offline/upload queue for this background session
+    await queue.completeOffline(sessionId);
+
+    // Screen 2 now receives active QR station state!
+    const qrState = workflow.getQrStationState();
+    expect(qrState.status).toBe('active');
+    expect(qrState.sessionId).toBe(sessionId);
+    expect(qrState.qrImageUrl).toBe('data:image/png;base64,mockqr');
+    expect(qrState.durationSeconds).toBe(45);
+
+    // Guest on Screen 2 dismisses
+    const dismissed = workflow.dismissQrStation();
+    expect(dismissed.status).toBe('idle');
+    expect(workflow.getQrStationState().status).toBe('idle');
+  });
+});
+
 describe('first-run guest-operation guard', () => {
   it('rejects Start until the local operator bootstrap is complete', () => {
     expect(() => assertOperatorBootstrapComplete(false)).toThrow(/operator.*passcode/i);

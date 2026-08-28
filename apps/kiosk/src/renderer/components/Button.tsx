@@ -1,15 +1,27 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import {
+  Button as CossButton,
+  type ButtonProps as CossButtonProps,
+} from '@grace-booth/ui';
 
-type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
+type LegacyVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'ghost' | 'outline' | 'default' | 'destructive';
 
-type ButtonProps = {
+export type ButtonProps = {
   children: ReactNode;
   icon?: ReactNode;
   iconAfter?: ReactNode;
   loading?: boolean;
-  variant?: ButtonVariant;
+  variant?: LegacyVariant;
   wide?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
+
+function mapVariant(v?: LegacyVariant): CossButtonProps['variant'] {
+  if (!v || v === 'primary' || v === 'default') return 'default';
+  if (v === 'secondary') return 'secondary';
+  if (v === 'quiet' || v === 'ghost') return 'ghost';
+  if (v === 'danger' || v === 'destructive') return 'destructive';
+  return 'outline';
+}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
@@ -26,19 +38,23 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ) {
+  const mappedVariant = mapVariant(variant);
+  const legacyVariantClass = `button button--${variant}${wide ? ' button--wide' : ''}`;
+
   return (
-    <button
+    <CossButton
       aria-busy={loading ? 'true' : undefined}
-      className={`button button--${variant}${wide ? ' button--wide' : ''} ${className}`.trim()}
+      className={`${legacyVariantClass} ${wide ? 'w-full' : ''} ${className}`.trim()}
       disabled={disabled ? true : loading}
+      icon={icon}
+      iconAfter={iconAfter}
+      loading={loading}
       ref={ref}
       type={type}
+      variant={mappedVariant}
       {...props}
     >
-      {icon ? <span className="button__icon">{icon}</span> : null}
       <span className="button__label">{children}</span>
-      {loading ? <span className="sr-only">Loading</span> : null}
-      {iconAfter ? <span className="button__icon">{iconAfter}</span> : null}
-    </button>
+    </CossButton>
   );
 });

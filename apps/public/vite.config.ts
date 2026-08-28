@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -6,18 +7,14 @@ import { defineConfig } from 'vitest/config';
 export type ValidatedBuildEnvironment = {
   apiUrl: URL;
   pageOrigin: string;
-  r2Origin: string;
 };
 
 const INERT_API_URL = 'https://unconfigured-api.invalid/functions/v1/photo';
 const INERT_PAGE_ORIGIN = 'https://unconfigured-page.invalid';
-const INERT_R2_ORIGIN = 'https://unconfigured-r2.invalid';
 
 export const DEFAULT_PRODUCTION_ENV: Record<string, string> = {
   VITE_PUBLIC_PHOTO_API_URL: 'https://bejgkclvsfbkpkflftxu.supabase.co/functions/v1/photo',
   VITE_PUBLIC_PAGE_ORIGIN: 'https://mat-photobooth.pages.dev',
-  VITE_PUBLIC_R2_ORIGIN:
-    'https://mat-photobooth-system.79a2773487948bc1e4900fb95e8723f0.r2.cloudflarestorage.com',
 };
 
 function parseHttpsUrl(value: string, name: string, allowLocalHttp = true): URL {
@@ -64,7 +61,6 @@ export function validateEnvironment(
   const missing = [
     env.VITE_PUBLIC_PHOTO_API_URL ? null : 'VITE_PUBLIC_PHOTO_API_URL',
     env.VITE_PUBLIC_PAGE_ORIGIN ? null : 'VITE_PUBLIC_PAGE_ORIGIN',
-    env.VITE_PUBLIC_R2_ORIGIN ? null : 'VITE_PUBLIC_R2_ORIGIN',
   ].filter((name): name is string => name !== null);
   if (production && missing.length > 0) {
     throw new Error(
@@ -77,9 +73,6 @@ export function validateEnvironment(
   const pageValue = testing
     ? 'https://photos.example.test'
     : (env.VITE_PUBLIC_PAGE_ORIGIN ?? INERT_PAGE_ORIGIN);
-  const r2Value = testing
-    ? 'https://bucket.account.r2.cloudflarestorage.com'
-    : (env.VITE_PUBLIC_R2_ORIGIN ?? INERT_R2_ORIGIN);
 
   const apiUrl = parseHttpsUrl(apiValue, 'VITE_PUBLIC_PHOTO_API_URL');
   if (
@@ -96,12 +89,7 @@ export function validateEnvironment(
     throw new Error('VITE_PUBLIC_PAGE_ORIGIN must contain only an origin');
   }
 
-  const r2Url = parseHttpsUrl(r2Value, 'VITE_PUBLIC_R2_ORIGIN', false);
-  if (r2Url.pathname !== '/' || r2Url.search || r2Url.hash || r2Url.port) {
-    throw new Error('VITE_PUBLIC_R2_ORIGIN must contain only an HTTPS origin without a port');
-  }
-
-  return { apiUrl, pageOrigin: pageUrl.origin, r2Origin: r2Url.origin };
+  return { apiUrl, pageOrigin: pageUrl.origin };
 }
 
 function contentSecurityPolicy(environment: ValidatedBuildEnvironment): string {
@@ -109,7 +97,7 @@ function contentSecurityPolicy(environment: ValidatedBuildEnvironment): string {
     environment.apiUrl.protocol === 'https:' && environment.pageOrigin.startsWith('https://')
       ? ' upgrade-insecure-requests'
       : '';
-  return `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob:; connect-src ${environment.apiUrl.origin} ${environment.r2Origin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; manifest-src 'self';${upgradeInsecureRequests}`;
+  return `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob:; connect-src ${environment.apiUrl.origin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; manifest-src 'self';${upgradeInsecureRequests}`;
 }
 
 export function renderCloudflarePagesHeaders(environment: ValidatedBuildEnvironment): string {
@@ -134,19 +122,32 @@ export function renderCloudflarePagesHeaders(environment: ValidatedBuildEnvironm
 `;
 }
 
-function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin {
+export function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin {
   return {
     name: 'grace-booth-security-template',
-    transformIndexHtml(html) {
+    transformIndexHtml(html, ctx) {
       const upgradeInsecureRequests =
-        environment.apiUrl.protocol === 'https:' && environment.pageOrigin.startsWith('https://')
+        !ctx.server &&
+        environment.apiUrl.protocol === 'https:' &&
+        environment.pageOrigin.startsWith('https://')
           ? 'upgrade-insecure-requests'
           : '';
-      const rendered = html
+      let rendered = html
         .replaceAll('__PHOTO_API_ORIGIN__', environment.apiUrl.origin)
         .replaceAll('__PUBLIC_PAGE_ORIGIN__', environment.pageOrigin)
-        .replaceAll('__R2_ORIGIN__', environment.r2Origin)
         .replaceAll('__UPGRADE_INSECURE_REQUESTS__', upgradeInsecureRequests);
+
+      // In Vite dev mode, allow 'unsafe-inline' and dev server origins on CSP for HMR and module execution
+      if (ctx.server) {
+        rendered = rendered
+          .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'")
+          .replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+          .replace(
+            `connect-src ${environment.apiUrl.origin}`,
+            `connect-src ${environment.apiUrl.origin} https://api.example.test ws: http: https:`,
+          );
+      }
+
       if (/__[A-Z0-9_]+__/u.test(rendered)) {
         throw new Error('Public security template contains an unresolved placeholder');
       }
@@ -159,13 +160,21 @@ function securityTemplatePlugin(environment: ValidatedBuildEnvironment): Plugin 
         source: renderCloudflarePagesHeaders(environment),
       });
     },
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url && (req.url === '/photo' || req.url.startsWith('/photo?') || req.url.startsWith('/photo#'))) {
+          req.url = '/index.html';
+        }
+        next();
+      });
+    },
   };
 }
 
 export default defineConfig(({ mode }) => {
   const environment = validateEnvironment(mode);
   return {
-    plugins: [react(), securityTemplatePlugin(environment)],
+    plugins: [tailwindcss(), react(), securityTemplatePlugin(environment)],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

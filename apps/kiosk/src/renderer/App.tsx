@@ -216,48 +216,64 @@ export function App() {
         return;
       }
 
-      unsubscribe = bridge.booth.subscribe((nextSnapshot) => {
-        if (active) {
-          setSnapshot(nextSnapshot);
-          setGuestError(null);
+      try {
+        unsubscribe = bridge.booth.subscribe((nextSnapshot) => {
+          if (active) {
+            setSnapshot(nextSnapshot);
+            setGuestError(null);
+          }
+        });
+        const [result, authStatus, cameraConfig] = await Promise.all([
+          bridge.booth.getSnapshot(),
+          bridge.admin.getAuthStatus(),
+          bridge.booth.getCameras().catch(() => null),
+        ]);
+        if (!active) {
+          return;
         }
-      });
-      const [result, authStatus, cameraConfig] = await Promise.all([
-        bridge.booth.getSnapshot(),
-        bridge.admin.getAuthStatus(),
-        bridge.booth.getCameras().catch(() => null),
-      ]);
-      if (!active) {
-        return;
+        if (cameraConfig?.ok) {
+          setSelectedCameraDeviceId(cameraConfig.data.deviceId);
+          setSelectedCameraResolution(cameraConfig.data.resolution);
+        }
+        if (result.ok) {
+          setSnapshot(result.data);
+        } else {
+          setSnapshot({
+            ...EMPTY_BOOTH_SNAPSHOT,
+            screen: 'recovery',
+            state: 'interrupted',
+            errorCode: 'interrupted',
+            message: 'The booth could not restore its last session. Ask an operator for help.',
+          });
+        }
+        if (authStatus.ok && !authStatus.data.configured) {
+          setDialog({ intent: 'bootstrap', mode: 'bootstrap' });
+          setDialogError(null);
+        } else if (!authStatus.ok) {
+          setSnapshot({
+            ...EMPTY_BOOTH_SNAPSHOT,
+            screen: 'recovery',
+            state: 'interrupted',
+            errorCode: 'operator_required',
+            message: 'Operator setup could not be verified. Ask an operator for help.',
+          });
+        }
+      } catch (err) {
+        console.error('Failed to initialize booth:', err);
+        if (active) {
+          setSnapshot({
+            ...EMPTY_BOOTH_SNAPSHOT,
+            screen: 'recovery',
+            state: 'interrupted',
+            errorCode: 'interrupted',
+            message: 'The booth connection failed to initialize. Please restart the booth.',
+          });
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-      if (cameraConfig?.ok) {
-        setSelectedCameraDeviceId(cameraConfig.data.deviceId);
-        setSelectedCameraResolution(cameraConfig.data.resolution);
-      }
-      if (result.ok) {
-        setSnapshot(result.data);
-      } else {
-        setSnapshot({
-          ...EMPTY_BOOTH_SNAPSHOT,
-          screen: 'recovery',
-          state: 'interrupted',
-          errorCode: 'interrupted',
-          message: 'The booth could not restore its last session. Ask an operator for help.',
-        });
-      }
-      if (authStatus.ok && !authStatus.data.configured) {
-        setDialog({ intent: 'bootstrap', mode: 'bootstrap' });
-        setDialogError(null);
-      } else if (!authStatus.ok) {
-        setSnapshot({
-          ...EMPTY_BOOTH_SNAPSHOT,
-          screen: 'recovery',
-          state: 'interrupted',
-          errorCode: 'operator_required',
-          message: 'Operator setup could not be verified. Ask an operator for help.',
-        });
-      }
-      setLoading(false);
     };
 
     void initialize();

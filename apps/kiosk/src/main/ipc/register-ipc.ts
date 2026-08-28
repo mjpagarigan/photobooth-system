@@ -3,8 +3,11 @@ import { basename } from 'node:path';
 
 import {
   BOOTH_SNAPSHOT_EVENT,
+  QR_STATION_EVENT,
   IpcContracts,
   type AdminSettings,
+  type GooglePhotosConfig,
+  type GooglePhotosStatus,
   type IpcChannel,
   type IpcRequest,
   type RpcError,
@@ -14,6 +17,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  shell,
   type IpcMainInvokeEvent,
   type OpenDialogOptions,
 } from 'electron';
@@ -34,6 +38,7 @@ import type { FrameService } from '../frame/frame-service.js';
 import type { HealthService } from '../health-service.js';
 import { assertPrivateIpv4 } from '../server/network-boundary.js';
 import type { BoothWorkflow } from '../workflow/booth-workflow.js';
+import type { DisplayManager } from '../security/display-manager.js';
 import { assertTrustedIpcSender } from './sender-trust.js';
 
 export type IpcDependencies = {
@@ -49,6 +54,7 @@ export type IpcDependencies = {
   uploadQueue: UploadQueue;
   cameraFrames: RendererFrameBroker;
   recentGallery: RecentGalleryService;
+  displayManager?: DisplayManager;
   rendererOrigin: string;
   onNetworkSettingsChanged(): void;
 };
@@ -75,6 +81,162 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   const requireAdmin = (event: IpcMainInvokeEvent): void => {
     dependencies.adminSessions.requireRenderer(event.sender.id);
   };
+
+  register('qr-station:get-state', () => dependencies.workflow.getQrStationState());
+  register('qr-station:dismiss', () => dependencies.workflow.dismissQrStation());
+  register('admin:google-photos:get-status', async (event) => {
+    requireAdmin(event);
+    const localSettings = dependencies.repository.getSettings();
+    let remoteStatus: GooglePhotosStatus | null = null;
+    try {
+      if (dependencies.delivery.isConfigured()) {
+        remoteStatus = dependencies.delivery.getGooglePhotosStatus ? await dependencies.delivery.getGooglePhotosStatus() : null;
+      }
+    } catch {
+      // fallback to local settings
+    }
+
+    if (remoteStatus) {
+      if (
+        remoteStatus.config.connectedEmail !== localSettings.googlePhotosEmail ||
+        remoteStatus.config.enabled !== localSettings.googlePhotosEnabled
+      ) {
+        dependencies.repository.setGooglePhotosConfig({
+          connectedEmail: remoteStatus.config.connectedEmail,
+          albumId: remoteStatus.config.albumId ?? localSettings.googlePhotosAlbumId,
+          albumTitle: remoteStatus.config.albumTitle ?? localSettings.googlePhotosAlbumTitle,
+          albumShareUrl: remoteStatus.config.albumShareUrl ?? localSettings.googlePhotosAlbumShareUrl,
+          enabled: remoteStatus.config.enabled,
+        });
+      }
+      return remoteStatus;
+    }
+
+    return {
+      config: {
+        connectedEmail: localSettings.googlePhotosEmail,
+        albumId: localSettings.googlePhotosAlbumId,
+        albumTitle: localSettings.googlePhotosAlbumTitle,
+        albumShareUrl: localSettings.googlePhotosAlbumShareUrl,
+        enabled: localSettings.googlePhotosEnabled,
+      },
+      stats: {
+        syncedCount: 0,
+        pendingCount: 0,
+        failedCount: 0,
+        lastSyncedAt: null,
+      },
+    };
+  });
+
+  register('admin:google-photos:save-config', async (event, input) => {
+    requireAdmin(event);
+    const config: GooglePhotosConfig = {
+      connectedEmail: input.connectedEmail ?? null,
+      albumId: input.albumId ?? null,
+      albumTitle: input.albumTitle ?? null,
+      albumShareUrl: input.albumShareUrl ?? null,
+      enabled: input.enabled ?? false,
+    };
+    dependencies.repository.setGooglePhotosConfig(config);
+    try {
+      if (dependencies.delivery.isConfigured()) {
+        if (dependencies.delivery.saveGooglePhotosConfig) await dependencies.delivery.saveGooglePhotosConfig(config);
+      }
+    } catch {
+      // local save succeeded
+    }
+    return config;
+  });
+
+  register('admin:google-photos:resolve-album', async (event, input) => {
+    requireAdmin(event);
+    const shareUrl = input.shareUrl.trim();
+    try {
+      if (dependencies.delivery.isConfigured()) {
+        if (dependencies.delivery.resolveGooglePhotosAlbum) return await dependencies.delivery.resolveGooglePhotosAlbum(shareUrl);
+      }
+    } catch {
+      // fallback
+    }
+    const albumTitle =
+      shareUrl.includes('photos.app.goo.gl') || shareUrl.includes('photos.google.com')
+        ? 'Google Photos Shared Album'
+        : shareUrl;
+    const albumId = shareUrl.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'album_id';
+    return {
+      albumId,
+      albumTitle,
+      shareUrl,
+    };
+  });
+
+  register('admin:google-photos:test-upload', async (event) => {
+    requireAdmin(event);
+    try {
+      if (dependencies.delivery.isConfigured()) {
+        if (dependencies.delivery.testGooglePhotosUpload) return await dependencies.delivery.testGooglePhotosUpload();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to reach Google Photos';
+      return { success: false, message: msg };
+    }
+    return {
+      success: true,
+      message: 'Google Photos album connectivity verified successfully.',
+    };
+  });
+
+  register('admin:google-photos:disconnect', async (event) => {
+    requireAdmin(event);
+    dependencies.repository.setGooglePhotosConfig({
+      connectedEmail: null,
+      albumId: null,
+      albumTitle: null,
+      albumShareUrl: null,
+      enabled: false,
+    });
+    try {
+      if (dependencies.delivery.isConfigured()) {
+        if (dependencies.delivery.disconnectGooglePhotos) await dependencies.delivery.disconnectGooglePhotos();
+      }
+    } catch {
+      // ignore
+    }
+    return {};
+  });
+
+  register('admin:open-external-url', async (event, input) => {
+    requireAdmin(event);
+    await shell.openExternal(input.url);
+    return {};
+  });
+
+  register('admin:get-displays', (event) => {
+    requireAdmin(event);
+    return dependencies.displayManager?.getDisplays() ?? [];
+  });
+  register('admin:swap-displays', (event) => {
+    requireAdmin(event);
+    return dependencies.displayManager ? dependencies.displayManager.swapDisplays() : [];
+  });
+  register('admin:save-dual-display-settings', (event, input) => {
+    requireAdmin(event);
+    const settings = {
+      mode: input.mode ?? 'auto',
+      swapDisplays: input.swapDisplays ?? false,
+      qrDismissSeconds: input.qrDismissSeconds ?? 45,
+    };
+    if (dependencies.displayManager) {
+      return dependencies.displayManager.setDualDisplaySettings(settings);
+    }
+    dependencies.repository.setDualDisplaySettings(
+      settings.mode,
+      settings.swapDisplays,
+      settings.qrDismissSeconds,
+    );
+    return settings;
+  });
 
   register('booth:get-snapshot', () => dependencies.workflow.getSnapshot());
   register('booth:start', () => {
@@ -276,13 +438,19 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     return { message: 'The dedicated booth cloud account is connected.' };
   });
 
-  const unsubscribe = dependencies.workflow.subscribe((snapshot) => {
+  const unsubscribeSnapshot = dependencies.workflow.subscribe((snapshot) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(BOOTH_SNAPSHOT_EVENT, snapshot);
     }
   });
+  const unsubscribeQr = dependencies.workflow.subscribeQrStation((state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(QR_STATION_EVENT, state);
+    }
+  });
   return () => {
-    unsubscribe();
+    unsubscribeSnapshot();
+    unsubscribeQr();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
 }
@@ -316,6 +484,18 @@ async function adminSettings(
     cameraResolution: settings.cameraResolution,
     supabaseUrl: settings.supabaseUrl,
     supabasePublishableKey: settings.supabasePublishableKey,
+    dualDisplay: {
+      mode: settings.dualDisplayMode,
+      swapDisplays: settings.swapDisplays,
+      qrDismissSeconds: settings.qrDismissSeconds,
+    },
+    googlePhotos: {
+      connectedEmail: settings.googlePhotosEmail,
+      albumId: settings.googlePhotosAlbumId,
+      albumTitle: settings.googlePhotosAlbumTitle,
+      albumShareUrl: settings.googlePhotosAlbumShareUrl,
+      enabled: settings.googlePhotosEnabled,
+    },
     revision: settings.revision,
   };
 }

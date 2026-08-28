@@ -9,11 +9,9 @@ bodies to the three Supabase Function POST routes:
 - `/photo/download`
 
 The page does not put the token in a request URL, browser storage, DOM text, referrers, analytics,
-or application logs. With R2 enabled, an authenticated image/download POST returns a bodyless
-`303` to a private five-minute presigned GET. Fetch follows it directly, validates the final R2
-origin and JPEG signature, and exposes only a blob URL to the DOM. The application has no fixed
-JPEG byte-size ceiling; Cloudflare, R2, the browser, and the guest device retain their platform and
-memory limits.
+or application logs. Authenticated image/download POST requests return JPEG bytes directly from the
+photo Function after it verifies the recorded storage object and reauthorizes the token. Redirects
+and non-API response origins are rejected. The browser exposes only a blob URL to the DOM.
 
 ## Required Cloudflare Pages build configuration
 
@@ -24,25 +22,20 @@ Build command: pnpm build
 Build output directory: apps/public/dist
 ```
 
-Set all three production build variables:
+Set both production build variables:
 
 ```text
 VITE_PUBLIC_PHOTO_API_URL=https://<project-ref>.supabase.co/functions/v1/photo
 VITE_PUBLIC_PAGE_ORIGIN=https://<production-photo-domain>
-VITE_PUBLIC_R2_ORIGIN=https://<bucket>.<account-id>.r2.cloudflarestorage.com
 ```
 
 `VITE_PUBLIC_PAGE_ORIGIN` must be the exact Cloudflare Pages production or custom-domain origin.
 Supabase must receive the same value as its server-only `PUBLIC_PAGE_ORIGIN` secret. Preview origins
 intentionally cannot call the photo API.
 
-`VITE_PUBLIC_R2_ORIGIN` must be the exact HTTPS origin emitted by R2 S3 presigned URLs. It is not an
-`r2.dev` or custom-domain origin and may not contain credentials, an explicit port, path, query, or
-fragment.
-
 The Vite production build validates these values and emits Cloudflare Pages `_headers` and
 `_redirects` files into `dist`. The response CSP permits connections only to the exact Supabase API
-and R2 origins. `/photo` remains non-cacheable and unindexed, while hashed assets receive immutable
+origin. `/photo` remains non-cacheable and unindexed, while hashed assets receive immutable
 caching. The checked-in `wrangler.jsonc` provides the equivalent SPA fallback when deploying the
 same output through Wrangler static assets.
 
@@ -53,7 +46,6 @@ pnpm typecheck
 pnpm test
 $env:VITE_PUBLIC_PHOTO_API_URL = 'http://127.0.0.1:54321/functions/v1/photo'
 $env:VITE_PUBLIC_PAGE_ORIGIN = 'http://127.0.0.1:4173'
-$env:VITE_PUBLIC_R2_ORIGIN = 'https://<bucket>.<account-id>.r2.cloudflarestorage.com'
 pnpm build
 ```
 
@@ -63,10 +55,9 @@ pnpm build
 ```powershell
 $env:VITE_PUBLIC_PHOTO_API_URL = 'https://<project-ref>.supabase.co/functions/v1/photo'
 $env:VITE_PUBLIC_PAGE_ORIGIN = 'https://photos.example.org'
-$env:VITE_PUBLIC_R2_ORIGIN = 'https://<bucket>.<account-id>.r2.cloudflarestorage.com'
 ```
 
-`VITE_PUBLIC_PAGE_ORIGIN` must be an exact origin — no path, no trailing slash — and it must be the **same value** you'll set as the `PUBLIC_PAGE_ORIGIN` secret on the Supabase Edge Functions (that's what the CORS/origin check compares against). `VITE_PUBLIC_R2_ORIGIN` is required: the production build fails without it, and it must match the virtual-hosted S3 origin the Functions use to presign R2 GETs.
+`VITE_PUBLIC_PAGE_ORIGIN` must be an exact origin — no path, no trailing slash — and it must be the **same value** you'll set as the `PUBLIC_PAGE_ORIGIN` secret on the Supabase Edge Functions (that's what the CORS/origin check compares against).
 
 ## 2. Build
 
@@ -80,7 +71,7 @@ Sanity-check the output before deploying:
 ```powershell
 Select-String -Path apps/public/dist/index.html -Pattern "__PHOTO_API_ORIGIN__|unconfigured.invalid"
 ```
-No matches means it's a real, configured build. The build also emits `dist/_headers` (exact CSP including the API and R2 origins) and `dist/_redirects`; review both before deploying.
+No matches means it's a real, configured build. The build also emits `dist/_headers` (exact CSP including the API origin) and `dist/_redirects`; review both before deploying.
 
 ## 3. Deploy with Wrangler (matches the checked-in config)
 

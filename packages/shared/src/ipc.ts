@@ -12,22 +12,34 @@ import {
   AdminHealthSchema,
   AdminSettingsSchema,
   BoothSnapshotSchema,
+  DisplayInfoSchema,
+  DualDisplaySettingsSchema,
   EmptyResponseSchema,
   FrameLayoutSchema,
   FrameSummarySchema,
   GalleryItemSchema,
+  GalleryCloudRepairResultSchema,
   OpaqueIdSchema,
   OptionalGoogleFormsUrlSchema,
+  GooglePhotosConfigSchema,
+  GooglePhotosStatusSchema,
+  QrStationStateSchema,
   UploadJobSummarySchema,
   rpcResultSchema,
   type AdminAuthStatus,
   type AdminHealth,
   type AdminSettings,
   type BoothSnapshot,
+  type DisplayInfo,
+  type DualDisplaySettings,
   type EmptyResponse,
   type FrameLayout,
   type FrameSummary,
   type GalleryItem,
+  type GalleryCloudRepairResult,
+  type GooglePhotosConfig,
+  type GooglePhotosStatus,
+  type QrStationState,
   type RpcResult,
   type UploadJobSummary,
 } from './domain.js';
@@ -104,6 +116,14 @@ export const IpcContracts = {
       .strict(),
     response: rpcResultSchema(EmptyResponseSchema),
   },
+  'qr-station:get-state': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(QrStationStateSchema),
+  },
+  'qr-station:dismiss': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(QrStationStateSchema),
+  },
   'gallery:get-recent': {
     request: z
       .object({
@@ -111,6 +131,10 @@ export const IpcContracts = {
       })
       .strict(),
     response: rpcResultSchema(z.array(GalleryItemSchema)),
+  },
+  'gallery:repair-cloud-photo': {
+    request: z.object({ sessionId: OpaqueIdSchema }).strict(),
+    response: rpcResultSchema(GalleryCloudRepairResultSchema),
   },
   'admin:get-auth-status': {
     request: EmptyRequestSchema,
@@ -147,6 +171,46 @@ export const IpcContracts = {
       })
       .strict(),
     response: rpcResultSchema(AdminSettingsSchema),
+  },
+  'admin:google-photos:get-status': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(GooglePhotosStatusSchema),
+  },
+  'admin:google-photos:save-config': {
+    request: GooglePhotosConfigSchema,
+    response: rpcResultSchema(GooglePhotosConfigSchema),
+  },
+  'admin:google-photos:resolve-album': {
+    request: z.object({ shareUrl: z.string().min(1) }).strict(),
+    response: rpcResultSchema(
+      z
+        .object({
+          albumId: z.string(),
+          albumTitle: z.string(),
+          shareUrl: z.string(),
+        })
+        .strict(),
+    ),
+  },
+  'admin:google-photos:test-upload': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(z.object({ success: z.boolean(), message: z.string() }).strict()),
+  },
+  'admin:google-photos:disconnect': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(EmptyResponseSchema),
+  },
+  'admin:get-displays': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(z.array(DisplayInfoSchema)),
+  },
+  'admin:swap-displays': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(z.array(DisplayInfoSchema)),
+  },
+  'admin:save-dual-display-settings': {
+    request: DualDisplaySettingsSchema,
+    response: rpcResultSchema(DualDisplaySettingsSchema),
   },
   'admin:list-frames': {
     request: EmptyRequestSchema,
@@ -223,10 +287,18 @@ export const IpcContracts = {
       .strict(),
     response: rpcResultSchema(SuccessMessageSchema),
   },
+  'admin:open-external-url': {
+    request: z.object({ url: z.string().min(1).max(2_000) }).strict(),
+    response: rpcResultSchema(EmptyResponseSchema),
+  },
 } as const;
 
 export const BOOTH_SNAPSHOT_EVENT = 'booth:snapshot-changed' as const;
 export const BoothSnapshotEventSchema = BoothSnapshotSchema;
+
+export const QR_STATION_EVENT = 'booth:qr-station-changed' as const;
+export const QrStationEventSchema = QrStationStateSchema;
+export type QrStationEvent = z.infer<typeof QrStationEventSchema>;
 
 export const CAMERA_FRAME_REQUEST_EVENT = 'booth:camera-frame-requested' as const;
 export const CameraFrameRequestEventSchema = z
@@ -258,8 +330,14 @@ export type GraceBoothBridge = {
     subscribe(listener: (snapshot: BoothSnapshot) => void): () => void;
     onCameraFrameRequest(listener: (request: CameraFrameRequestEvent) => void): () => void;
   };
+  qrStation: {
+    getState(): Promise<RpcResult<QrStationState>>;
+    dismiss(): Promise<RpcResult<QrStationState>>;
+    subscribe(listener: (state: QrStationState) => void): () => void;
+  };
   gallery: {
     getRecent(limit?: number): Promise<RpcResult<GalleryItem[]>>;
+    repairCloudPhoto(sessionId: string): Promise<RpcResult<GalleryCloudRepairResult>>;
   };
   admin: {
     getAuthStatus(): Promise<RpcResult<AdminAuthStatus>>;
@@ -275,6 +353,16 @@ export type GraceBoothBridge = {
       lanPort: number;
       expectedRevision: number;
     }): Promise<RpcResult<AdminSettings>>;
+    getGooglePhotosStatus(): Promise<RpcResult<GooglePhotosStatus>>;
+    saveGooglePhotosConfig(config: GooglePhotosConfig): Promise<RpcResult<GooglePhotosConfig>>;
+    resolveGooglePhotosAlbum(
+      shareUrl: string,
+    ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
+    testGooglePhotosUpload(): Promise<RpcResult<{ success: boolean; message: string }>>;
+    disconnectGooglePhotos(): Promise<RpcResult<EmptyResponse>>;
+    getDisplays(): Promise<RpcResult<DisplayInfo[]>>;
+    swapDisplays(): Promise<RpcResult<DisplayInfo[]>>;
+    saveDualDisplaySettings(input: DualDisplaySettings): Promise<RpcResult<DualDisplaySettings>>;
     listFrames(): Promise<RpcResult<FrameSummary[]>>;
     addFrame(): Promise<RpcResult<FrameSummary | null>>;
     updateFrameLayout(input: {
@@ -302,5 +390,6 @@ export type GraceBoothBridge = {
       supabaseUrl?: string | null,
       supabasePublishableKey?: string | null,
     ): Promise<RpcResult<{ message: string }>>;
+    openExternalUrl(url: string): Promise<RpcResult<EmptyResponse>>;
   };
 };

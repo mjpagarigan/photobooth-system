@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(69);
+select plan(86);
 
 set local timezone = 'America/Denver';
 
@@ -136,6 +136,23 @@ select has_function(
   'complete_photo_cleanup',
   array['uuid', 'uuid'],
   'cleanup completion exists'
+);
+select has_table(
+  'public',
+  'photo_storage_backend_repairs',
+  'storage-backend repair ledger exists'
+);
+select has_function(
+  'public',
+  'repair_photo_storage_backend',
+  array['uuid', 'uuid', 'text', 'bigint', 'text', 'timestamp with time zone', 'photo_session_status', 'text', 'text'],
+  'guarded storage-backend repair exists'
+);
+select has_function(
+  'public',
+  'rollback_photo_storage_backend_repair',
+  array['uuid'],
+  'ledger-based batch rollback exists'
 );
 select ok(exists(select 1 from storage.buckets where id = 'photos'), 'photos bucket exists');
 select is(
@@ -468,6 +485,181 @@ select is(
   ),
   'finalize is idempotent'
 );
+
+select ok(
+  (
+    select relrowsecurity and relforcerowsecurity
+    from pg_class
+    where oid = 'public.photo_storage_backend_repairs'::regclass
+  ),
+  'repair ledger forces RLS'
+);
+select ok(
+  not has_table_privilege('anon', 'public.photo_storage_backend_repairs', 'SELECT'),
+  'anon cannot read the repair ledger'
+);
+
+select is(
+  public.repair_photo_storage_backend(
+    '13131313-1313-4313-8313-131313131313',
+    '22222222-2222-4222-8222-222222222222',
+    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
+    999999,
+    repeat('cd', 32),
+    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+    'ready'::public.photo_session_status,
+    'supabase',
+    'admin-r2-verification'
+  ),
+  'stale',
+  'metadata drift prevents repair while the row still has the expected backend'
+);
+select is(
+  public.repair_photo_storage_backend(
+    '14141414-1414-4414-8414-141414141414',
+    '22222222-2222-4222-8222-222222222222',
+    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
+    1000000,
+    repeat('cd', 32),
+    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+    'ready'::public.photo_session_status,
+    'r2',
+    'admin-r2-verification'
+  ),
+  'stale',
+  'a non-Supabase caller snapshot cannot start a repair'
+);
+
+select is(
+  public.repair_photo_storage_backend(
+    '12121212-1212-4212-8212-121212121212',
+    '22222222-2222-4222-8222-222222222222',
+    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
+    1000000,
+    repeat('cd', 32),
+    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+    'ready'::public.photo_session_status,
+    'supabase',
+    'admin-r2-verification'
+  ),
+  'updated',
+  'an exact ready and unexpired snapshot can be repaired'
+);
+select is(
+  (select storage_backend from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+  'r2',
+  'repair changes only the selected backend'
+);
+select is(
+  (
+    select jsonb_build_object(
+      'path', storage_object_path,
+      'bytes', byte_size,
+      'hash', encode(content_sha256, 'hex'),
+      'status', status,
+      'expiry', expires_at,
+      'token', encode(public_token_hash, 'hex'),
+      'owner', owner_user_id,
+      'created', created_at,
+      'ready', ready_at
+    )
+    from public.photo_sessions
+    where id = '22222222-2222-4222-8222-222222222222'
+  ),
+  (
+    select jsonb_build_object(
+      'path', storage_object_path,
+      'bytes', byte_size,
+      'hash', encode(content_sha256, 'hex'),
+      'status', status,
+      'expiry', expires_at,
+      'token', encode(public_token_hash, 'hex'),
+      'owner', owner_user_id,
+      'created', created_at,
+      'ready', ready_at
+    )
+    from public.photo_storage_backend_repairs
+    where batch_id = '12121212-1212-4212-8212-121212121212'
+      and photo_session_id = '22222222-2222-4222-8222-222222222222'
+  ),
+  'the repair ledger preserves the guarded metadata snapshot'
+);
+select is(
+  (
+    select count(*)
+    from public.photo_storage_backend_repairs
+    where batch_id = '12121212-1212-4212-8212-121212121212'
+  ),
+  1::bigint,
+  'successful repair creates one ledger record'
+);
+select is(
+  public.repair_photo_storage_backend(
+    '12121212-1212-4212-8212-121212121212',
+    '22222222-2222-4222-8222-222222222222',
+    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
+    1000000,
+    repeat('cd', 32),
+    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+    'ready'::public.photo_session_status,
+    'supabase',
+    'admin-r2-verification'
+  ),
+  'already_applied',
+  'repeating the same batch is idempotent'
+);
+select is(
+  public.rollback_photo_storage_backend_repair('12121212-1212-4212-8212-121212121212'),
+  1,
+  'a matching ledger batch rolls back one repair'
+);
+select is(
+  (select storage_backend from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+  'supabase',
+  'rollback restores the recorded backend'
+);
+select ok(
+  (
+    select rolled_back_at is not null and rollback_state = 'rolled_back'
+    from public.photo_storage_backend_repairs
+    where batch_id = '12121212-1212-4212-8212-121212121212'
+      and photo_session_id = '22222222-2222-4222-8222-222222222222'
+  ),
+  'rollback is recorded without deleting the ledger entry'
+);
+select is(
+  public.rollback_photo_storage_backend_repair('12121212-1212-4212-8212-121212121212'),
+  0,
+  'repeating a rollback is safe'
+);
+
+update public.photo_sessions
+set
+  ready_at = statement_timestamp() - interval '721 hours',
+  expires_at = statement_timestamp() - interval '1 hour'
+where id = '22222222-2222-4222-8222-222222222222';
+
+select is(
+  public.repair_photo_storage_backend(
+    '15151515-1515-4515-8515-151515151515',
+    '22222222-2222-4222-8222-222222222222',
+    '2026/08/22222222-2222-4222-8222-222222222222.jpg',
+    1000000,
+    repeat('cd', 32),
+    (select expires_at from public.photo_sessions where id = '22222222-2222-4222-8222-222222222222'),
+    'ready'::public.photo_session_status,
+    'supabase',
+    'admin-r2-verification'
+  ),
+  'stale',
+  'expired rows cannot be repaired'
+);
+
+update public.photo_sessions
+set
+  ready_at = statement_timestamp(),
+  expires_at = statement_timestamp() + interval '720 hours'
+where id = '22222222-2222-4222-8222-222222222222';
 
 select is(
   (

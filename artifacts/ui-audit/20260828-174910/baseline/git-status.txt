@@ -1,0 +1,84 @@
+ M README.md
+ M apps/kiosk/electron.vite.config.ts
+ M apps/kiosk/package.json
+ M apps/kiosk/src/main/cloud/delivery-client.ts
+ M apps/kiosk/src/main/cloud/e2e-delivery-client.ts
+ M apps/kiosk/src/main/frame/frame-service.ts
+ M apps/kiosk/src/main/gallery/recent-gallery-service.ts
+ M apps/kiosk/src/main/index.ts
+ M apps/kiosk/src/main/ipc/register-ipc.ts
+ M apps/kiosk/src/preload/index.ts
+ M apps/kiosk/src/renderer/App.tsx
+ M apps/kiosk/src/renderer/components/Button.tsx
+ M apps/kiosk/src/renderer/components/RecentGallery.tsx
+ M apps/kiosk/src/renderer/screens/AttractScreen.tsx
+ M apps/kiosk/src/renderer/styles.css
+ M apps/kiosk/tests/main/delivery-client.test.ts
+ M apps/kiosk/tests/main/recent-gallery.test.ts
+ M apps/kiosk/tests/main/upload-queue.test.ts
+ M apps/kiosk/tests/renderer/App.test.tsx
+ M apps/kiosk/tests/renderer/RendererComponents.test.tsx
+ M apps/kiosk/vite.renderer.config.ts
+ M apps/public/README.md
+ M apps/public/index.html
+ M apps/public/package.json
+ M apps/public/src/App.tsx
+ M apps/public/src/api.ts
+ M apps/public/src/config.ts
+ M apps/public/src/styles.css
+ M apps/public/tests/api.test.ts
+ M apps/public/tests/security-config.test.ts
+ M apps/public/vite.config.ts
+ M docs/BUILD_FLOW_SUMMARY.md
+ M docs/SECURITY_AND_RETENTION.md
+ M docs/VERIFICATION.md
+ M eslint.config.mjs
+ D infra/r2-cors.json
+ M package.json
+ M packages/shared/src/cloud.ts
+ M packages/shared/src/domain.ts
+ M packages/shared/src/ipc.ts
+ M pnpm-lock.yaml
+ M scripts/smoke-photo-delivery.mjs
+ M supabase/README.md
+ M supabase/config.toml
+ M supabase/functions/_shared/r2.ts
+ M supabase/functions/_shared/schemas.ts
+ M supabase/functions/deno.json
+ M supabase/functions/photo/index.ts
+ M supabase/functions/tests/photo_test.ts
+ M supabase/functions/tests/r2_test.ts
+ M supabase/tests/database/photo_delivery.test.sql
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/admin-frame-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/admin-frame-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/admin-frame-collage-2-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/admin-frame-collage-2-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/admin-settings-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/admin-settings-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/attract-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/attract-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/countdown-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/countdown-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/final-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/final-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/processing-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/processing-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/recovery-camera-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/recovery-camera-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/recovery-interrupted-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/recovery-interrupted-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/recovery-upload-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/recovery-upload-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/review-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/review-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/review-collage-2-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/review-collage-2-1366x768-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/uploading-backoff-1280x720-kiosk-visual-win32.png
+ M tests/e2e/kiosk-visual.spec.ts-snapshots/uploading-backoff-1366x768-kiosk-visual-win32.png
+?? packages/ui/
+?? supabase/functions/_shared/storage-verification.ts
+?? supabase/functions/repair-photo/
+?? supabase/functions/tests/repair_photo_test.ts
+?? supabase/functions/tests/repair_storage_backends_test.ts
+?? supabase/functions/tools/
+?? supabase/migrations/20260827000000_photo_storage_backend_repair.sql

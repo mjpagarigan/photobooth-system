@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
@@ -37,7 +38,7 @@ export default defineConfig({
   renderer: {
     root: resolve(import.meta.dirname, 'src/renderer'),
     publicDir: resolve(import.meta.dirname, 'resources'),
-    plugins: [react()],
+    plugins: [tailwindcss(), react()],
     build: {
       rollupOptions: {
         input: resolve(import.meta.dirname, 'src/renderer/index.html'),

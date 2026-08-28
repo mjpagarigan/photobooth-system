@@ -1,0 +1,12 @@
+$ tsc --noEmit -p tsconfig.json && pnpm -r --if-present typecheck && pnpm functions:check
+Scope: 4 of 5 workspace projects
+packages/shared typecheck$ tsc --noEmit
+packages/ui typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+packages/ui typecheck: Done
+apps/kiosk typecheck$ tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json
+apps/public typecheck$ tsc --noEmit -p tsconfig.json
+apps/public typecheck: Done
+apps/kiosk typecheck: Done
+$ deno task --cwd supabase/functions check
+Task check deno check create-upload/index.ts confirm-upload/index.ts photo/index.ts repair-photo/index.ts cleanup-expired/index.ts tools/repair-storage-backends.ts integration/photo_delivery_integration_test.ts

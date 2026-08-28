@@ -54,6 +54,7 @@ export function AttractScreen({
             disabled={busy}
             aria-label="Recent Photos"
             title="Recent Photos"
+            type="button"
           >
             <Images aria-hidden="true" weight="bold" />
             <span className="operator-access__text">Recent</span>
@@ -66,6 +67,7 @@ export function AttractScreen({
             disabled={busy}
             aria-label="Camera Setup"
             title="Camera Setup"
+            type="button"
           >
             <Gear aria-hidden="true" weight="bold" />
             <span className="operator-access__text">Camera</span>
@@ -77,6 +79,7 @@ export function AttractScreen({
           aria-label="Admin"
           title="Admin"
           disabled={busy}
+          type="button"
         >
           <LockKey aria-hidden="true" weight="bold" />
           <span className="operator-access__text">Admin</span>
@@ -91,14 +94,14 @@ export function AttractScreen({
         </div>
 
         <h1 id="attract-title">M.A.T. PHOTOBOOTH</h1>
-        <p className="attract-card__subtitle">MINISTRY FAIR</p>
+        <p className="attract-card__subtitle">MINISTRY FAIR // CELEBRATION ARCHIVE</p>
         <p className="attract-card__lead">
-          Take three photos, get a collage, and download it with a QR code.
+          Take three photos, receive your finished collage, and scan to download instantly.
         </p>
 
         <p className="attract-status" role="status">
           <CheckCircle aria-hidden="true" weight="bold" />
-          <span>3 photos · collage · QR download</span>
+          <span>3 photos · custom collage · instant private download</span>
         </p>
 
         <Button

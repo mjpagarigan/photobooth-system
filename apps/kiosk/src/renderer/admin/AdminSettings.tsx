@@ -1,24 +1,31 @@
 import {
   ArrowClockwiseIcon as ArrowClockwise,
+  ArrowsLeftRightIcon as ArrowsLeftRight,
   CameraIcon as Camera,
   CheckCircleIcon as CheckCircle,
   CloudIcon as Cloud,
   DatabaseIcon as Database,
+  DesktopIcon as Desktop,
   FileLockIcon as FileLock,
   KeyIcon as Key,
   LinkSimpleIcon as LinkSimple,
   LockKeyIcon as LockKey,
   ShieldCheckIcon as ShieldCheck,
   WifiHighIcon as WifiHigh,
+  CopyIcon as Copy,
+  ImagesIcon as Images,
+  PaperPlaneTiltIcon as PaperPlaneTilt,
+  TrashIcon as Trash,
 } from '@phosphor-icons/react';
-import { useMemo, useState, type SyntheticEvent } from 'react';
+import { useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 
 import type {
   AdminHealth,
   AdminSettings as AdminSettingsData,
+  DisplayInfo,
+  DualDisplayMode,
   UploadJobSummary,
 } from '@grace-booth/shared';
-
 import { Button } from '../components/Button';
 
 type AdminSettingsProps = {
@@ -90,6 +97,193 @@ export function AdminSettings({
   const [currentPasscode, setCurrentPasscode] = useState('');
   const [newPasscode, setNewPasscode] = useState('');
   const [confirmPasscode, setConfirmPasscode] = useState('');
+  const [dualMode, setDualMode] = useState<DualDisplayMode>(settings.dualDisplay?.mode ?? 'auto');
+  const [swapDisplays, setSwapDisplays] = useState(settings.dualDisplay?.swapDisplays ?? false);
+  const [qrDismissSeconds, setQrDismissSeconds] = useState(settings.dualDisplay?.qrDismissSeconds ?? 45);
+  const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+
+  const [googlePhotosEnabled, setGooglePhotosEnabled] = useState(
+    settings.googlePhotos?.enabled ?? false,
+  );
+  const [googlePhotosEmail, setGooglePhotosEmail] = useState(
+    settings.googlePhotos?.connectedEmail ?? '',
+  );
+  const [googlePhotosShareUrl, setGooglePhotosShareUrl] = useState(
+    settings.googlePhotos?.albumShareUrl ?? '',
+  );
+  const [googlePhotosAlbumTitle, setGooglePhotosAlbumTitle] = useState(
+    settings.googlePhotos?.albumTitle ?? '',
+  );
+  const [googlePhotosAlbumId, setGooglePhotosAlbumId] = useState(
+    settings.googlePhotos?.albumId ?? '',
+  );
+  const [googleStats, setGoogleStats] = useState({
+    syncedCount: 0,
+    pendingCount: 0,
+    failedCount: 0,
+  });
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [googleFeedback, setGoogleFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    const bridge = window.graceBooth;
+    if (bridge?.admin.getGooglePhotosStatus) {
+      void bridge.admin.getGooglePhotosStatus().then((res) => {
+        if (res.ok) {
+          setGooglePhotosEnabled(res.data.config.enabled);
+          setGooglePhotosEmail(res.data.config.connectedEmail ?? '');
+          setGooglePhotosShareUrl(res.data.config.albumShareUrl ?? '');
+          setGooglePhotosAlbumTitle(res.data.config.albumTitle ?? '');
+          setGooglePhotosAlbumId(res.data.config.albumId ?? '');
+          setGoogleStats(res.data.stats);
+        }
+      });
+    }
+  }, []);
+
+  const handleResolveAlbum = async () => {
+    const bridge = window.graceBooth;
+    if (!bridge?.admin.resolveGooglePhotosAlbum || !googlePhotosShareUrl.trim()) return;
+    setGoogleFeedback('Resolving album...');
+    try {
+      const res = await bridge.admin.resolveGooglePhotosAlbum(googlePhotosShareUrl.trim());
+      if (res.ok) {
+        setGooglePhotosAlbumTitle(res.data.albumTitle);
+        setGooglePhotosAlbumId(res.data.albumId);
+        setGoogleFeedback(`Resolved: ${res.data.albumTitle}`);
+      } else {
+        setGoogleFeedback('Could not resolve album link.');
+      }
+    } catch {
+      setGoogleFeedback('Error resolving album link.');
+    }
+  };
+
+  const handleSaveGooglePhotos = async (e: SyntheticEvent) => {
+    e.preventDefault();
+    const bridge = window.graceBooth;
+    if (!bridge?.admin.saveGooglePhotosConfig) return;
+    setGoogleFeedback('Saving configuration...');
+    try {
+      const res = await bridge.admin.saveGooglePhotosConfig({
+        enabled: googlePhotosEnabled,
+        connectedEmail: googlePhotosEmail.trim() || null,
+        albumId: googlePhotosAlbumId.trim() || null,
+        albumTitle: googlePhotosAlbumTitle.trim() || null,
+        albumShareUrl: googlePhotosShareUrl.trim() || null,
+      });
+      if (res.ok) {
+        setGoogleFeedback('Google Photos configuration saved.');
+        onRefresh();
+      } else {
+        setGoogleFeedback('Failed to save configuration.');
+      }
+    } catch {
+      setGoogleFeedback('Failed to save Google Photos configuration.');
+    }
+  };
+
+    const handleConnectGoogleOAuth = () => {
+    const clientId = '823749351705-qku7r1r57gulhi8kdfblq0nau3v39ecl.apps.googleusercontent.com';
+    const baseUrl = supabaseUrl ? supabaseUrl.replace(/\/$/, '') : 'https://bejgkclvsfbkpkflftxu.supabase.co';
+    const redirectUri = `${baseUrl}/functions/v1/google-photos-auth`;
+    const scope = encodeURIComponent(
+      'https://www.googleapis.com/auth/photoslibrary.appendonly https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata https://www.googleapis.com/auth/userinfo.email',
+    );
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri,
+    )}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+
+    const bridge = window.graceBooth;
+    if (bridge?.admin.openExternalUrl) {
+      void bridge.admin.openExternalUrl(authUrl);
+    } else {
+      window.open(authUrl, '_blank');
+    }
+  };
+
+  const handleCopyAlbumLink = () => {
+    if (!googlePhotosShareUrl) return;
+    void navigator.clipboard.writeText(googlePhotosShareUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleTestGoogleUpload = async () => {
+    const bridge = window.graceBooth;
+    if (!bridge?.admin.testGooglePhotosUpload) return;
+    setGoogleFeedback('Sending test photo...');
+    try {
+      const res = await bridge.admin.testGooglePhotosUpload();
+      if (res.ok) {
+        setGoogleFeedback(res.data.message);
+      } else {
+        setGoogleFeedback('Test photo failed.');
+      }
+    } catch {
+      setGoogleFeedback('Test photo failed.');
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    const bridge = window.graceBooth;
+    if (!bridge?.admin.disconnectGooglePhotos) return;
+    try {
+      await bridge.admin.disconnectGooglePhotos();
+      setGooglePhotosEnabled(false);
+      setGooglePhotosEmail('');
+      setGooglePhotosAlbumId('');
+      setGooglePhotosAlbumTitle('');
+      setGooglePhotosShareUrl('');
+      setGoogleFeedback('Google Photos disconnected.');
+      onRefresh();
+    } catch {
+      setGoogleFeedback('Failed to disconnect Google Photos.');
+    }
+  };
+
+  useEffect(() => {
+    const bridge = window.graceBooth;
+    if (bridge?.admin.getDisplays) {
+      void bridge.admin.getDisplays().then((res) => {
+        if (res.ok) setDisplays(res.data);
+      });
+    }
+  }, []);
+
+  const handleSwap = async () => {
+    const bridge = window.graceBooth;
+    if (!bridge?.admin.swapDisplays) return;
+    setLocalError(null);
+    try {
+      const res = await bridge.admin.swapDisplays();
+      if (res.ok) {
+        setDisplays(res.data);
+        setSwapDisplays((prev) => !prev);
+      }
+    } catch {
+      setLocalError('Displays could not be swapped.');
+    }
+  };
+
+  const handleSaveDualDisplay = async (e: SyntheticEvent) => {
+    e.preventDefault();
+    const bridge = window.graceBooth;
+    if (!bridge?.admin.saveDualDisplaySettings) return;
+    setLocalError(null);
+    try {
+      const res = await bridge.admin.saveDualDisplaySettings({
+        mode: dualMode,
+        swapDisplays,
+        qrDismissSeconds,
+      });
+      if (res.ok) {
+        onRefresh();
+      }
+    } catch {
+      setLocalError('Dual display settings could not be saved.');
+    }
+  };
   const [supabaseUrl, setSupabaseUrl] = useState(settings.supabaseUrl ?? '');
   const [supabasePublishableKey, setSupabasePublishableKey] = useState(
     settings.supabasePublishableKey ?? '',
@@ -346,6 +540,201 @@ export function AdminSettings({
               type="submit"
             >
               Save settings
+            </Button>
+          </form>
+
+          <form className="settings-card settings-form" onSubmit={handleSaveDualDisplay}>
+            <div className="settings-card__title">
+              <Desktop aria-hidden="true" weight="bold" />
+              <div>
+                <h2>Dual-Monitor Setup</h2>
+                <p>
+                  Configure Screen 1 (Capture) and Screen 2 (QR Delivery) monitors ({displays.length}{' '}
+                  detected).
+                </p>
+              </div>
+            </div>
+            <label htmlFor="dual-mode">Dual Display Mode</label>
+            <select
+              id="dual-mode"
+              value={dualMode}
+              onChange={(e) => setDualMode(e.target.value as DualDisplayMode)}
+            >
+              <option value="auto">Auto (Enabled when 2 monitors connected)</option>
+              <option value="enabled">Force Enabled</option>
+              <option value="disabled">Disabled (Single Monitor Only)</option>
+            </select>
+            <label htmlFor="qr-timeout">QR Auto-Dismiss Duration</label>
+            <select
+              id="qr-timeout"
+              value={qrDismissSeconds}
+              onChange={(e) => setQrDismissSeconds(Number(e.target.value))}
+            >
+              <option value={30}>30 seconds</option>
+              <option value={45}>45 seconds (Default)</option>
+              <option value={60}>60 seconds</option>
+              <option value={90}>90 seconds</option>
+            </select>
+            <div className="two-field-grid">
+              <Button
+                icon={<ArrowsLeftRight aria-hidden="true" weight="bold" />}
+                loading={busy}
+                onClick={handleSwap}
+                type="button"
+                variant="secondary"
+              >
+                Swap Displays
+              </Button>
+              <Button
+                icon={<CheckCircle aria-hidden="true" weight="bold" />}
+                loading={busy}
+                type="submit"
+              >
+                Save Display
+              </Button>
+            </div>
+          </form>
+
+          <form className="settings-card settings-form" onSubmit={handleSaveGooglePhotos}>
+            <div className="settings-card__title">
+              <Images aria-hidden="true" weight="bold" />
+              <div>
+                <h2>Google Photos Shared Album Sync</h2>
+                <p>Live stream completed photo strips into an active Google Photos album.</p>
+              </div>
+            </div>
+
+            <div className="form-toggle">
+              <label htmlFor="google-photos-enabled">
+                <input
+                  id="google-photos-enabled"
+                  type="checkbox"
+                  checked={googlePhotosEnabled}
+                  onChange={(e) => setGooglePhotosEnabled(e.target.checked)}
+                />
+                <strong>Enable Google Photos Live Sync</strong>
+              </label>
+            </div>
+
+            <label>Google Account Authorization</label>
+            <div className="two-field-grid">
+              {googlePhotosEmail ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', padding: '0.5rem 0.75rem', color: '#4ade80' }}>
+                  <CheckCircle aria-hidden="true" weight="bold" />
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{googlePhotosEmail}</span>
+                </div>
+              ) : (
+                <Button
+                  icon={<Cloud aria-hidden="true" weight="bold" />}
+                  onClick={handleConnectGoogleOAuth}
+                  type="button"
+                  variant="secondary"
+                >
+                  Authorize Google Account
+                </Button>
+              )}
+              {googlePhotosEmail ? (
+                <Button
+                  icon={<Trash aria-hidden="true" weight="bold" />}
+                  onClick={handleDisconnectGoogle}
+                  type="button"
+                  variant="secondary"
+                >
+                  Disconnect
+                </Button>
+              ) : (
+                <Button
+                  icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                  onClick={onRefresh}
+                  type="button"
+                  variant="secondary"
+                >
+                  Check Auth Status
+                </Button>
+              )}
+            </div>
+
+            <label htmlFor="google-album-url">Google Photos Shared Album Link</label>
+            <div className="two-field-grid">
+              <input
+                id="google-album-url"
+                type="text"
+                placeholder="https://photos.app.goo.gl/..."
+                value={googlePhotosShareUrl}
+                onChange={(e) => setGooglePhotosShareUrl(e.target.value)}
+              />
+              <Button
+                icon={<LinkSimple aria-hidden="true" weight="bold" />}
+                onClick={handleResolveAlbum}
+                type="button"
+                variant="secondary"
+              >
+                Resolve
+              </Button>
+            </div>
+
+            {googlePhotosAlbumTitle ? (
+              <div className="info-banner" style={{ marginTop: '0.5rem' }}>
+                <CheckCircle aria-hidden="true" weight="bold" />
+                <span>Active Target: <strong>{googlePhotosAlbumTitle}</strong></span>
+              </div>
+            ) : null}
+
+            {googlePhotosShareUrl ? (
+              <div className="operator-share-hub" style={{ marginTop: '1rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+                    Operator Share Hub (For Guests Without Camera QR)
+                  </span>
+                </div>
+                <div className="two-field-grid">
+                  <Button
+                    icon={<Copy aria-hidden="true" weight="bold" />}
+                    onClick={handleCopyAlbumLink}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {copiedLink ? 'Copied to Clipboard!' : 'Copy Album Link'}
+                  </Button>
+                  <Button
+                    icon={<PaperPlaneTilt aria-hidden="true" weight="bold" />}
+                    onClick={handleTestGoogleUpload}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Send Test Photo
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="retention-values" style={{ marginTop: '1rem' }}>
+              <div>
+                <strong>{googleStats.syncedCount}</strong>
+                <span>Synced Strips</span>
+              </div>
+              <div>
+                <strong>{googleStats.pendingCount}</strong>
+                <span>Pending</span>
+              </div>
+              <div>
+                <strong>{googleStats.failedCount}</strong>
+                <span>Failed</span>
+              </div>
+            </div>
+
+            {googleFeedback ? (
+              <p style={{ fontSize: '0.9rem', color: 'var(--accent-color, #70b8ff)', margin: '0.5rem 0' }}>
+                {googleFeedback}
+              </p>
+            ) : null}
+
+            <Button
+              icon={<CheckCircle aria-hidden="true" weight="bold" />}
+              loading={busy}
+              type="submit"
+            >
+              Save Google Photos Config
             </Button>
           </form>
 

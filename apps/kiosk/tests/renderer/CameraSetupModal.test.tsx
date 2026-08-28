@@ -91,6 +91,14 @@ afterEach(() => {
 });
 
 describe('CameraSetupModal resolution preferences', () => {
+  it('places keyboard focus inside the dialog when it opens', async () => {
+    stubCamo(vi.fn(() => Promise.resolve(streamAt(1_280, 720))));
+    installBridge(vi.fn().mockResolvedValue(cameraConfiguration('webcam', null, '720p')));
+    render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus());
+  });
+
   it('loads Camo at the persisted 720p preference without hard minimum constraints', async () => {
     const stream = streamAt(1_280, 720);
     const getUserMedia = vi.fn(() => Promise.resolve(stream));

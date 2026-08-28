@@ -1,0 +1,30 @@
+ M apps/kiosk/src/main/cloud/delivery-client.ts
+ M apps/kiosk/src/main/cloud/e2e-delivery-client.ts
+ M apps/kiosk/src/main/frame/frame-service.ts
+ M apps/kiosk/src/main/gallery/recent-gallery-service.ts
+ M apps/kiosk/src/main/index.ts
+ M apps/kiosk/src/main/ipc/register-ipc.ts
+ M apps/kiosk/src/preload/index.ts
+ M docs/BUILD_FLOW_SUMMARY.md
+ M docs/SECURITY_AND_RETENTION.md
+ M docs/VERIFICATION.md
+ D infra/r2-cors.json
+ M packages/shared/src/cloud.ts
+ M packages/shared/src/domain.ts
+ M packages/shared/src/ipc.ts
+ M scripts/smoke-photo-delivery.mjs
+ M supabase/README.md
+ M supabase/config.toml
+ M supabase/functions/_shared/r2.ts
+ M supabase/functions/_shared/schemas.ts
+ M supabase/functions/deno.json
+ M supabase/functions/photo/index.ts
+ M supabase/functions/tests/photo_test.ts
+ M supabase/functions/tests/r2_test.ts
+ M supabase/tests/database/photo_delivery.test.sql
+?? supabase/functions/_shared/storage-verification.ts
+?? supabase/functions/repair-photo/
+?? supabase/functions/tests/repair_photo_test.ts
+?? supabase/functions/tests/repair_storage_backends_test.ts
+?? supabase/functions/tools/
+?? supabase/migrations/20260827000000_photo_storage_backend_repair.sql

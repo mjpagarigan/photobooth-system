@@ -69,30 +69,12 @@ The derivation key is independent of the cleanup and Supabase server keys. Routi
 
 The QR target is `https://<approved-public-origin>/photo#<token>`. URL fragments do not reach Cloudflare Pages or Supabase request paths. The public page sends the token only in strict POST bodies to `/photo/resolve`, `/photo/image`, and `/photo/download`. The application, page, and Functions never log those bodies. Unknown, expired, and deleted tokens receive the same public response shape; malformed requests fail validation before lookup.
 
-For private R2 delivery, image/download authorization HEADs and size-checks the object, rechecks the
-permanent token immediately before signing, and returns only a bodyless `303 See Other`. The signed
-GET is valid for at most 300 seconds and is clamped to the remaining permanent-token lifetime. The
-browser deliberately follows the redirect, accepts redirected JPEG bytes only from the configured
-R2 S3 API origin, and renders a blob URL. Signed URLs, credentials, authorization headers, tokens,
-and object paths are never logged or placed in application state, storage, analytics, or DOM text.
-
-The private bucket's complete browser CORS configuration is:
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://<exact-production-photo-origin>"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": [],
-    "ExposeHeaders": ["Content-Type", "Content-Length", "Content-Disposition"],
-    "MaxAgeSeconds": 300
-  }
-]
-```
-
-No wildcard origin/header, write method, or additional exposed response header is permitted. The
-public CSP lists the exact Supabase photo API and actual R2 presigned S3 origins in `connect-src`;
-`img-src` remains `'self' blob:` because the page never renders R2 URLs directly.
+For private delivery, resolve and image/download verify the object in the backend recorded on the
+row, validate size and JPEG metadata, then recheck token authorization. Image/download return bytes
+through the Edge Function; the browser rejects redirects and non-API response origins and renders a
+blob URL. R2 URLs, credentials, authorization headers, tokens, and object paths are never placed in
+browser state, storage, analytics, logs, or DOM text. The public CSP therefore lists only the exact
+Supabase photo API in `connect-src`; no browser-facing R2 CORS rule is needed.
 
 The bearer token grants access to one photo until its exact expiry. Anyone who receives the QR or copied URL can use it during that period. The public page therefore uses `no-store`, a restrictive CSP, no analytics, no third-party renderer requests, no referrer leakage, and no token in paths or query strings.
 
