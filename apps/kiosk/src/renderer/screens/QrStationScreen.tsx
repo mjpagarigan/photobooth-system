@@ -123,15 +123,18 @@ export function QrStationScreen(): React.ReactElement {
   // 1. Idle State: Full bleed background with top-right Recent Photos button
   if (stationState.status === 'idle' || !stationState.collageUrl || !stationState.qrImageUrl) {
     return (
-      <main className="screen screen--qr-station qr-station--idle" data-testid="qr-station-idle">
+      <main
+        className="screen screen--final screen--qr-station qr-station--idle"
+        data-testid="qr-station-idle"
+      >
         <img
-          className="qr-station__background"
+          className="final-background qr-station__background"
           src={idleBackground}
           alt=""
           aria-hidden="true"
           draggable="false"
         />
-        <div className="qr-station__top-controls">
+        <div className="final-top-controls qr-station__top-controls">
           <button
             className="operator-access recent-access"
             onClick={() => void openRecentGallery()}
@@ -157,16 +160,19 @@ export function QrStationScreen(): React.ReactElement {
 
   // 2. Active QR State: Collage preview + QR code + timer + actions
   return (
-    <main className="screen screen--qr-station qr-station--active" data-testid="qr-station-active">
+    <main
+      className="screen screen--final screen--qr-station qr-station--active"
+      data-testid="qr-station-active"
+    >
       <img
-        className="qr-station__background"
+        className="final-background qr-station__background"
         src={LOCAL_FIXTURES.finalBackground}
         alt=""
         aria-hidden="true"
         draggable="false"
       />
       <div className="final-scrim" aria-hidden="true" />
-      <div className="qr-station__top-controls">
+      <div className="final-top-controls qr-station__top-controls">
         <button
           className="operator-access recent-access"
           onClick={() => void openRecentGallery()}

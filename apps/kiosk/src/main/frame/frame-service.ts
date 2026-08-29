@@ -84,11 +84,11 @@ export const createMinistrySlots = (
   s1Y: number,
   s2Y: number,
   s3Y: number,
-  s1X: number = 0.075,
-  s2X: number = 0.073333,
-  s3X: number = 0.075,
-  width: number = 0.853333,
-  height: number = 0.163333,
+  s1X = 0.075,
+  s2X = 0.073333,
+  s3X = 0.075,
+  width = 0.853333,
+  height = 0.163333,
 ): FrameLayout =>
   FrameLayoutSchema.parse([
     { slotIndex: 1, name: 'Photo 1', x: s1X, y: s1Y, width, height, cropMode: 'crop-to-fill' },
@@ -96,7 +96,7 @@ export const createMinistrySlots = (
     { slotIndex: 3, name: 'Photo 3', x: s3X, y: s3Y, width, height, cropMode: 'crop-to-fill' },
   ]);
 
-export const MINISTRY_FRAMES: Array<{ name: string; file: string; slots: FrameLayout }> = [
+export const MINISTRY_FRAMES: { name: string; file: string; slots: FrameLayout }[] = [
   {
     name: 'NextGen Ministry',
     file: 'nextgen-frame.png',
@@ -308,21 +308,20 @@ export class FrameService {
         const filePath = join(framesDir, ministry.file);
         const bytes = await readFile(filePath);
         if (existing) {
-          // If the frame is an untouched shipped default (revision 0), ensure artwork and slots are up to date
-          if (existing.revision === 0) {
-            const isSlotMismatch = JSON.stringify(existing.slots) !== JSON.stringify(ministry.slots);
-            const normalized = await this.imageProcessor.normalizeFramePng(bytes);
-            const normalizedSha256 = createHash('sha256').update(normalized.bytes).digest('hex');
-            if (isSlotMismatch || existing.sha256 !== normalizedSha256) {
-              const imported = await this.importLibraryFrame(
-                ministry.name,
-                bytes,
-                ministry.slots,
-                existing.sortOrder,
-                [existing.id],
-              );
-              seeded.push(imported);
-            }
+          const normalized = await this.imageProcessor.normalizeFramePng(bytes);
+          const normalizedSha256 = createHash('sha256').update(normalized.bytes).digest('hex');
+          const isUntouchedShippedFrame = existing.revision === 0;
+          const isSlotMismatch = JSON.stringify(existing.slots) !== JSON.stringify(ministry.slots);
+          if (isSlotMismatch || existing.sha256 !== normalizedSha256) {
+            // Exact built-in names identify packaged ministry entries across releases. Artwork is
+            // authoritative, while operator-edited slot geometry is preserved on revised rows.
+            seeded.push(
+              this.replacePackagedArtwork(
+                existing,
+                normalized,
+                isUntouchedShippedFrame ? ministry.slots : undefined,
+              ),
+            );
           }
         } else {
           const imported = await this.importLibraryFrame(ministry.name, bytes, ministry.slots);
@@ -482,6 +481,42 @@ export class FrameService {
     const saved = this.repository.getFrame(frame.id);
     if (!saved) throw new AppError('frame_missing', 'The frame could not be saved.');
     return saved;
+  }
+
+  private replacePackagedArtwork(
+    existing: StoredFrame,
+    normalized: { bytes: Uint8Array; width: number; height: number },
+    slots?: FrameLayout,
+  ): StoredFrame {
+    if (!hasExactProductionStripAspect(normalized.width, normalized.height)) {
+      throw new AppError(
+        'frame_aspect',
+        'The frame must use an exact 1:3 vertical photobooth strip aspect.',
+      );
+    }
+    const stored = this.vault.write('frames', normalized.bytes);
+    try {
+      const updated = this.repository.updateFrameArtwork(
+        existing.id,
+        {
+          encryptedPath: stored.relativePath,
+          width: normalized.width,
+          height: normalized.height,
+          byteSize: stored.byteSize,
+          sha256: stored.sha256,
+        },
+        slots,
+      );
+      try {
+        this.vault.delete(existing.encryptedPath);
+      } catch {
+        // The updated row is authoritative; an already-missing superseded PNG is harmless.
+      }
+      return updated;
+    } catch (error) {
+      this.vault.delete(stored.relativePath);
+      throw error;
+    }
   }
 }
 

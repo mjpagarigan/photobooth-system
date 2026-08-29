@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -11,6 +11,7 @@ import {
   FrameService,
   MAT_FRAME_SLOTS,
   MAT_FRAME_NAME,
+  MINISTRY_FRAMES,
   SUPPORTED_FRAME_ASPECT,
 } from '../../src/main/frame/frame-service.js';
 import type { ImageProcessor } from '../../src/main/image/image-worker-client.js';
@@ -335,6 +336,43 @@ describe('packaged frame seeding', () => {
       expect(Array.isArray(ministryFrames)).toBe(true);
       const totalFrames = service.listFrames();
       expect(totalFrames.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('upgrades prior shipped ministry artwork while preserving edited slot geometry', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      PACKAGED_FRAMES,
+      passthroughProcessor(),
+    );
+    try {
+      const ministry = MINISTRY_FRAMES[0]!;
+      const previous = await service.importFrame(
+        ministry.name,
+        Buffer.from('previous shipped ministry artwork'),
+        ministry.slots,
+      );
+      const editedSlots = previous.slots.map((slot, index) =>
+        index === 0 ? { ...slot, x: slot.x + 0.005 } : slot,
+      );
+      const edited = service.updateLayout(previous.id, previous.name, editedSlots, previous.revision);
+      const previousArtworkHash = edited.sha256;
+
+      await service.ensureMinistryFrames();
+
+      const upgraded = store.repository.getFrame(edited.id);
+      const packagedBytes = readFileSync(
+        fileURLToPath(new URL(`../../resources/frames/${ministry.file}`, import.meta.url)),
+      );
+      expect(upgraded?.id).toBe(edited.id);
+      expect(upgraded?.sha256).toBe(createHash('sha256').update(packagedBytes).digest('hex'));
+      expect(upgraded?.sha256).not.toBe(previousArtworkHash);
+      expect(upgraded?.slots).toEqual(editedSlots);
+      expect(upgraded?.revision).toBeGreaterThan(edited.revision);
     } finally {
       store.close();
     }

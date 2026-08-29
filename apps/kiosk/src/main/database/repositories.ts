@@ -521,6 +521,42 @@ export class LocalRepository {
     return frame;
   }
 
+  updateFrameArtwork(
+    frameId: string,
+    artwork: Pick<StoredFrame, 'encryptedPath' | 'width' | 'height' | 'byteSize' | 'sha256'>,
+    slots?: FrameLayout,
+    now = Date.now(),
+  ): StoredFrame {
+    const validatedSlots = slots === undefined ? undefined : FrameLayoutSchema.parse(slots);
+    this.database.raw.transaction(() => {
+      const result = this.database.raw
+        .prepare(
+          `UPDATE frames SET encrypted_path = ?, width = ?, height = ?, byte_size = ?, sha256 = ?,
+            revision = revision + 1, updated_at = ? WHERE id = ?`,
+        )
+        .run(
+          artwork.encryptedPath,
+          artwork.width,
+          artwork.height,
+          artwork.byteSize,
+          artwork.sha256,
+          now,
+          frameId,
+        );
+      if (result.changes !== 1) {
+        throw new AppError('frame_missing', 'The selected frame no longer exists.');
+      }
+      if (validatedSlots !== undefined) {
+        this.database.raw.prepare('DELETE FROM frame_slots WHERE frame_id = ?').run(frameId);
+        this.insertFrameSlots(frameId, validatedSlots);
+      }
+      this.recordAudit('frame_change', 'success', 'artwork_updated', now);
+    })();
+    const frame = this.getFrame(frameId);
+    if (!frame) throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    return frame;
+  }
+
   createSession(sessionId: string, now = Date.now()): StoredSession {
     this.database.raw
       .prepare(
@@ -1422,7 +1458,7 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     cameraResolution: row.camera_resolution === '720p' ? '720p' : '1080p',
     supabaseUrl: row.supabase_url,
     supabasePublishableKey: row.supabase_publishable_key,
-    dualDisplayMode: (row.dual_display_mode as DualDisplayMode) || 'auto',
+    dualDisplayMode: (row.dual_display_mode as DualDisplayMode | null) ?? 'auto',
     swapDisplays: row.swap_displays === 1,
     qrDismissSeconds: row.qr_dismiss_seconds || 45,
     googlePhotosEnabled: row.google_photos_enabled === 1,

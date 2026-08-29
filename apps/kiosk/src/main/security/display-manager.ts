@@ -3,6 +3,7 @@ import type { DisplayInfo, DualDisplaySettings } from '@grace-booth/shared';
 import { BrowserWindow, screen, type Display } from 'electron';
 
 import type { LocalRepository } from '../database/repositories.js';
+import { isDualDisplayModeActive, selectDisplayRoles } from './dual-display-policy.js';
 import {
   getRendererTarget,
   isAllowedKioskPermission,
@@ -38,8 +39,10 @@ export class DisplayManager {
     screen.on('display-added', this.onDisplayAddedHandler);
     screen.on('display-removed', this.onDisplayRemovedHandler);
 
+    const captureWindow = this.captureWindow;
+    if (!captureWindow) throw new Error('Capture display window was not created');
     return {
-      captureWindow: this.captureWindow!,
+      captureWindow,
       rendererOrigin: this.rendererOrigin,
     };
   }
@@ -55,9 +58,7 @@ export class DisplayManager {
   isDualActive(): boolean {
     const displays = screen.getAllDisplays();
     const settings = this.repository.getSettings();
-    if (settings.dualDisplayMode === 'disabled') return false;
-    if (settings.dualDisplayMode === 'enabled') return displays.length >= 2;
-    return displays.length >= 2; // 'auto'
+    return isDualDisplayModeActive(settings.dualDisplayMode, displays.length);
   }
 
   getDisplays(): DisplayInfo[] {
@@ -102,10 +103,9 @@ export class DisplayManager {
     const displays = screen.getAllDisplays();
     const settings = this.repository.getSettings();
     const isDual = this.isDualActive();
-
-    const displayOrder = settings.swapDisplays && displays.length >= 2 ? [...displays].reverse() : displays;
-    const captureDisplay = displayOrder[0] ?? screen.getPrimaryDisplay();
-    const qrDisplay = isDual ? (displayOrder[1] ?? null) : null;
+    const roles = selectDisplayRoles(displays, screen.getPrimaryDisplay(), settings.swapDisplays);
+    const captureDisplay = roles.capture;
+    const qrDisplay = isDual ? roles.qrStation : null;
 
     // 1. Capture Window
     if (!this.captureWindow || this.captureWindow.isDestroyed()) {

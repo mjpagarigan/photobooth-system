@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import sharp from 'sharp';
@@ -8,21 +8,6 @@ const TARGET_HEIGHT = 3600;
 const TRANSPARENT_ALPHA_MAX = 8;
 const WINDOW_PADDING = 3;
 const MIN_WINDOW_PIXELS = 10_000;
-
-const createMinistrySlots = (
-  s1Y,
-  s2Y,
-  s3Y,
-  s1X = 0.075,
-  s2X = 0.073333,
-  s3X = 0.075,
-  width = 0.853333,
-  height = 0.163333,
-) => [
-  { slotIndex: 1, name: 'Photo 1', x: s1X, y: s1Y, width, height, cropMode: 'crop-to-fill' },
-  { slotIndex: 2, name: 'Photo 2', x: s2X, y: s2Y, width, height, cropMode: 'crop-to-fill' },
-  { slotIndex: 3, name: 'Photo 3', x: s3X, y: s3Y, width, height, cropMode: 'crop-to-fill' },
-];
 
 const ALL_TEMPLATES = [
   {
@@ -137,9 +122,14 @@ const ALL_TEMPLATES = [
   },
 ];
 
-const templateDir = process.argv[2] === '--all' || !process.argv[2]
-  ? 'C:/Users/padil/mj/photolayout-templates'
-  : null;
+const allTemplatesArgument = process.argv.indexOf('--all');
+const templateDir = allTemplatesArgument >= 0 ? process.argv[allTemplatesArgument + 1] : null;
+
+if (allTemplatesArgument >= 0 && !templateDir) {
+  throw new Error(
+    'Usage: pnpm --filter @grace-booth/kiosk frames:prepare --all <template-directory>',
+  );
+}
 
 const { existsSync } = await import('node:fs');
 
@@ -183,6 +173,11 @@ if (templateDir) {
     }
   }
 } else {
+  if (!process.argv[2] || !process.argv[3]) {
+    throw new Error(
+      'Usage: pnpm --filter @grace-booth/kiosk frames:prepare <mat.png> <anniversary.png>',
+    );
+  }
   const inputs = [
     {
       name: 'M.A.T. Anniversary',
@@ -201,45 +196,38 @@ if (templateDir) {
   }
 }
 
-async function prepareMinistryFrame({ name, source, target, slots }) {
+async function prepareMinistryFrame({ name, source, target }) {
   const sourcePath = resolve(source);
   const targetPath = resolve(target);
-  const { data, info } = await sharp(sourcePath)
-    .resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const windows = slots.map((slot) => ({
-    minX: Math.round(slot.x * TARGET_WIDTH),
-    minY: Math.round(slot.y * TARGET_HEIGHT),
-    maxX: Math.round((slot.x + slot.width) * TARGET_WIDTH) - 1,
-    maxY: Math.round((slot.y + slot.height) * TARGET_HEIGHT) - 1,
-  }));
-
-  for (let y = 0; y < info.height; y += 1) {
-    for (let x = 0; x < info.width; x += 1) {
-      const idx = (y * info.width + x) * info.channels;
-      const isInside = windows.some((w) => x >= w.minX && x <= w.maxX && y >= w.minY && y <= w.maxY);
-      if (isInside || data[idx + 3] < 200) {
-        data[idx + 3] = 0;
-      }
-    }
+  const sourceBytes = await readFile(sourcePath);
+  const image = sharp(sourceBytes, { failOn: 'warning' });
+  const metadata = await image.metadata();
+  if (
+    metadata.format !== 'png' ||
+    !metadata.hasAlpha ||
+    !metadata.width ||
+    !metadata.height ||
+    metadata.width * 3 !== metadata.height
+  ) {
+    throw new Error(
+      `${name} must be a transparent 1:3 PNG; received ${metadata.format ?? 'unknown'} ${metadata.width ?? 0}x${metadata.height ?? 0}`,
+    );
+  }
+  const alpha = (await image.stats()).channels.at(-1);
+  if (alpha?.min === undefined || alpha.min >= 255) {
+    throw new Error(`${name} must contain transparent photo windows`);
   }
 
   await mkdir(dirname(targetPath), { recursive: true });
-  const pngBuffer = await sharp(data, {
-    raw: { width: info.width, height: info.height, channels: info.channels },
-  })
-    .png({ compressionLevel: 9, adaptiveFiltering: false })
-    .toBuffer();
-
-  const { writeFile, unlink } = await import('node:fs/promises');
   let written = false;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      try { await unlink(targetPath); } catch {}
-      await writeFile(targetPath, pngBuffer);
+      try { await unlink(targetPath); } catch {
+        // The first generation has no previous target to remove.
+      }
+      // Preserve the designer-authored alpha mask exactly. Opaque foreground details can
+      // intentionally overlap a transparent photo window and must not be cleared here.
+      await writeFile(targetPath, sourceBytes);
       written = true;
       break;
     } catch {
@@ -247,7 +235,7 @@ async function prepareMinistryFrame({ name, source, target, slots }) {
     }
   }
   if (!written) {
-    await writeFile(targetPath, pngBuffer);
+    await writeFile(targetPath, sourceBytes);
   }
 
   process.stdout.write(`Generated ${name}: ${targetPath}\n`);

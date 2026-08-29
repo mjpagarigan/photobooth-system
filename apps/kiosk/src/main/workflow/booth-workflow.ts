@@ -28,7 +28,7 @@ const CANCELLABLE_STATES: readonly SessionState[] = ['countdown', 'capturing', '
 export type BoothWorkflowOptions = {
   shotCountdownsMs: readonly [number, number, number];
   cameraPreviewEnabled?: boolean;
-  isDualDisplayActive?: () => boolean;
+  isDualDisplayActive: () => boolean;
   now?: () => number;
 };
 
@@ -148,9 +148,7 @@ export class BoothWorkflow {
   }
 
   isDualDisplayActive(): boolean {
-    if (this.options.isDualDisplayActive) return this.options.isDualDisplayActive();
-    const settings = this.repository.getSettings();
-    return settings.dualDisplayMode === 'enabled';
+    return this.options.isDualDisplayActive();
   }
 
   getSnapshot(): BoothSnapshot {

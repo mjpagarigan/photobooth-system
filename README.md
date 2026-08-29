@@ -1,6 +1,6 @@
 # M.A.T. PHOTOBOOTH
 
-M.A.T. Photobooth is an offline-first Windows kiosk for ministry and event photography. It captures three photos with a five-second countdown for each shot, lets the guest review or retake the set, creates the framed photostrip locally, and presents a QR code for download.
+M.A.T. Photobooth is an offline-first Windows kiosk for ministry and event photography. It captures three photos with an eight-second opening countdown and five-second follow-up countdowns, lets the guest review or retake the set, creates the framed photostrip locally, and presents a QR code for download.
 
 The Electron renderer is sandboxed and context-isolated. Local photos are encrypted at rest, operational state is stored in SQLite, image processing runs through Sharp in a worker, and cloud delivery uses a private Supabase-backed workflow.
 
@@ -22,6 +22,7 @@ The Electron renderer is sandboxed and context-isolated. Local photos are encryp
 - A built-in or USB UVC webcam
 - Internet access when cloud QR delivery is required
 - A display resolution of at least 1280x720
+- An optional second display configured in Windows as an extended desktop for dual-monitor delivery
 
 Deno, Docker Desktop, and the Supabase CLI are only required for local backend development. They are not required to install or operate an already packaged kiosk.
 
@@ -92,17 +93,19 @@ On the first successful launch:
 6. Under **Cloud connection**, leave **Supabase Project URL** and **Supabase Publishable / Anon Key** blank to use the production project embedded in the official build. Enter only the assigned booth-account email and password, then click **Connect cloud**.
 7. Never enter a Supabase Dashboard-owner password, `sb_secret_...` key, or legacy `service_role` key in the kiosk.
 8. Confirm that camera, database, encrypted storage, and cloud health are reported correctly.
-9. Open **Frame Editor** and switch between **Collage 1 · M.A.T.** and **Collage 2 · Anniversary**. Verify that each packaged frame has its own three photo-slot outlines. Replacing artwork or saving slot geometry affects only the active collage; there are no separate layout presets.
+9. Open **Frame Editor** and inspect the complete frame library: two legacy anniversary layouts plus eleven transparent ministry layouts. Verify that every layout has three photo-slot outlines.
 10. Save only if you intentionally changed a frame or its slot geometry, return to the booth, and complete one test session.
-11. Confirm all three five-second countdowns, both choices on **Choose your collage**, Retake, Processing, the selected final photostrip, QR scanning, download, and **Done** behavior.
+11. Confirm the eight-second first countdown, both five-second follow-up countdowns, the complete **Choose your collage** library, Retake, Processing, the selected final photostrip, QR scanning, download, and **Done** behavior.
+
+The eleven ministry frame artworks are release-managed. On startup, a newer package refreshes artwork for those exact built-in names while preserving operator-edited slot geometry. Operator-imported frames are never replaced automatically.
 
 LAN admin access is disabled by default. Enable it only on a trusted private network and configure the required TLS certificate first.
 
 ## Guest workflow
 
 1. The **Ministry Fair** attract screen starts a new session.
-2. The camera takes three photos, each beginning with a five-second countdown.
-3. **Choose your collage** previews all three captures in both the M.A.T. and Anniversary frames, using the same slot geometry as the generated result.
+2. The camera takes three photos: the first begins with an eight-second countdown and the next two use five seconds each.
+3. **Choose your collage** previews all three captures in every enabled frame-library layout, using the same slot geometry as the generated result.
 4. Select the desired collage. **Retake all photos** restarts the complete sequence; **Use these photos** continues with the selected frame.
 5. **Processing** creates the selected collage locally and performs delivery.
 6. **All set!** shows the complete photostrip and a scannable QR code.
@@ -110,10 +113,10 @@ LAN admin access is disabled by default. Enable it only on a trusted private net
 
 ## Dual-monitor & multi-display setup
 
-Grace Booth supports dual-display operation to separate the interactive capture experience from the public QR delivery screen.
+Grace Booth supports dual-display operation to separate the interactive capture experience from the public QR delivery screen. In Windows **Display settings**, choose **Extend these displays**; Duplicate/Mirror mode is reported as one desktop and cannot host the delivery window.
 
 - **Screen 1 (Primary / Guest Viewfinder)**: Displays the Attract loop, interactive countdowns, live camera viewfinder, and collage review stage.
-- **Screen 2 (Secondary / QR Delivery Display)**: Dedicated guest-facing display showing the completed photostrip and high-contrast QR code for instant smartphone scanning, freeing up the primary screen for the next group.
+- **Screen 2 (Secondary / QR Delivery Display)**: Shows the M.A.T. logo background and a top-right **Recent** control while idle. During delivery it shows the finished photostrip on the left, the QR panel and configured timer on the right, and keeps **Recent** at the top-right while Screen 1 resets for the next group.
 
 ### Display configuration options
 
@@ -121,7 +124,7 @@ Open **Admin > Settings & Health > Dual-Monitor Setup**:
 
 1. **Dual Display Mode**:
    - `Auto`: Automatically enables dual-screen mode whenever 2 or more physical displays are detected.
-   - `Force Enabled`: Keeps the secondary delivery window active.
+   - `Force Enabled`: Explicitly selects dual-display operation; a second extended display must still be detected.
    - `Disabled`: Restricts the application to single-monitor operation.
 2. **Display Swapping**: Click **Swap Displays** to quickly interchange the primary capture window and secondary delivery window without reconfiguring Windows display settings.
 3. **QR Auto-Dismiss Duration**: Set the timer (30s, 45s default, 60s, or 90s) after which the secondary delivery screen automatically clears to protect privacy and prepare for subsequent guest sessions.
@@ -346,6 +349,7 @@ pnpm typecheck
 pnpm test
 pnpm lint
 pnpm format:check
+pnpm build:all
 pnpm test:e2e
 ```
 
@@ -455,6 +459,14 @@ On a network that blocks GitHub release downloads, configure an approved Electro
 5. Confirm the assigned booth user is active and enrolled in `booth_devices`.
 6. Reconnect the dedicated booth account if its session expired.
 7. Inspect **Upload Queue & Retry Buffer** and retry failed jobs after connectivity returns.
+
+### The extended display does not open
+
+1. In Windows **Display settings**, select **Extend these displays**, not Duplicate.
+2. Confirm Windows shows two displays before starting Grace Booth.
+3. Open **Admin > Settings & Health > Dual-Monitor Setup** and select `Auto` or `Force Enabled`.
+4. Use **Swap Displays** if capture and QR delivery appear on the wrong screens.
+5. Save the display settings, then reconnect the monitor or restart Grace Booth if Windows detected it only after startup.
 
 ### Logs and failure evidence
 

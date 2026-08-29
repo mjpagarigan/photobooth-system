@@ -122,7 +122,11 @@ describe('booth workflow camera recovery', () => {
       imageProcessor,
       queue as unknown as UploadQueue,
       qrService,
-      { shotCountdownsMs: [60_000, 60_000, 60_000], now: () => 2_000 },
+      {
+        shotCountdownsMs: [60_000, 60_000, 60_000],
+        isDualDisplayActive: () => false,
+        now: () => 2_000,
+      },
     );
     await workflow.initialize();
 
@@ -276,7 +280,11 @@ describe('booth workflow camera recovery', () => {
       imageProcessor,
       queue as unknown as UploadQueue,
       qrService,
-      { shotCountdownsMs: [60_000, 60_000, 60_000], now: () => 2_000 },
+      {
+        shotCountdownsMs: [60_000, 60_000, 60_000],
+        isDualDisplayActive: () => false,
+        now: () => 2_000,
+      },
     );
     await workflow.initialize();
 
@@ -703,6 +711,7 @@ function createWorkflow(
       qrService,
       {
         shotCountdownsMs: overrides.shotCountdownsMs ?? [60_000, 60_000, 60_000],
+        isDualDisplayActive: () => false,
         now: overrides.now ?? (() => 2_000),
       },
     ),

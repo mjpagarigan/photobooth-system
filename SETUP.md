@@ -10,6 +10,7 @@ Use a Windows x64 workstation with:
 - Node.js 24.x.
 - pnpm 11.x through Corepack.
 - At least 4 GB of free disk space for dependencies, test browsers, and package output.
+- An optional second monitor configured as an extended Windows desktop for dual-display delivery.
 - Docker Desktop or a compatible container runtime only when running the local Supabase database suite.
 
 The current development host can build the app but runs Windows 10 build 19045, which is past standard support. Do not use it as an unattended production booth without Windows 10 ESU.
@@ -39,7 +40,7 @@ Do not run a broad native rebuild. The kiosk packages the pinned N-API binaries 
 
 ## 3. Local configuration
 
-Use `.env.example` as a name and value reference. The Electron main process intentionally reads only its inherited OS or service environment; it does not parse a project `.env` file. Set kiosk values in the launching PowerShell session or in the approved Windows service wrapper, never in renderer build variables.
+Use `.env.example` as a name and value reference. Development builds load a local `.env` from the repository or kiosk directory when present; inherited PowerShell values still take precedence in normal Node environment handling. Packaged builds deliberately do not load project `.env` files. Never put kiosk secrets in renderer build variables.
 
 The kiosk defaults to `WebcamCameraAdapter`, which uses the laptop or system camera. Set `GRACE_BOOTH_CAMERA_ADAPTER=mock` to run the deterministic fixture flow instead; `sony` stays gated (see section 13). The local flow needs no cloud key or hosted account. Cloud settings require both values or neither:
 
@@ -107,22 +108,22 @@ Passcode verification uses serialized scrypt with a fresh 32-byte salt, a 64-byt
 
 The booth stores runtime data under Electron's per-user application-data directory. Do not move or copy individual encrypted asset files. Recovery depends on the database, sealed installation key, secret store, and encrypted asset tree remaining together under the same Windows user profile.
 
-## 6. Mock camera acceptance flow
+## 6. Camera acceptance flow
 
-The packaged mock camera is the only supported MVP adapter. Its preview is explicitly illustrative and its captures come from four packaged deterministic JPEG fixtures.
+Normal operation uses a built-in or USB UVC webcam selected from the operator camera setup. The deterministic mock adapter is for development and automated acceptance only; its captures come from packaged JPEG fixtures.
 
 Verify the guest flow:
 
 1. Start a session.
-2. Complete four real eight-second countdowns.
-3. Review all four captures.
+2. Complete the eight-second opening countdown and both five-second follow-up countdowns.
+3. Review all three captures.
 4. Use **Retake all photos** at least once and complete a replacement round.
 5. Use the replacement photos.
 6. Observe local processing and the upload milestones.
 7. If no cloud project is configured, verify the calm upload recovery screen and that it says the photo remains saved on the booth.
 8. With an approved test project configured, verify that the QR appears only after upload confirmation succeeds.
-9. Leave the Final screen open for more than ten minutes; it must remain available.
-10. Select **Done** and confirm focus returns to **Start Session**.
+9. In single-display mode, select **Done** and confirm focus returns to **Start Session**.
+10. With Windows configured to extend onto a second monitor, confirm Screen 1 returns to Attract immediately while Screen 2 shows the finished strip, QR code, top-right **Recent** control, and the operator-configured auto-dismiss timer.
 
 Retake-all preserves prior rounds. Upload failure never discards the local collage. Restart recovery reconciles persisted sessions and resumes valid review, processing, upload, or final work.
 
@@ -134,12 +135,12 @@ The Frame Editor accepts only a decoded PNG that:
 
 - Is no larger than 5 MiB.
 - Has real transparency.
-- Matches the supported 4:5 portrait collage aspect (the shipped default frame is 3375 x 4219).
+- Uses the exact 1:3 vertical photostrip aspect; packaged frames are 1200 x 3600.
 - Decodes within the image safety limits.
 
-Regenerate the shipped default frame from source artwork with `pnpm --filter @grace-booth/kiosk frame:build <source.png>`, then confirm the photo cutouts with `pnpm --filter @grace-booth/kiosk frame:verify`. A booth that already auto-imported an older default picks up a replacement default on its next start; operator-imported frames are never overwritten.
+Regenerate a legacy green-screen frame from approved source artwork with `pnpm --filter @grace-booth/kiosk frame:build <source.png> [target.png]`, then confirm the two packaged legacy frame cutouts with `pnpm --filter @grace-booth/kiosk frame:verify`. To import an approved directory containing all eleven transparent ministry templates, run `pnpm --filter @grace-booth/kiosk frames:prepare --all <template-directory>`. Commit the resulting files under `apps/kiosk/resources/frames`; packaging copies that directory into the application resources.
 
-Exactly four normalized slots are retained. Dragging and resizing have keyboard-equivalent X, Y, width, and height fields expressed as percentages. Each slot supports center-fill or fit. Save operations are revision-checked and atomic.
+Exactly three normalized slots are retained per frame. Dragging and resizing have keyboard-equivalent X, Y, width, and height fields expressed as percentages. Each slot supports crop-to-fill or fit. Save operations are revision-checked and atomic. The shipped library contains two legacy anniversary layouts and eleven transparent ministry layouts. A release refreshes the eleven exact ministry names while preserving revised slot geometry; operator-imported frames are never overwritten.
 
 Admin Settings provides:
 
@@ -148,6 +149,7 @@ Admin Settings provides:
 - Upload queue inspection and manual retry.
 - Passcode change.
 - Camera and cloud health.
+- Dual-monitor mode, display swapping, and a 30/45/60/90-second QR auto-dismiss timer.
 - LAN administration configuration, disabled by default.
 
 ## 8. Local administration and optional LAN HTTPS
@@ -285,7 +287,7 @@ pnpm lint
 pnpm format:check
 pnpm typecheck
 pnpm test
-pnpm build
+pnpm build:all
 pnpm test:e2e
 pnpm native:self-test
 ```
@@ -298,10 +300,10 @@ If Docker is available, also run the pgTAP command in section 9. If a hosted tes
 
 ## 12. Build and inspect the Windows installer
 
-Build the application, validate native modules under Electron, and create the unsigned x64 NSIS installer:
+Build the kiosk, validate native modules under Electron, and create the unsigned x64 NSIS installer:
 
 ```powershell
-pnpm build
+pnpm --filter @grace-booth/kiosk build
 pnpm native:self-test
 pnpm dist:win
 ```

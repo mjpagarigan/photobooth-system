@@ -1248,6 +1248,38 @@ body,
 }
 
 /* ==========================================================================
+   SCREEN: EXTENDED DISPLAY QR STATION
+   ========================================================================== */
+
+.screen--qr-station {
+  background: #000000;
+}
+
+.qr-station__background {
+  object-fit: cover;
+}
+
+.qr-station--idle .qr-station__background {
+  object-fit: contain;
+}
+
+.qr-station__timer-bar {
+  width: 100%;
+  height: 6px;
+  margin: 0 0 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.qr-station__timer-progress {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width 500ms linear;
+}
+
+/* ==========================================================================
    SCREEN: RECOVERY
    ========================================================================== */
 

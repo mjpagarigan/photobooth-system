@@ -107,6 +107,12 @@ async function startApplication(): Promise<void> {
   const vault = new PhotoVault(paths, secrets);
   const database = openBoothDatabase(paths.database, migrationsDirectory);
   const repository = new LocalRepository(database);
+  const displayManager = new DisplayManager(
+    appPath,
+    app.isPackaged,
+    process.env.ELECTRON_RENDERER_URL,
+    repository,
+  );
   const retention = new RetentionService(repository, vault, secrets, paths);
   const recovery = retention.recoverAfterRestart(now());
   const cleanup = retention.cleanupExpired(now());
@@ -175,6 +181,7 @@ async function startApplication(): Promise<void> {
       shotCountdownsMs: config.shotCountdownsMs,
       cameraPreviewEnabled:
         initialCameraAdapter === 'webcam' || initialCameraAdapter === 'internal_webcam',
+      isDualDisplayActive: () => displayManager.isDualActive(),
       now,
     },
   );
@@ -215,13 +222,6 @@ async function startApplication(): Promise<void> {
   await workflow.initialize();
 
   const target = getRendererTarget(app.isPackaged, process.env.ELECTRON_RENDERER_URL);
-  const displayManager = new DisplayManager(
-    appPath,
-    app.isPackaged,
-    process.env.ELECTRON_RENDERER_URL,
-    repository,
-  );
-
   const removeIpcHandlers = registerIpcHandlers({
     workflow,
     camera,
@@ -237,7 +237,7 @@ async function startApplication(): Promise<void> {
     recentGallery,
     displayManager,
     rendererOrigin: target.origin,
-    onNetworkSettingsChanged: () => serverManager?.requestReconfigure(),
+    onNetworkSettingsChanged: () => serverManager.requestReconfigure(),
   });
 
   const { captureWindow } = await displayManager.initialize();
