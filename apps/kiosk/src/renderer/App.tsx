@@ -151,7 +151,8 @@ export function App() {
   // The webcam stream exists only inside an active capture window (countdown or shutter); it is
   // released as soon as the session leaves those states so no track stays live while idle.
   const captureWindowOpen = snapshot.screen === 'countdown' || snapshot.screen === 'capturing';
-  const liveCameraEnabled = !visualSeed && snapshot.cameraPreviewEnabled && captureWindowOpen;
+  const liveCameraEnabled =
+    !visualSeed && snapshot.cameraPreviewEnabled && captureWindowOpen && !cameraSetupOpen;
   const camera = useCameraStream(
     liveCameraEnabled,
     selectedCameraDeviceId,

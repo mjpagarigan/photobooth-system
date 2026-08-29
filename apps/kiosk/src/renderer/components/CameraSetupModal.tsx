@@ -49,6 +49,11 @@ type CameraSetupModalProps = {
   ) => void;
 };
 
+const RESOLUTION_ITEMS = [
+  { label: '720p (1280 × 720) — virtual cameras and testing', value: '720p' as const },
+  { label: '1080p (1920 × 1080) — production quality', value: '1080p' as const },
+];
+
 export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetupModalProps) {
   const [selectedAdapter, setSelectedAdapter] = useState<CameraAdapterKind>('webcam');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -64,20 +69,48 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const webcamSelected = isWebcamCameraAdapter(selectedAdapter);
   const previewEnabled = isOpen && configurationLoaded && webcamSelected;
   const cameraStream = useCameraStream(previewEnabled, selectedDeviceId, selectedResolution);
-  const deviceItems = useMemo(
-    () => [
+  const deviceItems = useMemo(() => {
+    const items: { label: string; value: string }[] = [
       { label: 'Default system webcam', value: '' },
-      ...videoDevices.map((device) => ({
-        label: device.label || `Camera (${device.deviceId.slice(0, 8)})`,
+    ];
+    let foundSelected = !selectedDeviceId;
+    for (const device of videoDevices) {
+      if (device.deviceId === selectedDeviceId) {
+        foundSelected = true;
+      }
+      items.push({
+        label: device.label.length > 0 ? device.label : `Camera (${device.deviceId.slice(0, 8)})`,
         value: device.deviceId,
-      })),
-    ],
-    [videoDevices],
-  );
-  const resolutionItems = [
-    { label: '720p (1280 × 720) — virtual cameras and testing', value: '720p' as const },
-    { label: '1080p (1920 × 1080) — production quality', value: '1080p' as const },
-  ];
+      });
+    }
+    if (!foundSelected && selectedDeviceId) {
+      items.push({
+        label: `Camera (${selectedDeviceId.slice(0, 8)})`,
+        value: selectedDeviceId,
+      });
+    }
+    return items;
+  }, [selectedDeviceId, videoDevices]);
+
+  const selectedDeviceLabel = useMemo(() => {
+    const match = deviceItems.find((item) => item.value === (selectedDeviceId ?? ''));
+    return match?.label ?? (selectedDeviceId ? `Camera (${selectedDeviceId.slice(0, 8)})` : 'Default system webcam');
+  }, [deviceItems, selectedDeviceId]);
+
+  const selectedResolutionLabel = useMemo(() => {
+    const match = RESOLUTION_ITEMS.find((item) => item.value === selectedResolution);
+    return match?.label ?? '1080p (1920 × 1080) — production quality';
+  }, [selectedResolution]);
+
+  useEffect(() => {
+    if (cameraStream.ready) {
+      void enumerateVideoDevices().then((devices) => {
+        if (devices.length > 0) {
+          setVideoDevices(devices);
+        }
+      });
+    }
+  }, [cameraStream.ready]);
 
   const loadCameras = async () => {
     if (typeof window === 'undefined' || !window.graceBooth) return;
@@ -214,7 +247,11 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                     value={selectedDeviceId ?? ''}
                     onValueChange={(value) => setSelectedDeviceId(value ?? null)}
                   >
-                    <SelectTrigger aria-label="Active device node"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label="Active device node">
+                      <SelectValue placeholder="Default system webcam">
+                        {selectedDeviceLabel}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
                       {deviceItems.map((item) => (
                         <SelectItem key={item.value ? item.value : 'default'} value={item.value}>{item.label}</SelectItem>
@@ -238,13 +275,17 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               <Field className="camera-device-select-row">
                 <FieldLabel>Capture resolution</FieldLabel>
                 <Select
-                  items={resolutionItems}
+                  items={RESOLUTION_ITEMS}
                   value={selectedResolution}
                   onValueChange={(value) => value !== null && setSelectedResolution(value)}
                 >
-                  <SelectTrigger aria-label="Capture resolution"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Capture resolution">
+                    <SelectValue placeholder="Select resolution">
+                      {selectedResolutionLabel}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
-                    {resolutionItems.map((item) => (
+                    {RESOLUTION_ITEMS.map((item) => (
                       <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                     ))}
                   </SelectPopup>

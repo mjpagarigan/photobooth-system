@@ -1,7 +1,7 @@
 # Ticket — Camera lifecycle: fresh acquisition per capture window + per-shot timers
 
 Label: wayfinder:task (fixes 1, 5, 6)
-Status: open
+Status: closed
 
 ## Question
 
@@ -9,7 +9,10 @@ How does the kiosk acquire, refresh, and release the webcam so that (a) a restar
 
 ## Resolution
 
-(to be recorded after execution)
+- **App vs Modal Stream Isolation**: Prevented camera device locking in Windows/DirectShow by ensuring `liveCameraEnabled` in `App.tsx` is disarmed whenever `cameraSetupOpen` is active (`!cameraSetupOpen`).
+- **Normalized Device Selection**: Handled whitespace and nullish device strings in `useCameraStream.ts` without dropping selected hardware constraints.
+- **Dynamic Device Label Refreshing**: `CameraSetupModal.tsx` now listens to `cameraStream.ready` to re-enumerate media devices once access is granted, updating device labels from raw hashes to human-readable strings, and explicitly formats `SelectValue` labels.
+- **Robust Video Element Playback**: Safely calls `element.play()` upon stream assignment with environment capability checks.
 
 ## Key facts from recon
 

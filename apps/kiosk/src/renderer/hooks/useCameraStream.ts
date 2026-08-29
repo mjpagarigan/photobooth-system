@@ -60,7 +60,9 @@ function candidateConstraints(
     width: { ideal: dimensions.width },
     height: { ideal: dimensions.height },
   };
-  if (deviceId) return { ...base, deviceId: { exact: deviceId } };
+  const trimmed = deviceId?.trim();
+  const normalizedId = trimmed && trimmed.length > 0 ? trimmed : null;
+  if (normalizedId) return { ...base, deviceId: { exact: normalizedId } };
   const firstAvailable = devices[0]?.deviceId;
   if (firstAvailable) return { ...base, deviceId: { exact: firstAvailable } };
   return { ...base, facingMode: 'user' };
@@ -290,7 +292,12 @@ export function useCameraStream(
       if (previous && previous !== element) previous.srcObject = null;
       videoElementRef.current = element;
       if (!element) return;
-      if (element.srcObject !== state.stream) element.srcObject = state.stream;
+      if (element.srcObject !== state.stream) {
+        element.srcObject = state.stream;
+        if (state.stream && typeof element.play === 'function') {
+          void element.play().catch(() => undefined);
+        }
+      }
       const stream = state.stream;
       if (stream && state.resolution === null) {
         applyIntrinsicResolution(element, stream);
@@ -306,7 +313,12 @@ export function useCameraStream(
 
   useEffect(() => {
     const element = videoElementRef.current;
-    if (element && element.srcObject !== state.stream) element.srcObject = state.stream;
+    if (element && element.srcObject !== state.stream) {
+      element.srcObject = state.stream;
+      if (state.stream && typeof element.play === 'function') {
+        void element.play().catch(() => undefined);
+      }
+    }
     if (element && state.stream && state.resolution === null) {
       applyIntrinsicResolution(element, state.stream);
     }
