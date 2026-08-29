@@ -509,6 +509,7 @@ async function adminSettings(
 ): Promise<AdminSettings> {
   const settings = repository.getSettings();
   await frames.ensureDefaultFrames();
+  await frames.ensureMinistryFrames?.();
   const library = frames.getFrameSummaries();
   const activeFrame = library.find((frame) => frame.id === settings.activeFrameId) ?? library[0];
   if (!activeFrame) {

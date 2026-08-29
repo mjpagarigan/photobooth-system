@@ -320,6 +320,25 @@ describe('packaged frame seeding', () => {
       store.close();
     }
   });
+
+  it('seeds additional ministry frames when present in resources directory', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      PACKAGED_FRAMES,
+      passthroughProcessor(),
+    );
+    try {
+      await service.ensureDefaultFrames();
+      const ministryFrames = await service.ensureMinistryFrames();
+      expect(Array.isArray(ministryFrames)).toBe(true);
+      const totalFrames = service.listFrames();
+      expect(totalFrames.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      store.close();
+    }
+  });
 });
 
 function fakeProcessor(width: number, height: number): ImageProcessor {

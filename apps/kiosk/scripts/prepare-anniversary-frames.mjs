@@ -9,27 +9,128 @@ const TRANSPARENT_ALPHA_MAX = 8;
 const WINDOW_PADDING = 3;
 const MIN_WINDOW_PIXELS = 10_000;
 
-const inputs = [
+const ALL_TEMPLATES = [
   {
-    name: 'M.A.T. Anniversary',
-    source: process.argv[2],
-    target: process.argv[4] ?? 'resources/frames/mat-frame.png',
+    name: 'Across Ministry',
+    sourceFile: 'ACROSS TEMPLATE.png',
+    target: 'resources/frames/across-frame.png',
   },
   {
-    name: '42nd Anniversary',
-    source: process.argv[3],
-    target: process.argv[5] ?? 'resources/frames/anniv-frame.png',
+    name: 'B1G Singles Ministry',
+    sourceFile: 'B1G TEMPLATE.png',
+    target: 'resources/frames/b1g-frame.png',
+  },
+  {
+    name: 'Elevate Youth',
+    sourceFile: 'ELEVATE TEMPLATE.png',
+    target: 'resources/frames/elevate-frame.png',
+  },
+  {
+    name: 'Exalt Worship Ministry',
+    sourceFile: 'EXALT TEMPLATE.png',
+    target: 'resources/frames/exalt-frame.png',
+  },
+  {
+    name: 'Host Team',
+    sourceFile: 'HOST TEAM TEMPLATE.png',
+    target: 'resources/frames/host-team-frame.png',
+  },
+  {
+    name: 'Living Free Ministry',
+    sourceFile: 'LIVING FREE MINISTRY TEMPLATE.png',
+    target: 'resources/frames/living-free-frame.png',
+  },
+  {
+    name: 'M.A.T. 42nd Anniversary',
+    sourceFile: 'MAT TEMPLATE.png',
+    target: 'resources/frames/mat-frame.png',
+  },
+  {
+    name: 'Movement Ministry',
+    sourceFile: 'MOVEMENT TEMPLATE.png',
+    target: 'resources/frames/movement-frame.png',
+  },
+  {
+    name: 'NextGen Ministry',
+    sourceFile: 'NEXTGEN TEMPLATE.png',
+    target: 'resources/frames/nextgen-frame.png',
+  },
+  {
+    name: 'Ushering Ministry',
+    sourceFile: 'USHERING TEMPLATE.png',
+    target: 'resources/frames/ushering-frame.png',
+  },
+  {
+    name: 'Women 2 Women (W2W)',
+    sourceFile: 'W2W TEMPLATE.png',
+    target: 'resources/frames/w2w-frame.png',
   },
 ];
 
-if (inputs.some((input) => !input.source)) {
-  throw new Error(
-    'Usage: node scripts/prepare-anniversary-frames.mjs <mat-source.png> <anniv-source.png> [mat-output.png] [anniv-output.png]',
-  );
+const templateDir = process.argv[2] === '--all' || !process.argv[2]
+  ? 'C:/Users/padil/mj/photolayout-templates'
+  : null;
+
+if (templateDir) {
+  for (const item of ALL_TEMPLATES) {
+    const source = `${templateDir}/${item.sourceFile}`;
+    await prepareMinistryFrame({
+      name: item.name,
+      source,
+      target: item.target,
+    });
+  }
+} else {
+  const inputs = [
+    {
+      name: 'M.A.T. Anniversary',
+      source: process.argv[2],
+      target: process.argv[4] ?? 'resources/frames/mat-frame.png',
+    },
+    {
+      name: '42nd Anniversary',
+      source: process.argv[3],
+      target: process.argv[5] ?? 'resources/frames/anniv-frame.png',
+    },
+  ];
+
+  for (const input of inputs) {
+    await prepareFrame(input);
+  }
 }
 
-for (const input of inputs) {
-  await prepareFrame(input);
+async function prepareMinistryFrame({ name, source, target }) {
+  const sourcePath = resolve(source);
+  const targetPath = resolve(target);
+  const { data, info } = await sharp(sourcePath)
+    .resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const windows = [
+    { minX: Math.round(0.068333 * TARGET_WIDTH), minY: Math.round(0.28 * TARGET_HEIGHT), maxX: Math.round((0.068333 + 0.86) * TARGET_WIDTH) - 1, maxY: Math.round((0.28 + 0.166111) * TARGET_HEIGHT) - 1 },
+    { minX: Math.round(0.065 * TARGET_WIDTH), minY: Math.round(0.487778 * TARGET_HEIGHT), maxX: Math.round((0.065 + 0.86) * TARGET_WIDTH) - 1, maxY: Math.round((0.487778 + 0.166667) * TARGET_HEIGHT) - 1 },
+    { minX: Math.round(0.068333 * TARGET_WIDTH), minY: Math.round(0.696667 * TARGET_HEIGHT), maxX: Math.round((0.068333 + 0.86) * TARGET_WIDTH) - 1, maxY: Math.round((0.696667 + 0.166667) * TARGET_HEIGHT) - 1 },
+  ];
+
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      const isInside = windows.some((w) => x >= w.minX && x <= w.maxX && y >= w.minY && y <= w.maxY);
+      if (isInside) {
+        data[(y * info.width + x) * info.channels + 3] = 0;
+      }
+    }
+  }
+
+  await mkdir(dirname(targetPath), { recursive: true });
+  await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  })
+    .png({ compressionLevel: 9, adaptiveFiltering: false })
+    .toFile(targetPath);
+
+  process.stdout.write(`Generated ${name}: ${targetPath}\n`);
 }
 
 async function prepareFrame({ name, source, target }) {

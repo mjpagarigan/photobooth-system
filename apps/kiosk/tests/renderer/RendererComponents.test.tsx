@@ -176,7 +176,9 @@ describe('guest screen components', () => {
 
     await user.click(screen.getByRole('button', { name: /use these photos/i }));
     expect(onAccept).toHaveBeenCalledWith(FRAME_2.id);
-    expect(screen.getAllByRole('button')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /all layouts/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: /retake all photos/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: /use these photos/i })).toBeVisible();
     expect(screen.queryByText(/retake photo 1/i)).not.toBeInTheDocument();
   });
 

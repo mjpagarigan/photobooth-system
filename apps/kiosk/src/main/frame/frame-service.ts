@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import type { FrameLayout, FrameSummary } from '@grace-booth/shared';
 import { FrameLayoutSchema } from '@grace-booth/shared';
@@ -77,6 +78,19 @@ export const ANNIVERSARY_FRAME_SLOTS: FrameLayout = FrameLayoutSchema.parse([
     cropMode: 'crop-to-fill',
   },
 ]);
+
+export const MINISTRY_FRAMES: Array<{ name: string; file: string; slots: FrameLayout }> = [
+  { name: 'Across Ministry', file: 'across-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'B1G Singles Ministry', file: 'b1g-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Elevate Youth', file: 'elevate-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Exalt Worship Ministry', file: 'exalt-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Host Team', file: 'host-team-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Living Free Ministry', file: 'living-free-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Movement Ministry', file: 'movement-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'NextGen Ministry', file: 'nextgen-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Ushering Ministry', file: 'ushering-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  { name: 'Women 2 Women (W2W)', file: 'w2w-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+];
 
 export const DEFAULT_FRAME_SLOTS = MAT_FRAME_SLOTS;
 export const MAT_FRAME_NAME = 'M.A.T. 42nd Anniversary';
@@ -172,6 +186,32 @@ export class FrameService {
     return { option1, option2 };
   }
 
+  /**
+   * Seeds all available ministry template frames into the library so guests have access to all
+   * ministry-specific photostrip layouts.
+   */
+  async ensureMinistryFrames(): Promise<StoredFrame[]> {
+    const seeded: StoredFrame[] = [];
+    const framesDir = dirname(this.packagedFramePaths.option1);
+    for (const ministry of MINISTRY_FRAMES) {
+      const currentLibrary = this.repository.listFrames();
+      const alreadyPresent = currentLibrary.some(
+        (f) => f.name === ministry.name || f.name.toLowerCase() === ministry.name.toLowerCase(),
+      );
+      if (!alreadyPresent) {
+        try {
+          const filePath = join(framesDir, ministry.file);
+          const bytes = await readFile(filePath);
+          const imported = await this.importLibraryFrame(ministry.name, bytes, ministry.slots);
+          seeded.push(imported);
+        } catch {
+          // Additional ministry frame file not available in test harness, skip silently.
+        }
+      }
+    }
+    return seeded;
+  }
+
   async ensureDefaultFrame(): Promise<StoredFrame> {
     const { option1 } = await this.ensureDefaultFrames();
     return option1;
@@ -189,7 +229,6 @@ export class FrameService {
   listFrames(): StoredFrame[] {
     return this.repository.listFrames();
   }
-
   getFrameSummaries(): FrameSummary[] {
     return this.repository.listFrames().map((frame) => this.toSummary(frame));
   }

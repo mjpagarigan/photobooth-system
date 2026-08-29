@@ -4,10 +4,22 @@ import {
   CaretLeftIcon as CaretLeft,
   CaretRightIcon as CaretRight,
   CheckCircleIcon as CheckCircle,
+  SquaresFourIcon as SquaresFour,
 } from '@phosphor-icons/react';
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FrameSummary } from '@grace-booth/shared';
+import {
+  Button as CossButton,
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from '@grace-booth/ui';
 
 import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
@@ -39,6 +51,7 @@ export function ReviewScreen({
     selectedRawId !== null && options.some((option) => option.id === selectedRawId)
       ? selectedRawId
       : options[0]?.id;
+  const [layoutsModalOpen, setLayoutsModalOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
@@ -167,75 +180,90 @@ export function ReviewScreen({
   return (
     <main className="screen screen--review" data-testid="review-screen">
       <div className="review-layout">
-        <div className="review-carousel-container">
-          {options.length > 2 && (
-            <button
-              type="button"
-              className="review-carousel-arrow review-carousel-arrow--left"
-              onClick={() => scrollContainer('left')}
-              disabled={!canScrollLeft}
-              aria-label="Previous collage layouts"
+        <div className="review-carousel-column">
+          <div className="review-carousel-header">
+            <span className="review-carousel-heading">Choose Layout</span>
+            <Button
+              icon={<SquaresFour aria-hidden="true" weight="bold" />}
+              onClick={() => setLayoutsModalOpen(true)}
+              variant="secondary"
             >
-              <CaretLeft aria-hidden="true" weight="bold" />
-            </button>
-          )}
+              All Layouts ({options.length})
+            </Button>
+          </div>
 
-          <section
-            className="review-options-stage"
-            role="radiogroup"
-            aria-label="Collage options"
-            ref={stageRef}
-            onScroll={updateScrollState}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
-          >
-            {options.map((option, index) => (
-              <div
-                className={`review-option-card ${selectedId === option.id ? 'is-selected' : ''}`}
-                role="radio"
-                aria-checked={selectedId === option.id}
-                tabIndex={selectedId === option.id ? 0 : -1}
-                key={option.id}
-                onClick={() => handleCardClick(option.id)}
-                onKeyDown={(e) => handleKeyDown(e, option)}
-                data-testid={`collage-option-${index + 1}`}
-                data-collage-option={option.id}
-                aria-label={`Collage Option ${index + 1}: ${option.name}`}
+          <div className="review-carousel-container">
+            {options.length > 2 && (
+              <button
+                type="button"
+                className="review-carousel-arrow review-carousel-arrow--left"
+                onClick={() => scrollContainer('left')}
+                disabled={!canScrollLeft}
+                aria-label="Previous collage layouts"
               >
-                <div className="review-option-badge">
-                  <span className="review-option-title">Collage {index + 1}</span>
-                  {selectedId === option.id && (
-                    <span className="selected-indicator" aria-hidden="true">
-                      <CheckCircle weight="fill" /> Selected
-                    </span>
-                  )}
-                </div>
-                <div className="review-option-preview">
-                  <Photostrip
-                    captureUrls={captureUrls}
-                    frame={option}
-                    label={`Preview in Collage Option ${index + 1}`}
-                    variant="preview"
-                  />
-                </div>
-              </div>
-            ))}
-          </section>
+                <CaretLeft aria-hidden="true" weight="bold" />
+              </button>
+            )}
 
-          {options.length > 2 && (
-            <button
-              type="button"
-              className="review-carousel-arrow review-carousel-arrow--right"
-              onClick={() => scrollContainer('right')}
-              disabled={!canScrollRight}
-              aria-label="Next collage layouts"
+            <section
+              className="review-options-stage"
+              role="radiogroup"
+              aria-label="Collage options"
+              ref={stageRef}
+              onScroll={updateScrollState}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onWheel={handleWheel}
             >
-              <CaretRight aria-hidden="true" weight="bold" />
-            </button>
-          )}
+              {options.map((option, index) => (
+                <div
+                  className={`review-option-card ${selectedId === option.id ? 'is-selected' : ''}`}
+                  role="radio"
+                  aria-checked={selectedId === option.id}
+                  tabIndex={selectedId === option.id ? 0 : -1}
+                  key={option.id}
+                  onClick={() => handleCardClick(option.id)}
+                  onKeyDown={(e) => handleKeyDown(e, option)}
+                  data-testid={`collage-option-${index + 1}`}
+                  data-collage-option={option.id}
+                  aria-label={`Collage Option ${index + 1}: ${option.name}`}
+                >
+                  <div className="review-option-badge">
+                    <span className="review-option-title" title={option.name}>
+                      Collage {index + 1}
+                    </span>
+                    {selectedId === option.id && (
+                      <span className="selected-indicator" aria-hidden="true">
+                        <CheckCircle weight="fill" /> Selected
+                      </span>
+                    )}
+                  </div>
+                  <div className="review-option-preview">
+                    <Photostrip
+                      captureUrls={captureUrls}
+                      frame={option}
+                      label={`Preview in Collage Option ${index + 1}`}
+                      variant="preview"
+                    />
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            {options.length > 2 && (
+              <button
+                type="button"
+                className="review-carousel-arrow review-carousel-arrow--right"
+                onClick={() => scrollContainer('right')}
+                disabled={!canScrollRight}
+                aria-label="Next collage layouts"
+              >
+                <CaretRight aria-hidden="true" weight="bold" />
+              </button>
+            )}
+          </div>
         </div>
 
         <section className="review-decision-panel" aria-label="Review decisions">
@@ -282,6 +310,63 @@ export function ReviewScreen({
           </div>
         </section>
       </div>
+
+      <Dialog open={layoutsModalOpen} onOpenChange={setLayoutsModalOpen}>
+        <DialogPopup maxWidthClass="max-w-4xl" className="layouts-picker-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SquaresFour aria-hidden="true" weight="bold" className="size-5 text-primary" />
+              <span>All Frame Layouts</span>
+            </DialogTitle>
+            <DialogDescription>
+              Choose from all {options.length} photo templates for your photostrip.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogPanel className="layouts-picker-panel">
+            <div className="layouts-picker-grid">
+              {options.map((option) => {
+                const isSelected = selectedId === option.id;
+                return (
+                  <button
+                    type="button"
+                    key={option.id}
+                    className={`layouts-picker-tile ${isSelected ? 'is-selected' : ''}`}
+                    onClick={() => {
+                      setSelectedRawId(option.id);
+                      setLayoutsModalOpen(false);
+                    }}
+                    aria-label={`Select layout: ${option.name}`}
+                  >
+                    <div className="layouts-picker-preview-wrapper">
+                      <Photostrip
+                        captureUrls={captureUrls}
+                        frame={option}
+                        label={`Preview in ${option.name}`}
+                        variant="preview"
+                      />
+                      {isSelected && (
+                        <div className="layouts-picker-selected-badge" aria-hidden="true">
+                          <CheckCircle weight="fill" className="size-5 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="layouts-picker-name" title={option.name}>
+                      {option.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </DialogPanel>
+
+          <DialogFooter>
+            <DialogClose render={<CossButton type="button" variant="secondary" />}>
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </main>
   );
 }

@@ -75,6 +75,7 @@ export class BoothWorkflow {
 
   async initialize(): Promise<void> {
     await this.frameService.ensureDefaultFrames();
+    await this.frameService.ensureMinistryFrames?.();
     const recovered = this.repository.getLatestIncompleteSession();
     this.activeSessionId = recovered?.id ?? null;
     try {

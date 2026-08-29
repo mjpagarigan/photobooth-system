@@ -664,23 +664,51 @@ body,
   align-items: stretch;
 }
 
+.review-carousel-column {
+  flex: 1 1 65%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  height: 100%;
+}
+
+.review-carousel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.review-carousel-heading {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-muted);
+}
+
 .review-carousel-container {
   position: relative;
-  flex: 1 1 65%;
+  flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
+  height: 100%;
 }
 
 .review-options-stage {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   width: 100%;
   height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   align-items: center;
-  padding: 12px 8px;
+  padding: 8px 4px;
   scroll-behavior: smooth;
   scrollbar-width: none;
 }
@@ -701,9 +729,11 @@ body,
   cursor: pointer;
   transition: all 180ms ease;
   flex-shrink: 0;
-  width: 250px;
+  width: calc(50% - 10px);
+  min-width: 220px;
+  max-width: 320px;
   height: 100%;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 140px);
   box-shadow: var(--shadow-soft);
   position: relative;
   overflow: hidden;
@@ -722,6 +752,92 @@ body,
 .review-option-card:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.layouts-picker-modal {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layouts-picker-panel {
+  overflow-y: auto;
+  max-height: 65vh;
+  padding: 12px 4px;
+}
+
+.layouts-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 16px;
+  justify-items: center;
+}
+
+.layouts-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-tint);
+  border: var(--border-rigid);
+  cursor: pointer;
+  transition: all 150ms ease;
+  width: 100%;
+  max-width: 160px;
+  text-align: center;
+}
+
+.layouts-picker-tile:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.layouts-picker-tile.is-selected {
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 0 16px rgba(163, 94, 71, 0.4), var(--shadow-card);
+  background: rgba(163, 94, 71, 0.1);
+}
+
+.layouts-picker-tile:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.layouts-picker-preview-wrapper {
+  position: relative;
+  width: 72px;
+  height: 216px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  background: #000000;
+}
+
+.layouts-picker-selected-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: var(--color-primary);
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.layouts-picker-name {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .review-option-badge {
