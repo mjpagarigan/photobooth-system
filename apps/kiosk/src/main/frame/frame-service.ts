@@ -79,17 +79,78 @@ export const ANNIVERSARY_FRAME_SLOTS: FrameLayout = FrameLayoutSchema.parse([
   },
 ]);
 
+export const createMinistrySlots = (
+  s1Y: number,
+  s2Y: number,
+  s3Y: number,
+  s1X: number = 0.075,
+  s2X: number = 0.073333,
+  s3X: number = 0.075,
+  width: number = 0.853333,
+  height: number = 0.163333,
+): FrameLayout =>
+  FrameLayoutSchema.parse([
+    { slotIndex: 1, name: 'Photo 1', x: s1X, y: s1Y, width, height, cropMode: 'crop-to-fill' },
+    { slotIndex: 2, name: 'Photo 2', x: s2X, y: s2Y, width, height, cropMode: 'crop-to-fill' },
+    { slotIndex: 3, name: 'Photo 3', x: s3X, y: s3Y, width, height, cropMode: 'crop-to-fill' },
+  ]);
+
 export const MINISTRY_FRAMES: Array<{ name: string; file: string; slots: FrameLayout }> = [
-  { name: 'Across Ministry', file: 'across-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'B1G Singles Ministry', file: 'b1g-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Elevate Youth', file: 'elevate-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Exalt Worship Ministry', file: 'exalt-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Host Team', file: 'host-team-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Living Free Ministry', file: 'living-free-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Movement Ministry', file: 'movement-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'NextGen Ministry', file: 'nextgen-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Ushering Ministry', file: 'ushering-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
-  { name: 'Women 2 Women (W2W)', file: 'w2w-frame.png', slots: ANNIVERSARY_FRAME_SLOTS },
+  {
+    name: 'Across Ministry',
+    file: 'across-frame.png',
+    slots: createMinistrySlots(0.208333, 0.416667, 0.625),
+  },
+  {
+    name: 'B1G Singles Ministry',
+    file: 'b1g-frame.png',
+    slots: createMinistrySlots(0.226111, 0.434444, 0.642778, 0.068333, 0.065, 0.068333, 0.851667),
+  },
+  {
+    name: 'Elevate Youth',
+    file: 'elevate-frame.png',
+    slots: createMinistrySlots(0.228889, 0.437222, 0.645556),
+  },
+  {
+    name: 'Exalt Worship Ministry',
+    file: 'exalt-frame.png',
+    slots: createMinistrySlots(0.216111, 0.425, 0.633333),
+  },
+  {
+    name: 'Host Team',
+    file: 'host-team-frame.png',
+    slots: createMinistrySlots(0.228889, 0.437222, 0.645556),
+  },
+  {
+    name: 'Living Free Ministry',
+    file: 'living-free-frame.png',
+    slots: createMinistrySlots(0.21, 0.418333, 0.626667),
+  },
+  {
+    name: 'M.A.T. Ministry',
+    file: 'mat-ministry-frame.png',
+    slots: createMinistrySlots(0.236111, 0.445, 0.653333, 0.07, 0.066667, 0.07, 0.851667),
+  },
+  {
+    name: 'Movement Ministry',
+    file: 'movement-frame.png',
+    slots: createMinistrySlots(0.199444, 0.408333, 0.616111),
+  },
+  {
+    name: 'NextGen Ministry',
+    file: 'nextgen-frame.png',
+    slots: createMinistrySlots(0.221667, 0.430556, 0.638333),
+  },
+  {
+    name: 'Ushering Ministry',
+    file: 'ushering-frame.png',
+    slots: createMinistrySlots(0.267778, 0.476111, 0.684444),
+  },
+  {
+    name: 'Women 2 Women (W2W)',
+    file: 'w2w-frame.png',
+    slots: createMinistrySlots(0.234444, 0.442778, 0.651111),
+  },
 ];
 
 export const DEFAULT_FRAME_SLOTS = MAT_FRAME_SLOTS;
@@ -188,17 +249,32 @@ export class FrameService {
 
   /**
    * Seeds all available ministry template frames into the library so guests have access to all
-   * ministry-specific photostrip layouts.
+   * ministry-specific photostrip layouts. Automatically synchronizes calibrated slot positions.
    */
   async ensureMinistryFrames(): Promise<StoredFrame[]> {
     const seeded: StoredFrame[] = [];
     const framesDir = dirname(this.packagedFramePaths.option1);
     for (const ministry of MINISTRY_FRAMES) {
       const currentLibrary = this.repository.listFrames();
-      const alreadyPresent = currentLibrary.some(
+      const existing = currentLibrary.find(
         (f) => f.name === ministry.name || f.name.toLowerCase() === ministry.name.toLowerCase(),
       );
-      if (!alreadyPresent) {
+      if (existing) {
+        // If the frame is an untouched shipped default with misaligned slots, update its layout to calibrated positions
+        if (existing.revision === 0 && JSON.stringify(existing.slots) !== JSON.stringify(ministry.slots)) {
+          try {
+            const updated = this.repository.updateFrameLayout(
+              existing.id,
+              ministry.slots,
+              existing.revision,
+              ministry.name,
+            );
+            seeded.push(updated);
+          } catch {
+            // Ignore layout update failure
+          }
+        }
+      } else {
         try {
           const filePath = join(framesDir, ministry.file);
           const bytes = await readFile(filePath);

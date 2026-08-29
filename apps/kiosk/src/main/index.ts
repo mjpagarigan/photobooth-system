@@ -40,7 +40,8 @@ import { BoothWorkflow } from './workflow/booth-workflow.js';
 
 registerPrivilegedSchemes();
 
-const hasInstanceLock = app.requestSingleInstanceLock();
+const isNativeSelfTest = process.argv.includes('--native-self-test');
+const hasInstanceLock = isNativeSelfTest || app.requestSingleInstanceLock();
 if (!hasInstanceLock) app.quit();
 
 void app
