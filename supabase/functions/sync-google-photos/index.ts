@@ -3,6 +3,7 @@ import { createAdminClient } from '../_shared/supabase.ts';
 import { readUploadedBytes } from '../confirm-upload/index.ts';
 import {
   addMediaItemToAlbum,
+  createAlbumInGooglePhotos,
   refreshGoogleAccessToken,
   uploadBytesToGooglePhotos,
 } from '../_shared/google_photos.ts';
@@ -40,7 +41,7 @@ export async function processGooglePhotosSyncQueue(
   }
 
   const config = configData as GoogleConfigRow;
-  if (!config.enabled || !config.album_id) {
+  if (!config.enabled) {
     return { processed: 0, succeeded: 0, failed: 0 };
   }
 
@@ -77,6 +78,39 @@ export async function processGooglePhotosSyncQueue(
       }
       return { processed: jobs.length, succeeded: 0, failed: jobs.length };
     }
+  } else if (!config.refresh_token_encrypted && clientId !== 'mock_client_id') {
+    const missingTokenMsg = 'Google account is missing offline sync authorization. Please authorize Google in Kiosk Admin.';
+    for (const job of jobs) {
+      await admin.rpc('fail_google_photos_sync', {
+        p_job_id: job.id,
+        p_error_message: missingTokenMsg,
+        p_backoff_seconds: 60,
+      });
+    }
+    return { processed: jobs.length, succeeded: 0, failed: jobs.length };
+  }
+
+  // If album is not set yet, automatically create default shared album
+  let activeAlbumId = config.album_id;
+  if (!activeAlbumId && clientId !== 'mock_client_id' && accessToken !== 'mock_access_token') {
+    try {
+      const created = await createAlbumInGooglePhotos(
+        accessToken,
+        config.album_title || 'M.A.T. Photobooth Live Stream',
+      );
+      activeAlbumId = created.albumId;
+      await admin
+        .from('google_photos_config')
+        .update({
+          album_id: created.albumId,
+          album_title: created.albumTitle,
+          album_share_url: created.shareUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', 1);
+    } catch {
+      // Fallback
+    }
   }
 
   // 3. Process each claimed job
@@ -92,7 +126,7 @@ export async function processGooglePhotosSyncQueue(
       const uploadToken = await uploadBytesToGooglePhotos(accessToken, jpegBytes, fileName);
       const mediaId = await addMediaItemToAlbum(
         accessToken,
-        config.album_id,
+        activeAlbumId,
         uploadToken,
         `M.A.T. Photobooth - Session ${job.session_id}`,
       );

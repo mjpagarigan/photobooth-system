@@ -118,7 +118,7 @@ export function QrStationScreen(): React.ReactElement {
   const idleBackground =
     ('ministryIdleBackground' in LOCAL_FIXTURES
       ? (LOCAL_FIXTURES as unknown as Record<string, string>).ministryIdleBackground
-      : null) || LOCAL_FIXTURES.finalBackground;
+      : null) ?? LOCAL_FIXTURES.finalBackground;
 
   // 1. Idle State: Full bleed background with top-right Recent Photos button
   if (stationState.status === 'idle' || !stationState.collageUrl || !stationState.qrImageUrl) {

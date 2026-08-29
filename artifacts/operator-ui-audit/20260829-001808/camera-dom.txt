@@ -1,0 +1,51 @@
+- main:
+  - button:
+    - generic: Recent
+  - button:
+    - generic: Camera
+  - button:
+    - generic: Admin
+  - region:
+    - heading [level=1]: M.A.T. PHOTOBOOTH
+    - paragraph: MINISTRY FAIR // CELEBRATION ARCHIVE
+    - paragraph: Take three photos, receive your finished collage, and scan to download instantly.
+    - status:
+      - generic: 3 photos · custom collage · instant private download
+    - button:
+      - generic: Start photo session
+- dialog "Camera Configuration":
+  - button "Close" [active]:
+  - heading "Camera Configuration" [level=2]
+  - paragraph: Select active optical capture source and verify live telemetry feed.
+  - generic: Camera Source
+  - button "Laptop / USB Webcam Internal camera or standard UVC device":
+    - generic: Laptop / USB Webcam
+    - generic: Internal camera or standard UVC device
+  - button "Sony A7 Tethered High-precision Sony Alpha mirrorless":
+    - generic: Sony A7 Tethered
+    - generic: High-precision Sony Alpha mirrorless
+  - button "Mock Hardware Simulated capture for testing":
+    - generic: Mock Hardware
+    - generic: Simulated capture for testing
+  - generic: Active Device Node
+  - combobox "Active Device Node":
+    - option "Default System Webcam" [selected]
+  - button "Refresh camera devices":
+  - generic: Capture Resolution
+  - combobox "Capture Resolution":
+    - option "720p (1280 × 720) — virtual cameras and testing"
+    - option "1080p (1920 × 1080) — production quality" [selected]
+  - generic: +
+  - generic: +
+  - generic: +
+  - generic: +
+  - status:
+    - text: "Actual:"
+    - strong: Waiting for camera
+    - text: "Requested:"
+    - strong: 1920 × 1080
+    - generic: Negotiating the selected camera mode.
+  - button "Cancel":
+    - generic: Cancel
+  - button "Apply & Save":
+    - generic: Apply & Save

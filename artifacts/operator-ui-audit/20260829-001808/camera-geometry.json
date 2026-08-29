@@ -1,0 +1,13 @@
+{
+  "active": "Close",
+  "dialog": {
+    "height": 672,
+    "width": 900,
+    "x": 190,
+    "y": 24
+  },
+  "document": {
+    "height": 720,
+    "width": 1280
+  }
+}

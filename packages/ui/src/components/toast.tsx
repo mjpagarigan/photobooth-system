@@ -1,110 +1,125 @@
+import { Toast } from '@base-ui/react/toast';
 import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+  CheckCircleIcon as CheckCircle,
+  InfoIcon as Info,
+  SpinnerGapIcon as SpinnerGap,
+  WarningCircleIcon as WarningCircle,
+  WarningIcon as Warning,
+} from '@phosphor-icons/react';
+import type React from 'react';
+
 import { cn } from '../lib/utils';
 
-export type ToastItem = {
-  id: string;
-  title: ReactNode;
-  description?: ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'error';
-  duration?: number;
-}
+const icons = {
+  error: WarningCircle,
+  info: Info,
+  loading: SpinnerGap,
+  success: CheckCircle,
+  warning: Warning,
+} as const;
 
-type ToastContextType = {
-  toasts: ToastItem[];
-  add: (options: Omit<ToastItem, 'id'> & { id?: string }) => string;
-  remove: (id: string) => void;
-};
+export type ToastPosition =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right';
 
-const ToastContext = createContext<ToastContextType | null>(null);
-
-let globalToastContext: ToastContextType | null = null;
-
-export const toastManager = {
-  add(options: Omit<ToastItem, 'id'> & { id?: string }): string {
-    if (globalToastContext) {
-      return globalToastContext.add(options);
-    }
-    return '';
-  },
-  remove(id: string): void {
-    if (globalToastContext) {
-      globalToastContext.remove(id);
-    }
-  },
-};
-
-export const anchoredToastManager = toastManager;
-
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-
-  const remove = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const add = useCallback(
-    (options: Omit<ToastItem, 'id'> & { id?: string }) => {
-      const id = options.id ?? Math.random().toString(36).substring(2, 9);
-      const newToast: ToastItem = { ...options, id };
-      setToasts((prev) => [...prev.filter((t) => t.id !== id), newToast]);
-
-      const duration = options.duration ?? 4000;
-      if (duration > 0) {
-        setTimeout(() => remove(id), duration);
-      }
-      return id;
-    },
-    [remove],
-  );
-
-  const value = useMemo(() => ({ toasts, add, remove }), [toasts, add, remove]);
-
-  useEffect(() => {
-    globalToastContext = value;
-    return () => {
-      globalToastContext = null;
-    };
-  }, [value]);
+function Toasts({
+  portalProps,
+  position,
+}: {
+  portalProps?: React.ComponentProps<typeof Toast.Portal>;
+  position: ToastPosition;
+}): React.ReactElement {
+  const { toasts } = Toast.useToastManager();
 
   return (
-    <ToastContext.Provider value={value}>
-      {children}
-      <div
-        aria-live="polite"
-        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"
+    <Toast.Portal {...portalProps}>
+      <Toast.Viewport
+        className={cn(
+          'fixed z-[70] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3 outline-none',
+          position.startsWith('top') ? 'top-4' : 'bottom-4',
+          position.endsWith('left') && 'left-4',
+          position.endsWith('right') && 'right-4',
+          position.endsWith('center') && 'left-1/2 -translate-x-1/2',
+        )}
       >
-        {toasts.map((toast) => (
-          <div
-            className={cn(
-              'pointer-events-auto flex flex-col gap-1 rounded-xl border p-4 shadow-xl backdrop-blur-md transition-all duration-200 animate-in fade-in slide-in-from-bottom-2',
-              toast.variant === 'success' && 'border-success/50 bg-card text-foreground',
-              toast.variant === 'error' && 'border-destructive/50 bg-card text-foreground',
-              toast.variant === 'warning' && 'border-[#d97706]/50 bg-card text-foreground',
-              (!toast.variant || toast.variant === 'default') &&
-                'border-border/50 bg-card text-foreground',
-            )}
-            key={toast.id}
-          >
-            <div className="font-heading text-sm font-bold tracking-tight">{toast.title}</div>
-            {toast.description && (
-              <div className="text-xs text-muted-foreground leading-relaxed">
-                {toast.description}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
+        {toasts.map((toast) => {
+          const Icon = toast.type ? icons[toast.type as keyof typeof icons] : null;
+          return (
+            <Toast.Root
+              className="rounded-xl border border-border bg-card text-card-foreground shadow-2xl transition-[transform,opacity] data-starting-style:translate-y-2 data-starting-style:opacity-0 data-ending-style:translate-y-2 data-ending-style:opacity-0"
+              key={toast.id}
+              swipeDirection={position.startsWith('top') ? 'up' : 'down'}
+              toast={toast}
+            >
+              <Toast.Content className="flex min-h-14 items-start gap-3 px-4 py-3.5">
+                {Icon ? (
+                  <Icon
+                    aria-hidden="true"
+                    className={cn(
+                      'mt-0.5 size-5 shrink-0',
+                      toast.type === 'loading' && 'animate-spin',
+                    )}
+                    weight="bold"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <Toast.Title className="font-semibold" />
+                  <Toast.Description className="mt-0.5 text-sm text-muted-foreground" />
+                </div>
+                {toast.actionProps ? (
+                  <Toast.Action className="min-h-11 rounded-md px-3 font-semibold" />
+                ) : null}
+              </Toast.Content>
+            </Toast.Root>
+          );
+        })}
+      </Toast.Viewport>
+    </Toast.Portal>
   );
 }
 
-export function AnchoredToastProvider({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+export const toastManager: ReturnType<typeof Toast.createToastManager> = Toast.createToastManager();
+export const anchoredToastManager: ReturnType<typeof Toast.createToastManager> =
+  Toast.createToastManager();
+
+export type ToastProviderProps = Toast.Provider.Props & {
+  portalProps?: React.ComponentProps<typeof Toast.Portal>;
+  position?: ToastPosition;
+};
+
+export function ToastProvider({
+  children,
+  portalProps,
+  position = 'bottom-right',
+  ...props
+}: ToastProviderProps): React.ReactElement {
+  return (
+    <Toast.Provider toastManager={toastManager} {...props}>
+      {children}
+      <Toasts {...(portalProps ? { portalProps } : {})} position={position} />
+    </Toast.Provider>
+  );
 }
+
+export type AnchoredToastProviderProps = Toast.Provider.Props & {
+  portalProps?: React.ComponentProps<typeof Toast.Portal>;
+};
+
+export function AnchoredToastProvider({
+  children,
+  portalProps,
+  ...props
+}: AnchoredToastProviderProps): React.ReactElement {
+  return (
+    <Toast.Provider toastManager={anchoredToastManager} {...props}>
+      {children}
+      <Toasts {...(portalProps ? { portalProps } : {})} position="bottom-center" />
+    </Toast.Provider>
+  );
+}
+
+export { Toast as ToastPrimitive };

@@ -129,7 +129,7 @@ describe('CameraSetupModal resolution preferences', () => {
     });
     expect(video.width).not.toHaveProperty('min');
     expect(screen.getByText('Actual:').parentElement).toHaveTextContent('1280 × 720');
-    expect(screen.getByLabelText('Capture Resolution')).toHaveValue('720p');
+    expect(screen.getByRole('combobox', { name: 'Capture resolution' })).toHaveTextContent('720p');
     expect(screen.getByRole('button', { name: /apply & save/i })).toBeEnabled();
   });
 
@@ -145,7 +145,8 @@ describe('CameraSetupModal resolution preferences', () => {
     render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
 
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
-    await user.selectOptions(screen.getByLabelText('Capture Resolution'), '720p');
+    await user.click(screen.getByRole('combobox', { name: 'Capture resolution' }));
+    await user.click(screen.getByRole('option', { name: /720p/i }));
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
     expect(first.track.stop).toHaveBeenCalledOnce();
 

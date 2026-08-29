@@ -20,27 +20,28 @@ export const Toolbar = forwardRef<
 
 export const ToolbarButton = BaseToolbar.Button;
 
-export function ToolbarGroup({
-  className,
-  children,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+export const ToolbarGroup = forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<typeof BaseToolbar.Group>
+>(function ToolbarGroup({ className, ...props }, ref) {
   return (
-    <div className={cn('flex items-center gap-1.5', className)} {...props}>
-      {children}
-    </div>
-  );
-}
-
-export function ToolbarSeparator({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn('h-5 w-px bg-border/40 my-auto', className)}
+    <BaseToolbar.Group
+      className={cn('flex items-center gap-1.5', className)}
+      ref={ref}
       {...props}
     />
   );
-}
+});
+
+export const ToolbarSeparator = forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<typeof BaseToolbar.Separator>
+>(function ToolbarSeparator({ className, ...props }, ref) {
+  return (
+    <BaseToolbar.Separator
+      className={cn('mx-1 h-5 w-px shrink-0 bg-border/60', className)}
+      ref={ref}
+      {...props}
+    />
+  );
+});

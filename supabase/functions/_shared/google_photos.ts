@@ -45,6 +45,136 @@ export async function refreshGoogleAccessToken(
   return data.access_token;
 }
 
+export async function createAlbumInGooglePhotos(
+  accessToken: string,
+  title: string,
+  deps: GooglePhotosDependencies = DEFAULT_DEPENDENCIES,
+): Promise<{ albumId: string; albumTitle: string; shareUrl: string; productUrl?: string | undefined }> {
+  const createRes = await deps.fetchImpl('https://photoslibrary.googleapis.com/v1/albums', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      album: {
+        title,
+      },
+    }),
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text().catch(() => '');
+    throw new ApiError(
+      createRes.status === 429 ? 429 : createRes.status >= 500 ? 503 : 400,
+      createRes.status === 429 ? 'rate_limited' : createRes.status >= 500 ? 'unavailable' : 'invalid_request',
+      `Google Photos album creation failed: ${errText || createRes.statusText}`,
+      createRes.status === 429 || createRes.status >= 500,
+    );
+  }
+
+  const album = (await createRes.json()) as { id: string; title?: string; productUrl?: string };
+  let shareUrl = album.productUrl || '';
+
+  // Attempt to enable public album sharing for guests
+  try {
+    const shareRes = await deps.fetchImpl(`https://photoslibrary.googleapis.com/v1/albums/${album.id}:share`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sharedAlbumOptions: {
+          isCollaborative: false,
+          isCommentable: true,
+        },
+      }),
+    });
+    if (shareRes.ok) {
+      const shareData = (await shareRes.json()) as {
+        shareInfo?: { shareableUrl?: string };
+      };
+      if (shareData.shareInfo?.shareableUrl) {
+        shareUrl = shareData.shareInfo.shareableUrl;
+      }
+    }
+  } catch {
+    // Non-fatal fallback to productUrl
+  }
+
+  return {
+    albumId: album.id,
+    albumTitle: album.title || title,
+    shareUrl: shareUrl || album.productUrl || '',
+    productUrl: album.productUrl,
+  };
+}
+
+export async function listGooglePhotosAlbums(
+  accessToken: string,
+  deps: GooglePhotosDependencies = DEFAULT_DEPENDENCIES,
+): Promise<Array<{ id: string; title: string; shareUrl?: string | undefined; productUrl?: string | undefined }>> {
+  const albums: Array<{ id: string; title: string; shareUrl?: string | undefined; productUrl?: string | undefined }> = [];
+  const seenIds = new Set<string>();
+
+  // 1. Fetch user/app created albums
+  try {
+    const res = await deps.fetchImpl('https://photoslibrary.googleapis.com/v1/albums?pageSize=50', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        albums?: Array<{ id: string; title?: string; productUrl?: string; shareInfo?: { shareableUrl?: string } }>;
+      };
+      if (data.albums) {
+        for (const a of data.albums) {
+          if (a.id && !seenIds.has(a.id)) {
+            seenIds.add(a.id);
+            albums.push({
+              id: a.id,
+              title: a.title || 'Untitled Album',
+              shareUrl: a.shareInfo?.shareableUrl || a.productUrl,
+              productUrl: a.productUrl,
+            });
+          }
+        }
+      }
+    }
+  } catch {
+    // Fallback
+  }
+
+  // 2. Fetch shared albums
+  try {
+    const resShared = await deps.fetchImpl('https://photoslibrary.googleapis.com/v1/sharedAlbums?pageSize=50', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (resShared.ok) {
+      const data = (await resShared.json()) as {
+        sharedAlbums?: Array<{ id: string; title?: string; productUrl?: string; shareInfo?: { shareableUrl?: string } }>;
+      };
+      if (data.sharedAlbums) {
+        for (const a of data.sharedAlbums) {
+          if (a.id && !seenIds.has(a.id)) {
+            seenIds.add(a.id);
+            albums.push({
+              id: a.id,
+              title: a.title || 'Shared Album',
+              shareUrl: a.shareInfo?.shareableUrl || a.productUrl,
+              productUrl: a.productUrl,
+            });
+          }
+        }
+      }
+    }
+  } catch {
+    // Fallback
+  }
+
+  return albums;
+}
+
 export async function uploadBytesToGooglePhotos(
   accessToken: string,
   jpegBytes: Uint8Array,
@@ -83,29 +213,35 @@ export async function uploadBytesToGooglePhotos(
 
 export async function addMediaItemToAlbum(
   accessToken: string,
-  albumId: string,
+  albumId: string | null | undefined,
   uploadToken: string,
   description = 'M.A.T. Photobooth Strip',
   deps: GooglePhotosDependencies = DEFAULT_DEPENDENCIES,
 ): Promise<string> {
+  const cleanAlbumId = albumId ? albumId.trim() : null;
+  const payload: Record<string, unknown> = {
+    newMediaItems: [
+      {
+        description,
+        simpleMediaItem: {
+          uploadToken,
+          fileName: 'photostrip.jpg',
+        },
+      },
+    ],
+  };
+
+  if (cleanAlbumId && cleanAlbumId.length > 0) {
+    payload.albumId = cleanAlbumId;
+  }
+
   const response = await deps.fetchImpl('https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      albumId,
-      newMediaItems: [
-        {
-          description,
-          simpleMediaItem: {
-            uploadToken,
-            fileName: 'photostrip.jpg',
-          },
-        },
-      ],
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -113,7 +249,7 @@ export async function addMediaItemToAlbum(
     throw new ApiError(
       response.status === 429 ? 429 : response.status >= 500 ? 503 : 400,
       response.status === 429 ? 'rate_limited' : response.status >= 500 ? 'unavailable' : 'invalid_request',
-      `Google Photos batchCreate failed: ${errText || response.statusText}`,
+      `Google Photos batchCreate failed (${response.status}): ${errText || response.statusText}`,
       response.status === 429 || response.status >= 500,
     );
   }
@@ -146,55 +282,50 @@ export async function resolveAlbumShareUrl(
   shareUrl: string,
   deps: GooglePhotosDependencies = DEFAULT_DEPENDENCIES,
 ): Promise<{ albumId: string; albumTitle: string; shareUrl: string }> {
-  // If the input is already a direct Google album ID
-  if (!shareUrl.startsWith('http://') && !shareUrl.startsWith('https://')) {
-    const albumRes = await deps.fetchImpl(`https://photoslibrary.googleapis.com/v1/albums/${shareUrl}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (albumRes.ok) {
-      const album = (await albumRes.json()) as { id: string; title?: string; shareInfo?: { shareableUrl?: string } };
-      return {
-        albumId: album.id,
-        albumTitle: album.title || 'Shared Album',
-        shareUrl: album.shareInfo?.shareableUrl || shareUrl,
-      };
+  const trimmed = shareUrl.trim();
+
+  // 1. If the input is already a direct Google album ID
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    try {
+      const albumRes = await deps.fetchImpl(`https://photoslibrary.googleapis.com/v1/albums/${trimmed}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (albumRes.ok) {
+        const album = (await albumRes.json()) as { id: string; title?: string; shareInfo?: { shareableUrl?: string }; productUrl?: string };
+        return {
+          albumId: album.id,
+          albumTitle: album.title || 'Shared Album',
+          shareUrl: album.shareInfo?.shareableUrl || album.productUrl || trimmed,
+        };
+      }
+    } catch {
+      // Continue to search
     }
   }
 
-  // Query user's albums list to match or find
-  const listRes = await deps.fetchImpl('https://photoslibrary.googleapis.com/v1/albums?pageSize=50', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (listRes.ok) {
-    const listData = (await listRes.json()) as {
-      albums?: Array<{ id: string; title?: string; shareInfo?: { shareableUrl?: string } }>;
-    };
-    if (listData.albums && listData.albums.length > 0) {
-      // Check if any album matches the share URL
-      const found = listData.albums.find(
-        (a) => a.shareInfo?.shareableUrl === shareUrl || a.id === shareUrl,
+  // 2. Query user's albums and shared albums list
+  try {
+    const albums = await listGooglePhotosAlbums(accessToken, deps);
+    if (albums.length > 0) {
+      const found = albums.find(
+        (a) => a.shareUrl === trimmed || a.productUrl === trimmed || a.id === trimmed,
       );
       if (found) {
         return {
           albumId: found.id,
           albumTitle: found.title || 'Shared Album',
-          shareUrl: found.shareInfo?.shareableUrl || shareUrl,
+          shareUrl: found.shareUrl || found.productUrl || trimmed,
         };
       }
-      // Default to matching first album or returning validated input
-      const first = listData.albums[0]!;
-      return {
-        albumId: first.id,
-        albumTitle: first.title || 'Shared Album',
-        shareUrl,
-      };
     }
+  } catch {
+    // Continue
   }
 
-  return {
-    albumId: shareUrl.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'default_album',
-    albumTitle: 'Google Photos Shared Album',
-    shareUrl,
-  };
+  // If still not matched, explain to the operator that albums must be created via the Photobooth
+  throw new ApiError(
+    400,
+    'invalid_request',
+    'Could not resolve album. Google Photos API requires the album to be created through the photobooth so photos can be streamed into it. Please click "Create & Select" under "Create new shared event album".',
+  );
 }

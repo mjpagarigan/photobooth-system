@@ -48,7 +48,10 @@ export type DeliveryClient = {
   confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse>;
   getGooglePhotosStatus?(): Promise<GooglePhotosStatus>;
   saveGooglePhotosConfig?(config: GooglePhotosConfig): Promise<void>;
+  createGooglePhotosAlbum?(title: string): Promise<{ albumId: string; albumTitle: string; shareUrl: string }>;
+  listGooglePhotosAlbums?(): Promise<Array<{ id: string; title: string; shareUrl?: string }>>;
   resolveGooglePhotosAlbum?(shareUrl: string): Promise<{ albumId: string; albumTitle: string; shareUrl: string }>;
+  syncGooglePhotosNow?(): Promise<{ processed: number; succeeded: number; failed: number }>;
   testGooglePhotosUpload?(): Promise<{ success: boolean; message: string }>;
   disconnectGooglePhotos?(): Promise<void>;
   health(): Promise<{ healthy: boolean; code: string | null; message: string }>;
@@ -283,6 +286,29 @@ export class SupabaseDeliveryClient implements DeliveryClient {
     await this.invokeFunction('google-photos-auth', { action: 'save-config', config });
   }
 
+  async createGooglePhotosAlbum(
+    title: string,
+  ): Promise<{ albumId: string; albumTitle: string; shareUrl: string }> {
+    const res = (await this.invokeFunction('google-photos-auth', {
+      action: 'create-album',
+      title,
+    })) as {
+      ok: boolean;
+      data: { albumId: string; albumTitle: string; shareUrl: string };
+    };
+    return res.data;
+  }
+
+  async listGooglePhotosAlbums(): Promise<Array<{ id: string; title: string; shareUrl?: string }>> {
+    const res = (await this.invokeFunction('google-photos-auth', {
+      action: 'list-albums',
+    })) as {
+      ok: boolean;
+      data: { albums: Array<{ id: string; title: string; shareUrl?: string }> };
+    };
+    return res.data?.albums || [];
+  }
+
   async resolveGooglePhotosAlbum(
     shareUrl: string,
   ): Promise<{ albumId: string; albumTitle: string; shareUrl: string }> {
@@ -292,6 +318,16 @@ export class SupabaseDeliveryClient implements DeliveryClient {
     })) as {
       ok: boolean;
       data: { albumId: string; albumTitle: string; shareUrl: string };
+    };
+    return res.data;
+  }
+
+  async syncGooglePhotosNow(): Promise<{ processed: number; succeeded: number; failed: number }> {
+    const res = (await this.invokeFunction('google-photos-auth', {
+      action: 'sync-now',
+    })) as {
+      ok: boolean;
+      data: { processed: number; succeeded: number; failed: number };
     };
     return res.data;
   }
@@ -431,13 +467,21 @@ export class SupabaseDeliveryClient implements DeliveryClient {
 function functionErrorFromResponse(body: unknown): { code: string | null; message: string | null } {
   if (!body || typeof body !== 'object') return { code: null, message: null };
   const response = body as Record<string, unknown>;
+  if (typeof response.error === 'string') {
+    return { code: null, message: response.error };
+  }
   const candidate =
     response.error && typeof response.error === 'object'
       ? (response.error as Record<string, unknown>)
       : response;
   return {
     code: typeof candidate.code === 'string' ? candidate.code : null,
-    message: typeof candidate.message === 'string' ? candidate.message : null,
+    message:
+      typeof candidate.message === 'string'
+        ? candidate.message
+        : typeof candidate.error === 'string'
+          ? candidate.error
+          : null,
   };
 }
 

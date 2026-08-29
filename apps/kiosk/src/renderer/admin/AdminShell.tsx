@@ -7,6 +7,21 @@ import {
 } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@grace-booth/ui';
+
 import { BrandMark } from '../components/BrandMark';
 import { Button } from '../components/Button';
 import type { AdminView } from '../types';
@@ -20,40 +35,52 @@ type AdminShellProps = {
 
 export function AdminShell({ children, onExit, onViewChange, view }: AdminShellProps) {
   return (
-    <main className="admin-shell" data-testid="admin-shell">
-      <aside className="admin-nav" aria-label="Operator navigation">
-        <BrandMark compact />
-        <div className="admin-nav__title">
-          <strong>OPERATOR PANEL</strong>
-          <span>M.A.T. // LOCAL TELEMETRY</span>
-        </div>
-        <nav>
-          <button
-            className={view === 'frame' ? 'is-active' : ''}
-            onClick={() => onViewChange('frame')}
-            aria-current={view === 'frame' ? 'page' : undefined}
-          >
-            <FrameCorners aria-hidden="true" weight="bold" />
-            <span>FRAME EDITOR</span>
-          </button>
-          <button
-            className={view === 'gallery' ? 'is-active' : ''}
-            onClick={() => onViewChange('gallery')}
-            aria-current={view === 'gallery' ? 'page' : undefined}
-          >
-            <Images aria-hidden="true" weight="bold" />
-            <span>RECENT PHOTOS</span>
-          </button>
-          <button
-            className={view === 'settings' ? 'is-active' : ''}
-            onClick={() => onViewChange('settings')}
-            aria-current={view === 'settings' ? 'page' : undefined}
-          >
-            <Gear aria-hidden="true" weight="bold" />
-            <span>SETTINGS &amp; HEALTH</span>
-          </button>
-        </nav>
-        <div className="admin-nav__exit">
+    <SidebarProvider className="admin-shell" data-testid="admin-shell">
+      <Sidebar aria-label="Operator navigation" className="admin-nav">
+        <SidebarHeader className="admin-nav__header">
+          <BrandMark compact />
+          <div className="admin-nav__title">
+            <strong>Operator panel</strong>
+            <span>Local booth controls</span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={view === 'frame'}
+                    onClick={() => onViewChange('frame')}
+                  >
+                    <FrameCorners aria-hidden="true" weight="bold" />
+                    <span>Frame editor</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={view === 'gallery'}
+                    onClick={() => onViewChange('gallery')}
+                  >
+                    <Images aria-hidden="true" weight="bold" />
+                    <span>Recent photos</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={view === 'settings'}
+                    onClick={() => onViewChange('settings')}
+                  >
+                    <Gear aria-hidden="true" weight="bold" />
+                    <span>Settings &amp; health</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter className="admin-nav__exit">
           <Button
             icon={<ArrowLeft aria-hidden="true" weight="bold" />}
             onClick={onExit}
@@ -66,9 +93,9 @@ export function AdminShell({ children, onExit, onViewChange, view }: AdminShellP
             <SignOut aria-hidden="true" weight="bold" />
             <span>ACCESS LOCKS ON DISMISSAL</span>
           </span>
-        </div>
-      </aside>
-      <section className="admin-workspace">{children}</section>
-    </main>
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset className="admin-workspace">{children}</SidebarInset>
+    </SidebarProvider>
   );
 }

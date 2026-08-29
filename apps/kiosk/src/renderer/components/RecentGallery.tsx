@@ -6,9 +6,22 @@ import {
   QrCodeIcon as QrCode,
   XIcon as X,
 } from '@phosphor-icons/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import type { GalleryItem, GalleryUploadStatus, UploadJobSummary } from '@grace-booth/shared';
+import {
+  Badge,
+  Button as CossButton,
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+  Skeleton,
+} from '@grace-booth/ui';
 
 import { Button } from './Button';
 
@@ -44,75 +57,7 @@ export function RecentGallery({
   repairingSessionId = null,
   onClose,
 }: RecentGalleryProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const detailDialogRef = useRef<HTMLDivElement>(null);
-  const detailTriggerRef = useRef<HTMLElement | null>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
   const [detailItem, setDetailItem] = useState<GalleryItem | null>(null);
-
-  useEffect(() => {
-    if (operator) return;
-    previousFocusRef.current = document.activeElement as HTMLElement | null;
-    const focusable = containerRef.current?.querySelector<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    focusable?.focus();
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (detailItem !== null) {
-          setDetailItem(null);
-        } else {
-          onClose();
-        }
-        return;
-      }
-      if (event.key === 'Tab' && containerRef.current) {
-        const trapRoot = detailItem ? detailDialogRef.current : containerRef.current;
-        const focusables = Array.from(
-          trapRoot?.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-          ) ?? [],
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [operator, onClose, detailItem]);
-
-  useEffect(() => {
-    if (!detailItem) {
-      detailTriggerRef.current?.focus();
-      return;
-    }
-    detailDialogRef.current
-      ?.querySelector<HTMLElement>(
-        'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-      )
-      ?.focus();
-  }, [detailItem]);
-
-  useEffect(() => {
-    return () => previousFocusRef.current?.focus();
-  }, []);
-
-  const openDetail = (item: GalleryItem, trigger: HTMLElement) => {
-    detailTriggerRef.current = trigger;
-    setDetailItem(item);
-  };
 
   const jobForSession = (sessionId: string): UploadJobSummary | null =>
     jobs.find((job) => job.sessionId === sessionId) ?? null;
@@ -126,28 +71,30 @@ export function RecentGallery({
       aria-modal={operator ? undefined : 'true'}
       aria-label="Recently captured photostrips"
       data-testid="recent-gallery"
-      ref={containerRef}
     >
       {!operator ? (
         <header className="recent-gallery__header">
           <h2>
             <Images aria-hidden="true" weight="bold" /> Recent photos
           </h2>
-          <button
+          <CossButton
             aria-label="Close recent photos"
-            className="icon-button"
             onClick={onClose}
+            size="icon"
             type="button"
+            variant="ghost"
           >
             <X aria-hidden="true" weight="bold" />
-          </button>
+          </CossButton>
         </header>
       ) : null}
 
       {busy ? (
-        <p className="recent-gallery__status" role="status">
-          Loading recent photos…
-        </p>
+        <div className="recent-gallery__loading" role="status">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <span className="sr-only">Loading recent photos…</span>
+        </div>
       ) : null}
       {error ? (
         <p className="form-error" role="alert">
@@ -163,20 +110,16 @@ export function RecentGallery({
           const job = operator ? jobForSession(item.sessionId) : null;
           return (
             <article
-              className={`gallery-tile gallery-tile--clickable${operator ? ' gallery-tile--operator' : ''}`}
+              className={`gallery-tile${operator ? ' gallery-tile--operator' : ''}`}
               data-testid={`gallery-item-${index + 1}`}
               key={item.sessionId}
-              onClick={(event) => openDetail(item, event.currentTarget)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  openDetail(item, e.currentTarget);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-label={`View photo strip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
             >
+              <button
+                aria-label={`View photo strip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
+                className="gallery-tile__open"
+                onClick={() => setDetailItem(item)}
+                type="button"
+              >
               <div className="gallery-tile__preview-container">
                 <img
                   alt={`Photostrip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
@@ -188,7 +131,16 @@ export function RecentGallery({
                   <MagnifyingGlassPlus weight="bold" />
                 </span>
               </div>
+              </button>
 
+              <div className="gallery-tile__summary">
+                <span className="gallery-tile__captured">
+                  {formatTimestamp(item.metadata.capturedAt)}
+                </span>
+                <Badge className={`status-pill status-pill--${item.metadata.uploadStatus}`}>
+                  {STATUS_LABEL[item.metadata.uploadStatus]}
+                </Badge>
+              </div>
               {item.qrDataUrl ? (
                 <img
                   alt={`QR code for the photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
@@ -196,12 +148,7 @@ export function RecentGallery({
                   draggable="false"
                   src={item.qrDataUrl}
                 />
-              ) : (
-                <span className="gallery-tile__qr gallery-tile__qr--empty" aria-hidden="true" />
-              )}
-              <span className="gallery-tile__captured">
-                {formatTimestamp(item.metadata.capturedAt)}
-              </span>
+              ) : null}
               {operator ? (
                 <table className="gallery-tile__metadata">
                   <tbody>
@@ -270,40 +217,26 @@ export function RecentGallery({
         </footer>
       ) : null}
 
-      {detailItem ? (
-        <div
-          className="recent-detail-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Enlarged photo strip details"
-          onClick={() => setDetailItem(null)}
-        >
-          <div
-            className="recent-detail-modal"
-            onClick={(e) => e.stopPropagation()}
-            ref={detailDialogRef}
-            role="document"
-          >
-            <header className="recent-detail-modal__header" role="presentation">
+      <Dialog onOpenChange={(open) => !open && setDetailItem(null)} open={Boolean(detailItem)}>
+        {detailItem ? (
+          <DialogPopup className="recent-detail-modal" maxWidthClass="max-w-4xl" showCloseButton={false}>
+            <DialogHeader className="recent-detail-modal__header">
               <div className="recent-detail-modal__title-group">
-                <h2>
+                <DialogTitle>
                   <Images aria-hidden="true" weight="bold" /> Photo Strip Details
-                </h2>
-                <span className="recent-detail-modal__subtitle">
+                </DialogTitle>
+                <DialogDescription className="recent-detail-modal__subtitle">
                   {formatTimestamp(detailItem.metadata.capturedAt)}
-                </span>
+                </DialogDescription>
               </div>
-              <button
-                aria-label="Close photo details"
-                className="icon-button"
-                onClick={() => setDetailItem(null)}
-                type="button"
+              <DialogClose
+                render={<CossButton aria-label="Close photo details" size="icon" type="button" variant="ghost" />}
               >
                 <X aria-hidden="true" weight="bold" />
-              </button>
-            </header>
+              </DialogClose>
+            </DialogHeader>
 
-            <div
+            <DialogPanel
               aria-label="Scrollable photo details"
               className="recent-detail-modal__body"
               tabIndex={0}
@@ -409,16 +342,16 @@ export function RecentGallery({
                   </div>
                 ) : null}
               </div>
-            </div>
+            </DialogPanel>
 
-            <footer className="recent-detail-modal__footer" role="presentation">
-              <Button onClick={() => setDetailItem(null)} variant="secondary">
+            <DialogFooter className="recent-detail-modal__footer">
+              <DialogClose render={<CossButton type="button" variant="secondary" />}>
                 Close
-              </Button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
+              </DialogClose>
+            </DialogFooter>
+          </DialogPopup>
+        ) : null}
+      </Dialog>
     </section>
   );
 
@@ -427,9 +360,15 @@ export function RecentGallery({
   }
 
   return (
-    <div className="recent-gallery-backdrop" role="presentation">
-      {content}
-    </div>
+    <Dialog onOpenChange={(open) => !open && onClose()} open>
+      <DialogPopup className="recent-gallery-shell" maxWidthClass="max-w-6xl" showCloseButton={false}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>Recent photos</DialogTitle>
+          <DialogDescription>Recently captured photostrips available on this booth.</DialogDescription>
+        </DialogHeader>
+        <DialogPanel className="p-0">{content}</DialogPanel>
+      </DialogPopup>
+    </Dialog>
   );
 }
 

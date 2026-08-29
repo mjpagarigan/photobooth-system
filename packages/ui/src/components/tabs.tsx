@@ -42,7 +42,7 @@ export const TabsTab = forwardRef<HTMLButtonElement, TabsTabProps>(function Tabs
     <BaseTabs.Tab
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 font-sans font-semibold tracking-wide transition-all cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50',
-        'data-[selected]:bg-card data-[selected]:text-foreground data-[selected]:shadow-sm',
+        'data-active:bg-card data-active:text-foreground data-active:shadow-sm',
         'hover:text-foreground',
         size === 'sm' && 'px-2.5 py-1 text-xs',
         size === 'default' && 'px-3.5 py-1.5 text-sm',

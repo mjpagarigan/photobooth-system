@@ -1,0 +1,29 @@
+{
+  "frameTabs": {
+    "selectedAfterArrow": "true"
+  },
+  "frameDelete": {
+    "dialogVisible": true,
+    "focusRestored": true
+  },
+  "galleryDetail": {
+    "dialogVisible": true,
+    "focusRestored": true
+  },
+  "settingsTabs": {
+    "selectedAfterArrow": "true"
+  },
+  "settingsValidation": {
+    "alert": "LAN port must be between 1024 and 65535.",
+    "invalid": "true"
+  },
+  "bootstrap": {
+    "remainsOpenAfterEscape": true,
+    "cancelCount": 0,
+    "passwordTypeAfterToggle": "text"
+  },
+  "cameraSelect": {
+    "optionCount": 1,
+    "listboxVisible": true
+  }
+}

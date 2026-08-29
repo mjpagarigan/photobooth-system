@@ -61,7 +61,7 @@ begin
   from public.google_photos_config
   where id = 1;
 
-  if v_enabled is not true or v_album_id is null or length(trim(v_album_id)) = 0 then
+  if v_enabled is not true then
     return null;
   end if;
 

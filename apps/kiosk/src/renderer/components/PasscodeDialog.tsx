@@ -4,9 +4,25 @@ import {
   LockKeyIcon as LockKey,
   XIcon as X,
 } from '@phosphor-icons/react';
-import { useEffect, useId, useRef, useState, type SyntheticEvent } from 'react';
+import { useRef, useState } from 'react';
 
-import { Button } from './Button';
+import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  Form,
+  Input,
+} from '@grace-booth/ui';
 
 type PasscodeDialogProps = {
   busy?: boolean;
@@ -27,58 +43,16 @@ export function PasscodeDialog({
   onCancel,
   onSubmit,
 }: PasscodeDialogProps) {
-  const descriptionId = useId();
-  const errorId = useId();
-  const dialogRef = useRef<HTMLElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [passcode, setPasscode] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [showPasscode, setShowPasscode] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const openerRef = useRef<HTMLElement | null>(
+    typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   const isBootstrap = mode === 'bootstrap';
-
-  useEffect(() => {
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    inputRef.current?.focus();
-    return () => previouslyFocused?.focus();
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && dismissible && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const focusable = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [busy, dismissible, onCancel]);
 
   const title = isBootstrap
     ? 'Create operator passcode'
@@ -92,8 +66,8 @@ export function PasscodeDialog({
       ? 'Enter the operator passcode to restart this session safely.'
       : 'Enter the shared operator passcode.';
 
-  const submit = (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
-    event.preventDefault();
+  const submit = (event?: React.SyntheticEvent) => {
+    event?.preventDefault();
     setLocalError(null);
 
     if (passcode.length < MIN_PASSCODE_LENGTH) {
@@ -112,92 +86,109 @@ export function PasscodeDialog({
   const displayedError = localError ?? error;
 
   return (
-    <div className="dialog-backdrop" role="presentation">
-      <section
+    <Dialog
+      onOpenChange={(open) => {
+        if (!open && dismissible && !busy) onCancel();
+      }}
+      open
+    >
+      <DialogPopup
         className="passcode-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="passcode-title"
-        aria-describedby={displayedError ? `${descriptionId} ${errorId}` : descriptionId}
-        ref={dialogRef}
+        finalFocus={() => openerRef.current}
+        maxWidthClass="max-w-md"
+        showCloseButton={false}
       >
-        {dismissible ? (
-          <button
-            aria-label="Close"
-            className="icon-button passcode-dialog__close"
-            disabled={busy}
-            onClick={() => {
-              if (!busy) {
-                onCancel();
-              }
-            }}
-          >
-            <X aria-hidden="true" weight="bold" />
-          </button>
-        ) : null}
-        <div className="passcode-dialog__header">
+        <DialogHeader className="passcode-dialog__header">
           <div className="passcode-dialog__motif">
             <LockKey aria-hidden="true" weight="bold" />
           </div>
           <div>
-            <h2 id="passcode-title">{title}</h2>
-            <p id={descriptionId}>{description}</p>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
           </div>
-        </div>
-        <form onSubmit={submit} className="passcode-dialog__form">
-          <label htmlFor="operator-passcode">Passcode</label>
-          <div className="password-field">
-            <input
-              autoComplete={isBootstrap ? 'new-password' : 'current-password'}
-              id="operator-passcode"
-              maxLength={64}
-              minLength={MIN_PASSCODE_LENGTH}
-              onChange={(event) => setPasscode(event.target.value)}
-              ref={inputRef}
-              type={showPasscode ? 'text' : 'password'}
-              value={passcode}
-              aria-invalid={Boolean(displayedError)}
-            />
-            <button
-              aria-label={showPasscode ? 'Hide passcode' : 'Show passcode'}
-              className="password-field__toggle"
-              onClick={() => setShowPasscode((visible) => !visible)}
-              type="button"
+          {dismissible ? (
+            <DialogClose
+              disabled={busy}
+              render={
+                <Button
+                  aria-label="Close"
+                  className="passcode-dialog__close"
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                />
+              }
             >
-              {showPasscode ? <EyeSlash aria-hidden="true" weight="bold" /> : <Eye aria-hidden="true" weight="bold" />}
-            </button>
-          </div>
-          {isBootstrap ? (
-            <>
-              <label htmlFor="operator-passcode-confirmation">Confirm passcode</label>
-              <input
-                autoComplete="new-password"
-                id="operator-passcode-confirmation"
-                maxLength={64}
-                minLength={MIN_PASSCODE_LENGTH}
-                onChange={(event) => setConfirmation(event.target.value)}
-                type={showPasscode ? 'text' : 'password'}
-                value={confirmation}
-              />
-            </>
+              <X aria-hidden="true" weight="bold" />
+            </DialogClose>
           ) : null}
-          {displayedError ? (
-            <p className="form-error" id={errorId} role="alert">
-              {displayedError}
-            </p>
-          ) : null}
-          <div className="passcode-dialog__actions">
+        </DialogHeader>
+        <Form className="contents" noValidate onSubmit={submit}>
+          <DialogPanel className="passcode-dialog__form">
+            <Field invalid={Boolean(displayedError)} name="passcode">
+              <FieldLabel>Passcode</FieldLabel>
+              <div className="password-field">
+                <Input
+                  aria-invalid={Boolean(displayedError)}
+                  autoComplete={isBootstrap ? 'new-password' : 'current-password'}
+                  autoFocus
+                  id="operator-passcode"
+                  maxLength={64}
+                  minLength={MIN_PASSCODE_LENGTH}
+                  onChange={(event) => setPasscode(event.target.value)}
+                  required
+                  type={showPasscode ? 'text' : 'password'}
+                  value={passcode}
+                />
+                <Button
+                  aria-label={showPasscode ? 'Hide passcode' : 'Show passcode'}
+                  className="password-field__toggle"
+                  onClick={() => setShowPasscode((visible) => !visible)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  {showPasscode ? (
+                    <EyeSlash aria-hidden="true" weight="bold" />
+                  ) : (
+                    <Eye aria-hidden="true" weight="bold" />
+                  )}
+                </Button>
+              </div>
+              <FieldDescription>Use at least {MIN_PASSCODE_LENGTH} characters.</FieldDescription>
+              {displayedError ? <FieldError match>{displayedError}</FieldError> : null}
+            </Field>
+            {isBootstrap ? (
+              <Field name="confirmation">
+                <FieldLabel>Confirm passcode</FieldLabel>
+                <Input
+                  autoComplete="new-password"
+                  id="operator-passcode-confirmation"
+                  maxLength={64}
+                  minLength={MIN_PASSCODE_LENGTH}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  required
+                  type={showPasscode ? 'text' : 'password'}
+                  value={confirmation}
+                />
+              </Field>
+            ) : null}
+          </DialogPanel>
+          <DialogFooter className="passcode-dialog__actions">
             {dismissible ? (
-              <Button disabled={busy} onClick={onCancel} variant="secondary">
+              <DialogClose
+                disabled={busy}
+                render={<Button type="button" variant="secondary" />}
+              >
                 Cancel
-              </Button>
+              </DialogClose>
             ) : null}
             <Button loading={busy} type="submit">
               {mode === 'restart' ? 'Restart session' : isBootstrap ? 'Save passcode' : 'Unlock'}
             </Button>
-          </div>
-        </form>
-      </section>
-    </div>
+          </DialogFooter>
+        </Form>
+      </DialogPopup>
+    </Dialog>
   );
 }

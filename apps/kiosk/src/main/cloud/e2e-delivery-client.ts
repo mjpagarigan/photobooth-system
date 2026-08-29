@@ -9,6 +9,8 @@ import type {
   CreateUploadResponse,
   ResumeUploadResponse,
   PhotoAvailability,
+  GooglePhotosConfig,
+  GooglePhotosStatus,
 } from '@grace-booth/shared';
 
 import { DeliveryFailure, type DeliveryClient } from './delivery-client.js';
@@ -114,6 +116,76 @@ export class E2eDeliveryClient implements DeliveryClient {
   confirmPhotoRepair(request: ConfirmPhotoRepairRequest): Promise<ConfirmUploadResponse> {
     void request;
     return this.confirmUpload();
+  }
+
+  getGooglePhotosStatus(): Promise<GooglePhotosStatus> {
+    return Promise.resolve({
+      config: {
+        connectedEmail: 'booth-operator@example.com',
+        albumId: 'e2e_album_123',
+        albumTitle: 'E2E Photobooth Album',
+        albumShareUrl: 'https://photos.app.goo.gl/e2e123',
+        enabled: true,
+      },
+      stats: {
+        syncedCount: 1,
+        pendingCount: 0,
+        failedCount: 0,
+        lastSyncedAt: Date.now(),
+      },
+      hasRefreshToken: true,
+      hasCredentials: true,
+    });
+  }
+
+  saveGooglePhotosConfig(config: GooglePhotosConfig): Promise<void> {
+    void config;
+    return Promise.resolve();
+  }
+
+  createGooglePhotosAlbum(
+    title: string,
+  ): Promise<{ albumId: string; albumTitle: string; shareUrl: string }> {
+    return Promise.resolve({
+      albumId: 'e2e_created_album_123',
+      albumTitle: title,
+      shareUrl: `https://photos.app.goo.gl/${encodeURIComponent(title)}`,
+    });
+  }
+
+  listGooglePhotosAlbums(): Promise<Array<{ id: string; title: string; shareUrl?: string }>> {
+    return Promise.resolve([
+      {
+        id: 'e2e_album_1',
+        title: 'Ministry Fair 2026',
+        shareUrl: 'https://photos.app.goo.gl/e2e1',
+      },
+    ]);
+  }
+
+  resolveGooglePhotosAlbum(
+    shareUrl: string,
+  ): Promise<{ albumId: string; albumTitle: string; shareUrl: string }> {
+    return Promise.resolve({
+      albumId: 'resolved_album_123',
+      albumTitle: 'Resolved Event Album',
+      shareUrl,
+    });
+  }
+
+  syncGooglePhotosNow(): Promise<{ processed: number; succeeded: number; failed: number }> {
+    return Promise.resolve({ processed: 1, succeeded: 1, failed: 0 });
+  }
+
+  testGooglePhotosUpload(): Promise<{ success: boolean; message: string }> {
+    return Promise.resolve({
+      success: true,
+      message: 'E2E Google Photos test upload succeeded.',
+    });
+  }
+
+  disconnectGooglePhotos(): Promise<void> {
+    return Promise.resolve();
   }
 
   health(): Promise<{ healthy: boolean; code: string | null; message: string }> {

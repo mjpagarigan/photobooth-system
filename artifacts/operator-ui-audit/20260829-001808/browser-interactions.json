@@ -1,0 +1,20 @@
+{
+  "frameArrowAfterRight": "true",
+  "deleteAfterFirstClick": 1,
+  "deleteDialogCount": 0,
+  "settingsScrollOwners": [
+    {
+      "className": "admin-workspace",
+      "clientHeight": 720,
+      "scrollHeight": 2644,
+      "tag": "SECTION"
+    }
+  ],
+  "cameraInitialFocus": {
+    "label": "Close",
+    "tag": "BUTTON",
+    "text": ""
+  },
+  "cameraClosedAfterEscape": true,
+  "cameraFocusRestored": true
+}

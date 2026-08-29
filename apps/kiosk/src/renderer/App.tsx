@@ -15,6 +15,7 @@ import type {
   RpcResult,
   UploadJobSummary,
 } from '@grace-booth/shared';
+import { AnchoredToastProvider, ToastProvider } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
@@ -192,6 +193,17 @@ export function App() {
           setAdminSettings(fixture.settings);
           setHealth(fixture.health);
           setJobs(fixture.jobs);
+          setAdminBusy(fixture.operatorBusy ?? false);
+          setAdminError(fixture.operatorError ?? null);
+          setAdminStatus(fixture.operatorStatus ?? null);
+          setRecent({
+            open: false,
+            busy: false,
+            items: fixture.recentItems ?? [],
+            error: null,
+          });
+          setDialog(fixture.dialog ?? null);
+          setCameraSetupOpen(fixture.cameraSetupOpen ?? false);
           if (fixture.adminView) {
             setAdminView(fixture.adminView);
             setAdminOpen(true);
@@ -1052,6 +1064,8 @@ export function App() {
 
   if (adminOpen && adminSettings) {
     return (
+      <ToastProvider>
+      <AnchoredToastProvider>
       <>
         <AdminShell onExit={() => void exitAdmin()} onViewChange={setAdminView} view={adminView}>
           {adminView === 'frame' ? (
@@ -1113,7 +1127,7 @@ export function App() {
               }
               onOpenCameras={() => setCameraSetupOpen(true)}
               onRefresh={() => void refreshAdminData()}
-              onRetryJob={(jobId) => void retryJob(jobId)}
+              onRetryJob={(jobId: string) => void retryJob(jobId)}
               onSaveSettings={(input) => void saveSettings(input)}
               settings={adminSettings}
               status={adminStatus}
@@ -1130,10 +1144,14 @@ export function App() {
           }}
         />
       </>
+      </AnchoredToastProvider>
+      </ToastProvider>
     );
   }
 
   return (
+    <ToastProvider>
+    <AnchoredToastProvider>
     <>
       <div
         aria-hidden={dialog || cameraSetupOpen || recent.open ? true : undefined}
@@ -1181,5 +1199,7 @@ export function App() {
         />
       ) : null}
     </>
+    </AnchoredToastProvider>
+    </ToastProvider>
   );
 }

@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AdminHealth, AdminSettings, FrameLayout, GalleryItem } from '@grace-booth/shared';
 
 import { AdminSettings as AdminSettingsScreen } from '../../src/renderer/admin/AdminSettings';
+import { AdminShell } from '../../src/renderer/admin/AdminShell';
 import { FrameEditor } from '../../src/renderer/admin/FrameEditor';
 import { RecentGallery } from '../../src/renderer/components/RecentGallery';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
@@ -307,9 +308,13 @@ describe('FrameEditor', () => {
     await user.click(screen.getByRole('button', { name: `Move ${FRAME.name} down` }));
     expect(onMoveFrame).toHaveBeenCalledWith(FRAME.id, 'down');
 
-    await user.click(screen.getByRole('button', { name: `Delete ${FRAME.name}` }));
+    const deleteButton = screen.getByRole('button', { name: `Delete ${FRAME.name}` });
+    await user.click(deleteButton);
     expect(onDeleteFrame).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: `Confirm delete ${FRAME.name}` }));
+    await user.keyboard('{Escape}');
+    expect(deleteButton).toHaveFocus();
+    await user.click(deleteButton);
+    await user.click(screen.getByRole('button', { name: 'Delete frame' }));
     expect(onDeleteFrame).toHaveBeenCalledWith(FRAME.id);
   });
 
@@ -328,8 +333,17 @@ describe('FrameEditor', () => {
     // Row 1 (FRAME) is selected by default. Click trash on Row 2 (FRAME_2).
     await user.click(screen.getByRole('button', { name: `Delete ${FRAME_2.name}` }));
     expect(onDeleteFrame).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: `Confirm delete ${FRAME_2.name}` }));
+    await user.click(screen.getByRole('button', { name: 'Delete frame' }));
     expect(onDeleteFrame).toHaveBeenCalledWith(FRAME_2.id);
+  });
+
+  it('uses roving keyboard selection for photo-slot tabs', async () => {
+    const user = userEvent.setup();
+    render(<FrameEditor {...baseProps} frames={[FRAME]} onSave={() => undefined} />);
+    const first = screen.getByRole('tab', { name: 'Slot 1' });
+    first.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Slot 2' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('handles ReviewScreen with 1, 3, and 20 frames with roving tabindex and keyboard navigation', async () => {
@@ -380,6 +394,25 @@ describe('FrameEditor', () => {
   });
 });
 
+describe('AdminShell', () => {
+  it('exposes current-page navigation and keeps exit separate', async () => {
+    const user = userEvent.setup();
+    const onViewChange = vi.fn();
+    render(
+      <AdminShell onExit={vi.fn()} onViewChange={onViewChange} view="frame">
+        <p>Workspace</p>
+      </AdminShell>,
+    );
+    expect(screen.getByRole('button', { name: 'Frame editor' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await user.click(screen.getByRole('button', { name: 'Recent photos' }));
+    expect(onViewChange).toHaveBeenCalledWith('gallery');
+    expect(screen.getByRole('button', { name: 'Back to booth' })).toBeVisible();
+  });
+});
+
 describe('AdminSettings', () => {
   const props = {
     health: HEALTH,
@@ -394,26 +427,30 @@ describe('AdminSettings', () => {
   };
 
   it('validates LAN port range before saving', async () => {
+    const user = userEvent.setup();
     render(
       <AdminSettingsScreen
         {...props}
         settings={{ ...SETTINGS, lan: { ...SETTINGS.lan, enabled: true } }}
       />,
     );
+    await user.click(screen.getByRole('tab', { name: 'Network' }));
     const portInput = screen.getByLabelText('Port');
     fireEvent.change(portInput, { target: { value: '80' } });
-    fireEvent.submit(portInput.closest('form')!);
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'LAN port must be between 1024 and 65535.',
     );
     expect(props.onSaveSettings).not.toHaveBeenCalled();
   });
 
-  it('keeps retention read-only and passcode inputs aligned to 8 to 64 characters', () => {
+  it('keeps retention read-only and passcode inputs aligned to 8 to 64 characters', async () => {
+    const user = userEvent.setup();
     render(<AdminSettingsScreen {...props} />);
     expect(screen.getByText('30')).toBeVisible();
     expect(screen.getByText('60')).toBeVisible();
     expect(screen.queryByRole('spinbutton', { name: /retention/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Security & Cloud' }));
     expect(screen.getByLabelText('Current passcode')).toHaveAttribute('maxLength', '64');
     expect(screen.getByLabelText('New passcode')).toHaveAttribute('maxLength', '64');
     expect(screen.getByLabelText('Confirm passcode')).toHaveAttribute('maxLength', '64');

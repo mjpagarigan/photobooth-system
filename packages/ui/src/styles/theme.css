@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../components";
 
 @theme {
   --color-charcoal: #464646;

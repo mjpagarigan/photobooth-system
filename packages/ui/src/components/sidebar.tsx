@@ -31,18 +31,19 @@ export function SidebarProvider({
   children,
   defaultExpanded = true,
   className,
+  ...props
 }: {
-  children: ReactNode;
   defaultExpanded?: boolean;
-  className?: string;
-}) {
+} & HTMLAttributes<HTMLDivElement>) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const toggle = useCallback(() => setExpanded((prev) => !prev), []);
   const value = useMemo(() => ({ expanded, setExpanded, toggle }), [expanded, toggle]);
 
   return (
     <SidebarContext.Provider value={value}>
-      <div className={cn('flex h-full w-full overflow-hidden', className)}>{children}</div>
+      <div data-slot="sidebar-provider" className={cn('flex h-full w-full overflow-hidden', className)} {...props}>
+        {children}
+      </div>
     </SidebarContext.Provider>
   );
 }
@@ -54,6 +55,7 @@ export function Sidebar({
 }: HTMLAttributes<HTMLElement>) {
   return (
     <aside
+      data-slot="sidebar"
       className={cn(
         'relative flex h-full w-72 flex-col shrink-0 border-r border-border/40 bg-card text-card-foreground transition-all duration-200 select-none z-20',
         className,
@@ -71,7 +73,7 @@ export function SidebarHeader({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex flex-col gap-2 p-5 border-b border-border/40', className)} {...props}>
+    <div data-slot="sidebar-header" className={cn('flex flex-col gap-2 p-5 border-b border-border/40', className)} {...props}>
       {children}
     </div>
   );
@@ -83,7 +85,7 @@ export function SidebarContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex flex-1 flex-col overflow-y-auto p-3 gap-4', className)} {...props}>
+    <div data-sidebar="content" data-slot="sidebar-content" className={cn('flex flex-1 flex-col overflow-y-auto p-3 gap-4', className)} {...props}>
       {children}
     </div>
   );
@@ -95,7 +97,7 @@ export function SidebarGroup({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex flex-col gap-1', className)} {...props}>
+    <div data-slot="sidebar-group" className={cn('flex flex-col gap-1', className)} {...props}>
       {children}
     </div>
   );
@@ -112,6 +114,7 @@ export function SidebarGroupLabel({
         'px-3 py-1.5 font-mono text-[10px] font-bold tracking-widest text-muted-foreground uppercase',
         className,
       )}
+      data-slot="sidebar-group-label"
       {...props}
     >
       {children}
@@ -125,7 +128,7 @@ export function SidebarGroupContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex flex-col gap-1', className)} {...props}>
+    <div data-sidebar="group-content" data-slot="sidebar-group-content" className={cn('flex flex-col gap-1', className)} {...props}>
       {children}
     </div>
   );
@@ -137,7 +140,7 @@ export function SidebarMenu({
   ...props
 }: HTMLAttributes<HTMLUListElement>) {
   return (
-    <ul className={cn('flex flex-col gap-1 list-none p-0 m-0', className)} {...props}>
+    <ul data-slot="sidebar-menu" className={cn('flex flex-col gap-1 list-none p-0 m-0', className)} {...props}>
       {children}
     </ul>
   );
@@ -149,7 +152,7 @@ export function SidebarMenuItem({
   ...props
 }: HTMLAttributes<HTMLLIElement>) {
   return (
-    <li className={cn('list-none p-0 m-0', className)} {...props}>
+    <li data-slot="sidebar-menu-item" className={cn('list-none p-0 m-0', className)} {...props}>
       {children}
     </li>
   );
@@ -184,6 +187,9 @@ export const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButton
       <button
         aria-current={isActive ? 'page' : undefined}
         className={classNames}
+        data-active={isActive ? 'true' : 'false'}
+        data-sidebar="menu-button"
+        data-slot="sidebar-menu-button"
         disabled={disabled}
         ref={ref}
         type="button"
@@ -203,6 +209,7 @@ export function SidebarFooter({
   return (
     <div
       className={cn('mt-auto flex flex-col gap-2 p-4 border-t border-border/40', className)}
+      data-slot="sidebar-footer"
       {...props}
     >
       {children}
@@ -214,10 +221,10 @@ export function SidebarInset({
   children,
   className,
   ...props
-}: HTMLAttributes<HTMLDivElement>) {
+}: HTMLAttributes<HTMLElement>) {
   return (
-    <div className={cn('flex flex-1 flex-col overflow-hidden bg-background', className)} {...props}>
+    <main data-slot="sidebar-inset" className={cn('flex min-w-0 flex-1 flex-col overflow-hidden bg-background', className)} {...props}>
       {children}
-    </div>
+    </main>
   );
 }

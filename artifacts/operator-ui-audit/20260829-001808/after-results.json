@@ -1,0 +1,2263 @@
+[
+  {
+    "visual": "admin-frame",
+    "surface": "frame-editor",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "frame-editor--default--viewport--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "button",
+          "label": "Reset slot",
+          "left": 959,
+          "top": 884,
+          "right": 1263,
+          "bottom": 932
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame-error",
+    "surface": "frame-editor",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "frame-editor--save-error--viewport--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "button",
+          "label": "Reset slot",
+          "left": 959,
+          "top": 884,
+          "right": 1263,
+          "bottom": 932
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery",
+    "surface": "recent-photos",
+    "state": "populated",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "recent-photos--populated--viewport--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery-empty",
+    "surface": "recent-photos",
+    "state": "empty",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "recent-photos--empty--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings",
+    "surface": "settings-health",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "settings-health--default--viewport--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": [
+        {
+          "node": "button",
+          "label": "Configure Camera & Test Feed",
+          "left": 350,
+          "top": 724,
+          "right": 1202,
+          "bottom": 772
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-degraded",
+    "surface": "settings-health",
+    "state": "degraded",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "settings-health--degraded--viewport--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-error",
+    "surface": "settings-health",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "settings-health--save-error--viewport--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": [
+        {
+          "node": "button",
+          "label": "Configure Camera & Test Feed",
+          "left": 350,
+          "top": 724,
+          "right": 1202,
+          "bottom": 772
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-login",
+    "surface": "operator-access",
+    "state": "login",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "operator-access--login--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-bootstrap",
+    "surface": "operator-access",
+    "state": "bootstrap",
+    "interaction": "nondismissible",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "operator-access--bootstrap--nondismissible--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-restart",
+    "surface": "operator-access",
+    "state": "restart",
+    "interaction": "busy",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "operator-access--restart--busy--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "camera-setup",
+    "surface": "camera-setup",
+    "state": "open",
+    "interaction": "default",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "screenshot": "camera-setup--open--default--1280x720.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "bodyWidth": 1280,
+      "documentWidth": 1280,
+      "bodyHeight": 720,
+      "documentHeight": 720,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame",
+    "surface": "frame-editor",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "frame-editor--default--viewport--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "button",
+          "label": "Reset slot",
+          "left": 1005,
+          "top": 886,
+          "right": 1309,
+          "bottom": 934
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame-error",
+    "surface": "frame-editor",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "frame-editor--save-error--viewport--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "button",
+          "label": "Reset slot",
+          "left": 1005,
+          "top": 886,
+          "right": 1309,
+          "bottom": 934
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery",
+    "surface": "recent-photos",
+    "state": "populated",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "recent-photos--populated--viewport--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery-empty",
+    "surface": "recent-photos",
+    "state": "empty",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "recent-photos--empty--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings",
+    "surface": "settings-health",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "settings-health--default--viewport--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-degraded",
+    "surface": "settings-health",
+    "state": "degraded",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "settings-health--degraded--viewport--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-error",
+    "surface": "settings-health",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "settings-health--save-error--viewport--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-login",
+    "surface": "operator-access",
+    "state": "login",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "operator-access--login--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-bootstrap",
+    "surface": "operator-access",
+    "state": "bootstrap",
+    "interaction": "nondismissible",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "operator-access--bootstrap--nondismissible--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-restart",
+    "surface": "operator-access",
+    "state": "restart",
+    "interaction": "busy",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "operator-access--restart--busy--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "camera-setup",
+    "surface": "camera-setup",
+    "state": "open",
+    "interaction": "default",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "screenshot": "camera-setup--open--default--1366x768.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1366,
+      "viewportHeight": 768,
+      "bodyWidth": 1366,
+      "documentWidth": 1366,
+      "bodyHeight": 768,
+      "documentHeight": 768,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame",
+    "surface": "frame-editor",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "frame-editor--default--viewport--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame-error",
+    "surface": "frame-editor",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "frame-editor--save-error--viewport--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery",
+    "surface": "recent-photos",
+    "state": "populated",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "recent-photos--populated--viewport--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery-empty",
+    "surface": "recent-photos",
+    "state": "empty",
+    "interaction": "default",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "recent-photos--empty--default--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings",
+    "surface": "settings-health",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "settings-health--default--viewport--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-degraded",
+    "surface": "settings-health",
+    "state": "degraded",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "settings-health--degraded--viewport--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-error",
+    "surface": "settings-health",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "settings-health--save-error--viewport--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-login",
+    "surface": "operator-access",
+    "state": "login",
+    "interaction": "default",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "operator-access--login--default--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-bootstrap",
+    "surface": "operator-access",
+    "state": "bootstrap",
+    "interaction": "nondismissible",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "operator-access--bootstrap--nondismissible--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-restart",
+    "surface": "operator-access",
+    "state": "restart",
+    "interaction": "busy",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "operator-access--restart--busy--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "camera-setup",
+    "surface": "camera-setup",
+    "state": "open",
+    "interaction": "default",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "camera-setup--open--default--1920x1080.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "bodyWidth": 1920,
+      "documentWidth": 1920,
+      "bodyHeight": 1080,
+      "documentHeight": 1080,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame",
+    "surface": "frame-editor",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "frame-editor--default--viewport--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": 39,
+          "top": 1166,
+          "right": 729,
+          "bottom": 1210
+        },
+        {
+          "node": "tab",
+          "label": "Slot 1",
+          "left": 44,
+          "top": 1323,
+          "right": 268,
+          "bottom": 1371
+        },
+        {
+          "node": "tab",
+          "label": "Slot 2",
+          "left": 272,
+          "top": 1323,
+          "right": 496,
+          "bottom": 1371
+        },
+        {
+          "node": "tab",
+          "label": "Slot 3",
+          "left": 500,
+          "top": 1323,
+          "right": 724,
+          "bottom": 1371
+        },
+        {
+          "node": "input",
+          "label": "x percent",
+          "left": 39,
+          "top": 1448,
+          "right": 378,
+          "bottom": 1492
+        },
+        {
+          "node": "input",
+          "label": "y percent",
+          "left": 390,
+          "top": 1448,
+          "right": 729,
+          "bottom": 1492
+        },
+        {
+          "node": "input",
+          "label": "width percent",
+          "left": 39,
+          "top": 1526,
+          "right": 378,
+          "bottom": 1570
+        },
+        {
+          "node": "input",
+          "label": "height percent",
+          "left": 390,
+          "top": 1526,
+          "right": 729,
+          "bottom": 1570
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "button",
+          "label": "Reset slot",
+          "left": 39,
+          "top": 1796,
+          "right": 729,
+          "bottom": 1844
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-frame-error",
+    "surface": "frame-editor",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "frame-editor--save-error--viewport--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": 39,
+          "top": 1166,
+          "right": 729,
+          "bottom": 1210
+        },
+        {
+          "node": "tab",
+          "label": "Slot 1",
+          "left": 44,
+          "top": 1323,
+          "right": 268,
+          "bottom": 1371
+        },
+        {
+          "node": "tab",
+          "label": "Slot 2",
+          "left": 272,
+          "top": 1323,
+          "right": 496,
+          "bottom": 1371
+        },
+        {
+          "node": "tab",
+          "label": "Slot 3",
+          "left": 500,
+          "top": 1323,
+          "right": 724,
+          "bottom": 1371
+        },
+        {
+          "node": "input",
+          "label": "x percent",
+          "left": 39,
+          "top": 1448,
+          "right": 378,
+          "bottom": 1492
+        },
+        {
+          "node": "input",
+          "label": "y percent",
+          "left": 390,
+          "top": 1448,
+          "right": 729,
+          "bottom": 1492
+        },
+        {
+          "node": "input",
+          "label": "width percent",
+          "left": 39,
+          "top": 1526,
+          "right": 378,
+          "bottom": 1570
+        },
+        {
+          "node": "input",
+          "label": "height percent",
+          "left": 390,
+          "top": 1526,
+          "right": 729,
+          "bottom": 1570
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "button",
+          "label": "Reset slot",
+          "left": 39,
+          "top": 1796,
+          "right": 729,
+          "bottom": 1844
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery",
+    "surface": "recent-photos",
+    "state": "populated",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "recent-photos--populated--viewport--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-gallery-empty",
+    "surface": "recent-photos",
+    "state": "empty",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "recent-photos--empty--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings",
+    "surface": "settings-health",
+    "state": "default",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "settings-health--default--viewport--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": [
+        {
+          "node": "tab",
+          "label": "Upload Queue",
+          "left": 653,
+          "top": 327,
+          "right": 782,
+          "bottom": 371
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-degraded",
+    "surface": "settings-health",
+    "state": "degraded",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "settings-health--degraded--viewport--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": [
+        {
+          "node": "tab",
+          "label": "Upload Queue",
+          "left": 653,
+          "top": 273,
+          "right": 782,
+          "bottom": 317
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "admin-settings-error",
+    "surface": "settings-health",
+    "state": "save-error",
+    "interaction": "viewport",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "settings-health--save-error--viewport--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": [
+        {
+          "node": "tab",
+          "label": "Upload Queue",
+          "left": 653,
+          "top": 327,
+          "right": 782,
+          "bottom": 371
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-login",
+    "surface": "operator-access",
+    "state": "login",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "operator-access--login--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-bootstrap",
+    "surface": "operator-access",
+    "state": "bootstrap",
+    "interaction": "nondismissible",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "operator-access--bootstrap--nondismissible--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "operator-restart",
+    "surface": "operator-access",
+    "state": "restart",
+    "interaction": "busy",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "operator-access--restart--busy--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [],
+      "outOfViewport": []
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  },
+  {
+    "visual": "camera-setup",
+    "surface": "camera-setup",
+    "state": "open",
+    "interaction": "default",
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "screenshot": "camera-setup--open--default--768x1024.png",
+    "seriousOrCritical": [],
+    "moderate": [
+      {
+        "id": "landmark-unique",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1
+      }
+    ],
+    "geometry": {
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "bodyWidth": 768,
+      "documentWidth": 768,
+      "bodyHeight": 1024,
+      "documentHeight": 1024,
+      "horizontalOverflow": false,
+      "undersizedControls": [
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "SPAN",
+          "width": 18,
+          "height": 18
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        },
+        {
+          "label": "INPUT",
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "outOfViewport": [
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        },
+        {
+          "node": "input",
+          "label": "",
+          "left": -1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0
+        }
+      ]
+    },
+    "externalRequests": [],
+    "consoleErrors": []
+  }
+]

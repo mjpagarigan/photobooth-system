@@ -1,0 +1,22 @@
+Baseline classification: clean; no pre-existing/unknown-provenance changes.
+Tracked forbidden changes relative to HEAD: none.
+Deleted forbidden files: none.
+Untracked forbidden files: none.
+
+Allowed-path definition used for the aggregate manifest:
+- apps/kiosk/src/renderer/admin/**
+- apps/kiosk/src/renderer/components/RecentGallery.tsx
+- apps/kiosk/src/renderer/components/CameraSetupModal.tsx
+- apps/kiosk/src/renderer/components/PasscodeDialog.tsx
+- apps/kiosk/src/renderer/App.tsx (approval-required operator fixture/provider exception)
+- apps/kiosk/src/renderer/styles.css
+- apps/kiosk/src/renderer/visual-fixtures.ts
+- packages/ui/**
+- apps/kiosk/tests/renderer/**
+- tests/e2e/**
+- playwright.config.ts
+- apps/kiosk/vite.renderer.config.ts
+- package manifests only if a documented frontend requirement is approved
+- artifacts/operator-ui-audit/**
+
+Every other tracked path is treated as forbidden for this task.

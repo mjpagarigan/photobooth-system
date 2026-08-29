@@ -202,6 +202,9 @@ export const GooglePhotosStatusSchema = z
   .object({
     config: GooglePhotosConfigSchema,
     stats: GoogleSyncStatsSchema,
+    hasRefreshToken: z.boolean().default(false),
+    hasCredentials: z.boolean().default(true),
+    authUrl: z.string().nullable().optional(),
   })
   .strict();
 export type GooglePhotosStatus = z.infer<typeof GooglePhotosStatusSchema>;

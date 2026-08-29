@@ -1,6 +1,8 @@
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import {
   addMediaItemToAlbum,
+  createAlbumInGooglePhotos,
+  listGooglePhotosAlbums,
   refreshGoogleAccessToken,
   resolveAlbumShareUrl,
   uploadBytesToGooglePhotos,
@@ -34,6 +36,69 @@ Deno.test('refreshGoogleAccessToken rejects invalid credentials with 401', async
     () => refreshGoogleAccessToken('cid', 'csec', 'invalid_token', { fetchImpl: mockFetch }),
     Error,
   );
+});
+
+Deno.test('createAlbumInGooglePhotos creates and shares album', async () => {
+  const mockFetch: typeof fetch = (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/v1/albums')) {
+      assertEquals(init?.method, 'POST');
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: 'created_album_123',
+            title: 'Ministry Fair 2026',
+            productUrl: 'https://photos.google.com/lr/album/created_album_123',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    }
+    if (url.includes(':share')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            shareInfo: { shareableUrl: 'https://photos.app.goo.gl/share123' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    }
+    return Promise.reject(new Error('Unknown url'));
+  };
+
+  const result = await createAlbumInGooglePhotos('token', 'Ministry Fair 2026', {
+    fetchImpl: mockFetch,
+  });
+
+  assertEquals(result.albumId, 'created_album_123');
+  assertEquals(result.albumTitle, 'Ministry Fair 2026');
+  assertEquals(result.shareUrl, 'https://photos.app.goo.gl/share123');
+});
+
+Deno.test('listGooglePhotosAlbums returns array of albums', async () => {
+  const mockFetch: typeof fetch = (_input, _init) => {
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          albums: [
+            {
+              id: 'album_1',
+              title: 'First Album',
+              productUrl: 'https://photos.google.com/album1',
+              shareInfo: { shareableUrl: 'https://photos.app.goo.gl/alb1' },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+  };
+
+  const albums = await listGooglePhotosAlbums('token', { fetchImpl: mockFetch });
+  assertEquals(albums.length, 1);
+  assertEquals(albums[0]?.title, 'First Album');
+  assertEquals(albums[0]?.shareUrl, 'https://photos.app.goo.gl/alb1');
 });
 
 Deno.test('uploadBytesToGooglePhotos streams bytes and returns upload token', async () => {
@@ -102,3 +167,58 @@ Deno.test('resolveAlbumShareUrl resolves share URL to album title and ID', async
   assertEquals(resolved.albumId, 'album_123');
   assertEquals(resolved.albumTitle, 'Sunday Service 2026');
 });
+
+Deno.test('listGooglePhotosAlbums merges both user albums and shared albums without duplicates', async () => {
+  const mockFetch: typeof fetch = (input) => {
+    const url = String(input);
+    if (url.includes('/v1/albums')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            albums: [
+              { id: 'alb_1', title: 'Album 1', productUrl: 'https://photos.google.com/1' },
+              { id: 'alb_shared_dup', title: 'Shared Dup', productUrl: 'https://photos.google.com/dup' },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    }
+    if (url.includes('/v1/sharedAlbums')) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            sharedAlbums: [
+              { id: 'alb_shared_dup', title: 'Shared Dup', productUrl: 'https://photos.google.com/dup' },
+              { id: 'alb_shared_2', title: 'Shared 2', productUrl: 'https://photos.google.com/2' },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    }
+    return Promise.reject(new Error('Unknown url'));
+  };
+
+  const albums = await listGooglePhotosAlbums('token', { fetchImpl: mockFetch });
+  assertEquals(albums.length, 3);
+  assertEquals(albums.map((a) => a.id), ['alb_1', 'alb_shared_dup', 'alb_shared_2']);
+});
+
+Deno.test('resolveAlbumShareUrl throws ApiError when external album cannot be found', async () => {
+  const mockFetch: typeof fetch = () => {
+    return Promise.resolve(
+      new Response(JSON.stringify({ albums: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  };
+
+  await assertRejects(
+    () => resolveAlbumShareUrl('token', 'https://photos.app.goo.gl/unknown_external', { fetchImpl: mockFetch }),
+    Error,
+    'Google Photos API requires the album to be created through the photobooth',
+  );
+});
+

@@ -1,0 +1,5 @@
+Workspace: C:\Users\padil\mj\photobooth-system
+CodexSandboxUsers: Modify, Synchronize (explicit); ReadAndExecute, Synchronize (inherited)
+Current user LAPTOP-GSLG702R\padil: FullControl (inherited)
+SYSTEM: FullControl (inherited)
+Administrators: FullControl (inherited)

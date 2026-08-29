@@ -192,6 +192,44 @@ export const IpcContracts = {
         .strict(),
     ),
   },
+  'admin:google-photos:create-album': {
+    request: z.object({ title: z.string().min(1).max(120) }).strict(),
+    response: rpcResultSchema(
+      z
+        .object({
+          albumId: z.string(),
+          albumTitle: z.string(),
+          shareUrl: z.string(),
+        })
+        .strict(),
+    ),
+  },
+  'admin:google-photos:list-albums': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(
+      z.array(
+        z
+          .object({
+            id: z.string(),
+            title: z.string(),
+            shareUrl: z.string().optional(),
+          })
+          .strict(),
+      ),
+    ),
+  },
+  'admin:google-photos:sync-now': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(
+      z
+        .object({
+          processed: z.number(),
+          succeeded: z.number(),
+          failed: z.number(),
+        })
+        .strict(),
+    ),
+  },
   'admin:google-photos:test-upload': {
     request: EmptyRequestSchema,
     response: rpcResultSchema(z.object({ success: z.boolean(), message: z.string() }).strict()),
@@ -355,9 +393,16 @@ export type GraceBoothBridge = {
     }): Promise<RpcResult<AdminSettings>>;
     getGooglePhotosStatus(): Promise<RpcResult<GooglePhotosStatus>>;
     saveGooglePhotosConfig(config: GooglePhotosConfig): Promise<RpcResult<GooglePhotosConfig>>;
+    createGooglePhotosAlbum(
+      title: string,
+    ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
+    listGooglePhotosAlbums(): Promise<RpcResult<Array<{ id: string; title: string; shareUrl?: string | undefined }>>>;
     resolveGooglePhotosAlbum(
       shareUrl: string,
     ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
+    syncGooglePhotosNow(): Promise<
+      RpcResult<{ processed: number; succeeded: number; failed: number }>
+    >;
     testGooglePhotosUpload(): Promise<RpcResult<{ success: boolean; message: string }>>;
     disconnectGooglePhotos(): Promise<RpcResult<EmptyResponse>>;
     getDisplays(): Promise<RpcResult<DisplayInfo[]>>;

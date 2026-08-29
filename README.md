@@ -130,14 +130,87 @@ Open **Admin > Settings & Health > Dual-Monitor Setup**:
 
 Grace Booth can automatically upload completed high-resolution photostrips directly to a designated Google Photos shared album in real time.
 
-### Setting up Google Photos sync
+```text
+[ Kiosk Photo Session ]
+         │ (Captures 3 photos + builds Photostrip Collage)
+         ▼
+[ Cloudflare R2 / Supabase Storage ]
+         │ (Instant upload & confirmation via confirm-upload)
+         ├───────────────────────────────────────────────────────┐
+         ▼                                                       ▼
+[ Screen 1 / Screen 2 (Dual Monitor) ]             [ google_sync_queue (Supabase) ]
+  • Instant Attract Reset for Screen 1                   │ (Non-blocking async trigger)
+  • Immediate QR Delivery on Screen 2                    ▼
+                                                   [ sync-google-photos (Edge Function) ]
+                                                         │ (Streams Collage from R2)
+                                                         ▼
+                                                   [ Google Photos Shared Album ]
+```
 
-1. Open **Admin > Settings & Health > Google Photos Shared Album Sync**.
-2. Check **Enable Google Photos Live Sync**.
-3. Under **Google Account Authorization**, initiate authorization with your event/ministry Google Account.
-4. Select an existing album or create a new event album directly from the operator dashboard.
-5. Once connected, every finalized photostrip is queued and uploaded in the background to the Google Photos album, generating an instantly shareable album link for organizers and attendees.
-6. Local offline storage and Supabase cloud delivery operate in parallel; temporary internet interruptions are buffered and retried automatically.
+### Architecture & Non-Blocking Design
+- **Zero Guest Latency**: Captures and QR code delivery on Screen 1 / Screen 2 complete instantly. Guests never wait for Google Photos sync.
+- **Asynchronous Resilient Worker**: When a photostrip is confirmed, a database trigger automatically enqueues a sync task in `google_sync_queue`. The `sync-google-photos` Supabase Edge Function streams the image bytes directly from Cloudflare R2 into the designated Google Photos album in the background.
+- **Offline & Retry Resilient**: If the internet drops or Google Photos API throttles, jobs remain queued with exponential backoff and retry mechanisms.
+
+---
+
+### Prerequisites & Google Cloud Console Setup
+
+To enable Google Photos integration for your Supabase backend:
+
+1. **Create / Open a Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/).
+   - Create a new project (e.g. `Grace Booth Photobooth`) or select an existing one.
+2. **Enable Google Photos Library API**:
+   - Navigate to **APIs & Services > Library**.
+   - Search for **Photos Library API** and click **Enable**.
+3. **Configure OAuth Consent Screen**:
+   - Go to **APIs & Services > OAuth consent screen**.
+   - Select **External** (or Internal for Google Workspace).
+   - Fill in App Name (e.g., `M.A.T. Photobooth`), Support Email, and Developer Contact Info.
+   - Add scopes: `https://www.googleapis.com/auth/photoslibrary.appendonly` and `https://www.googleapis.com/auth/photoslibrary.sharing`.
+   - Add test users (if published in Testing mode) including the event organizer's Google Account.
+4. **Create OAuth 2.0 Credentials**:
+   - Go to **APIs & Services > Credentials > Create Credentials > OAuth client ID**.
+   - Application type: **Web application**.
+   - Name: `Photobooth Backend Auth`.
+   - **Authorized redirect URIs**: Add your Supabase Edge Function redirect URL:
+     ```text
+     https://<YOUR_SUPABASE_PROJECT_REF>.supabase.co/functions/v1/google-photos-auth
+     ```
+   - Save and copy the generated **Client ID** and **Client Secret**.
+5. **Set Supabase Edge Function Secrets**:
+   - Set the secrets in your Supabase project (via CLI or Supabase Dashboard > Project Settings > Edge Functions):
+     ```powershell
+     npx supabase secrets set GOOGLE_CLIENT_ID="your_google_client_id.apps.googleusercontent.com" GOOGLE_CLIENT_SECRET="your_google_client_secret" --project-ref <YOUR_SUPABASE_PROJECT_REF>
+     ```
+
+---
+
+### Kiosk Operator Step-by-Step Configuration
+
+1. **Open Operator Settings**:
+   - In the Kiosk, open **Admin** (enter your operator passcode) and navigate to **Settings & Telemetry > Google Photos**.
+2. **Enable Live Sync**:
+   - Toggle **Enable Google Photos Live Sync** to `ON`.
+3. **Authorize Google Account**:
+   - Click **Authorize Google Account** (or **Re-Authorize**).
+   - A browser window will open asking you to sign in with your event's Google account and grant Photos permissions.
+   - After completing the consent prompt, return to the Kiosk and click **Check Auth Status**.
+   - Confirm your connected Google email is displayed with a green verified checkmark.
+4. **Create or Select Event Album**:
+   > [!IMPORTANT]
+   > **Google Photos API Policy Constraint**: The Google Photos Library API strictly requires that photos added to an album be added to an album **created by the same application via the API** (`albums.create`). Albums manually created on the consumer Google Photos web app cannot receive programmatic uploads.
+   - In the **Create new shared event album (Recommended)** field, type your event title (e.g. `Ministry Fair 2026`, `Youth Camp 2026`).
+   - Click **Create & Select**.
+   - The application creates the album, enables public link sharing, saves it as the active live sync target, and displays the **Active Target Album** banner with a shareable URL.
+5. **Share the Live Album with Guests & Organizers**:
+   - Click **Copy Guest Album Link** to copy the public album URL to your clipboard.
+   - Click **Open in Browser** to view live streaming photos in real time.
+6. **Diagnostics & Manual Controls**:
+   - **Send Test Photo**: Click to verify immediate end-to-end cloud upload and Google Photos album delivery.
+   - **Sync Pending Now**: Manually trigger queue processing for any buffered jobs.
+   - **Telemetry Cards**: Monitor `Synced Strips`, `Pending`, and `Failed` sync metrics directly from the operator dashboard.
 
 ## Build and package the Windows kiosk
 

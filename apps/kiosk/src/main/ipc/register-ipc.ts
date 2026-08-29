@@ -126,6 +126,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
         failedCount: 0,
         lastSyncedAt: null,
       },
+      hasRefreshToken: Boolean(localSettings.googlePhotosEmail),
+      hasCredentials: true,
     };
   });
 
@@ -147,6 +149,52 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       // local save succeeded
     }
     return config;
+  });
+
+  register('admin:google-photos:create-album', async (event, input) => {
+    requireAdmin(event);
+    const title = input.title.trim();
+    const current = dependencies.repository.getSettings();
+    if (dependencies.delivery.isConfigured() && dependencies.delivery.createGooglePhotosAlbum) {
+      const created = await dependencies.delivery.createGooglePhotosAlbum(title);
+      dependencies.repository.setGooglePhotosConfig({
+        connectedEmail: current.googlePhotosEmail,
+        albumId: created.albumId,
+        albumTitle: created.albumTitle,
+        albumShareUrl: created.shareUrl,
+        enabled: current.googlePhotosEnabled,
+      });
+      return created;
+    }
+    const fallback = {
+      albumId: `album_${Date.now()}`,
+      albumTitle: title,
+      shareUrl: `https://photos.app.goo.gl/${encodeURIComponent(title)}`,
+    };
+    dependencies.repository.setGooglePhotosConfig({
+      connectedEmail: current.googlePhotosEmail,
+      albumId: fallback.albumId,
+      albumTitle: fallback.albumTitle,
+      albumShareUrl: fallback.shareUrl,
+      enabled: current.googlePhotosEnabled,
+    });
+    return fallback;
+  });
+
+  register('admin:google-photos:list-albums', async (event) => {
+    requireAdmin(event);
+    if (dependencies.delivery.isConfigured() && dependencies.delivery.listGooglePhotosAlbums) {
+      return await dependencies.delivery.listGooglePhotosAlbums();
+    }
+    return [];
+  });
+
+  register('admin:google-photos:sync-now', async (event) => {
+    requireAdmin(event);
+    if (dependencies.delivery.isConfigured() && dependencies.delivery.syncGooglePhotosNow) {
+      return await dependencies.delivery.syncGooglePhotosNow();
+    }
+    return { processed: 0, succeeded: 0, failed: 0 };
   });
 
   register('admin:google-photos:resolve-album', async (event, input) => {

@@ -14,9 +14,29 @@ import {
   WarningCircleIcon as WarningCircle,
   ArrowsClockwiseIcon as ArrowsClockwise,
 } from '@phosphor-icons/react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { Button } from './Button';
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+  Field,
+  FieldLabel,
+  Radio,
+  RadioGroup,
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from '@grace-booth/ui';
 import { enumerateVideoDevices, useCameraStream } from '../hooks/useCameraStream';
 
 type CameraSetupModalProps = {
@@ -30,8 +50,6 @@ type CameraSetupModalProps = {
 };
 
 export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetupModalProps) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const descriptionId = useId();
   const [selectedAdapter, setSelectedAdapter] = useState<CameraAdapterKind>('webcam');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedResolution, setSelectedResolution] = useState<CameraResolution>('1080p');
@@ -46,6 +64,20 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const webcamSelected = isWebcamCameraAdapter(selectedAdapter);
   const previewEnabled = isOpen && configurationLoaded && webcamSelected;
   const cameraStream = useCameraStream(previewEnabled, selectedDeviceId, selectedResolution);
+  const deviceItems = useMemo(
+    () => [
+      { label: 'Default system webcam', value: '' },
+      ...videoDevices.map((device) => ({
+        label: device.label || `Camera (${device.deviceId.slice(0, 8)})`,
+        value: device.deviceId,
+      })),
+    ],
+    [videoDevices],
+  );
+  const resolutionItems = [
+    { label: '720p (1280 × 720) — virtual cameras and testing', value: '720p' as const },
+    { label: '1080p (1920 × 1080) — production quality', value: '1080p' as const },
+  ];
 
   const loadCameras = async () => {
     if (typeof window === 'undefined' || !window.graceBooth) return;
@@ -78,62 +110,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
     setConfigurationLoaded(false);
     void loadCameras();
     setSuccessMessage(null);
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    return () => {
-      previouslyFocused?.focus();
-    };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const focusFrame = requestAnimationFrame(() => {
-      dialogRef.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
-    });
-
-    return () => cancelAnimationFrame(focusFrame);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const focusable = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), select:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isOpen, saving, onClose]);
 
   if (!isOpen) return null;
 
@@ -166,125 +143,113 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   };
 
   return (
-    <div className="dialog-backdrop" role="presentation">
-      <section
-        className="camera-setup-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="camera-setup-title"
-        aria-describedby={descriptionId}
-        ref={dialogRef}
-      >
-        <button
-          aria-label="Close"
-          className="icon-button passcode-dialog__close"
-          disabled={saving}
-          onClick={onClose}
-        >
-          <X aria-hidden="true" weight="bold" />
-        </button>
-
-        <div className="camera-setup-dialog__header">
+    <Dialog onOpenChange={(open) => !open && !saving && onClose()} open={isOpen}>
+      <DialogPopup className="camera-setup-dialog" maxWidthClass="max-w-4xl" showCloseButton={false}>
+        <DialogHeader className="camera-setup-dialog__header">
           <div className="camera-setup-dialog__icon">
             <Camera aria-hidden="true" weight="bold" size={32} />
           </div>
           <div>
-            <h2 id="camera-setup-title">Camera Configuration</h2>
-            <p id={descriptionId} className="camera-setup-dialog__subtitle">
+            <DialogTitle>Camera configuration</DialogTitle>
+            <DialogDescription className="camera-setup-dialog__subtitle">
               Select active optical capture source and verify live telemetry feed.
-            </p>
+            </DialogDescription>
           </div>
-        </div>
+          <DialogClose
+            disabled={saving}
+            render={<Button aria-label="Close" size="icon" type="button" variant="ghost" />}
+          >
+            <X aria-hidden="true" weight="bold" />
+          </DialogClose>
+        </DialogHeader>
 
-        <div className="camera-setup-dialog__content">
-          <div className="camera-adapter-selector">
-            <label className="field-label">Camera Source</label>
-            <div className="camera-source-grid">
-              <button
-                type="button"
+        <DialogPanel className="camera-setup-dialog__content">
+          <Field className="camera-adapter-selector">
+            <FieldLabel>Camera source</FieldLabel>
+            <RadioGroup
+              className="camera-source-grid"
+              onValueChange={(value) => setSelectedAdapter(value as CameraAdapterKind)}
+              value={selectedAdapter === 'internal_webcam' ? 'webcam' : selectedAdapter}
+            >
+              <label
                 className={`camera-source-card ${selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam' ? 'camera-source-card--active' : ''}`}
-                onClick={() => setSelectedAdapter('webcam')}
               >
+                <Radio value="webcam" />
                 <VideoCamera size={24} weight="bold" />
                 <span className="camera-source-card__title">Laptop / USB Webcam</span>
                 <span className="camera-source-card__desc">
                   Internal camera or standard UVC device
                 </span>
-              </button>
+              </label>
 
-              <button
-                type="button"
+              <label
                 className={`camera-source-card ${selectedAdapter === 'sony' ? 'camera-source-card--active' : ''}`}
-                onClick={() => setSelectedAdapter('sony')}
               >
+                <Radio value="sony" />
                 <Camera size={24} weight="bold" />
                 <span className="camera-source-card__title">Sony A7 Tethered</span>
                 <span className="camera-source-card__desc">
                   High-precision Sony Alpha mirrorless
                 </span>
-              </button>
+              </label>
 
-              <button
-                type="button"
+              <label
                 className={`camera-source-card ${selectedAdapter === 'mock' ? 'camera-source-card--active' : ''}`}
-                onClick={() => setSelectedAdapter('mock')}
               >
+                <Radio value="mock" />
                 <ArrowsClockwise size={24} weight="bold" />
                 <span className="camera-source-card__title">Mock Hardware</span>
                 <span className="camera-source-card__desc">Simulated capture for testing</span>
-              </button>
-            </div>
-          </div>
+              </label>
+            </RadioGroup>
+          </Field>
 
           {(selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam') && (
             <div className="camera-webcam-section">
-              <div className="camera-device-select-row">
-                <label htmlFor="camera-device-select" className="field-label">
-                  Active Device Node
-                </label>
+              <Field className="camera-device-select-row">
+                <FieldLabel>Active device node</FieldLabel>
                 <div className="select-with-refresh">
-                  <select
-                    id="camera-device-select"
-                    className="select-input"
+                  <Select
+                    items={deviceItems}
                     value={selectedDeviceId ?? ''}
-                    onChange={(e) => setSelectedDeviceId(e.target.value || null)}
+                    onValueChange={(value) => setSelectedDeviceId(value ?? null)}
                   >
-                    <option value="">Default System Webcam</option>
-                    {videoDevices.map((device) => (
-                      <option key={device.deviceId} value={device.deviceId}>
-                        {device.label || `Camera (${device.deviceId.slice(0, 8)})`}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="icon-button"
+                    <SelectTrigger aria-label="Active device node"><SelectValue /></SelectTrigger>
+                    <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
+                      {deviceItems.map((item) => (
+                        <SelectItem key={item.value ? item.value : 'default'} value={item.value}>{item.label}</SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                  <Button
                     title="Refresh camera devices"
                     aria-label="Refresh camera devices"
                     onClick={() => void loadCameras()}
                     disabled={loading}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
                   >
                     <ArrowsClockwise className={loading ? 'spin' : ''} size={18} weight="bold" />
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Field>
 
-              <div className="camera-device-select-row">
-                <label htmlFor="camera-resolution-select" className="field-label">
-                  Capture Resolution
-                </label>
-                <select
-                  id="camera-resolution-select"
-                  className="select-input"
+              <Field className="camera-device-select-row">
+                <FieldLabel>Capture resolution</FieldLabel>
+                <Select
+                  items={resolutionItems}
                   value={selectedResolution}
-                  onChange={(event) =>
-                    setSelectedResolution(event.target.value === '720p' ? '720p' : '1080p')
-                  }
+                  onValueChange={(value) => value !== null && setSelectedResolution(value)}
                 >
-                  <option value="720p">720p (1280 × 720) — virtual cameras and testing</option>
-                  <option value="1080p">1080p (1920 × 1080) — production quality</option>
-                </select>
-              </div>
+                  <SelectTrigger aria-label="Capture resolution"><SelectValue /></SelectTrigger>
+                  <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
+                    {resolutionItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </Field>
 
               <div className="camera-preview-container">
                 <div className="camera-preview-box">
@@ -383,7 +348,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
           )}
 
           {selectedAdapter === 'sony' && (
-            <div className="camera-info-card">
+            <Alert className="camera-info-card">
               <div className="camera-info-card__badge">
                 <WarningCircle size={20} weight="bold" />
                 <span>NATIVE SONY PC REMOTE ADAPTER — NOT AVAILABLE</span>
@@ -404,11 +369,11 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                   {cameraStatus.operatorMessage})
                 </div>
               )}
-            </div>
+            </Alert>
           )}
 
           {selectedAdapter === 'mock' && (
-            <div className="camera-info-card">
+            <Alert className="camera-info-card">
               <div className="camera-info-card__badge">
                 <ArrowsClockwise size={20} weight="bold" />
                 <span>MOCK CAMERA EMULATOR</span>
@@ -417,7 +382,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                 Simulates three guest shots using bundled test fixtures. Ideal for offline staging
                 and UI verification without hardware.
               </p>
-            </div>
+            </Alert>
           )}
 
           {error && (
@@ -432,12 +397,12 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               <span>{successMessage}</span>
             </div>
           )}
-        </div>
+        </DialogPanel>
 
-        <div className="camera-setup-dialog__actions">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+        <DialogFooter className="camera-setup-dialog__actions">
+          <DialogClose disabled={saving} render={<Button type="button" variant="secondary" />}>
             Cancel
-          </Button>
+          </DialogClose>
           <Button
             loading={saving}
             onClick={handleSave}
@@ -445,8 +410,8 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
           >
             Apply &amp; Save
           </Button>
-        </div>
-      </section>
-    </div>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
   );
 }

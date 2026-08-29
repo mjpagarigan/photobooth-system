@@ -1,0 +1,11 @@
+Checkpoint: 2026-08-29, evidence-only approval gate
+Tracked diff outside artifacts/operator-ui-audit/20260829-001808: none (git diff --quiet exit 0)
+Untracked paths outside artifacts/operator-ui-audit/20260829-001808: none
+apps/kiosk/src/main aggregate: c8e998cd0c504839490fe5bb51cd524e712b2851f1c06f3ef41f4aaea71ed3dc (matches baseline)
+apps/kiosk/src/preload aggregate: e46144d0be4384ecdc23c7340fff5e4a176e7243957894535efa3847603ea69a (matches baseline)
+packages/shared aggregate: 9c1d2058d770453e57e373c3f4ac61445ec160456cac0b581a1ece7e49c508bf (matches baseline)
+supabase aggregate: 6130eab538b5f7bcc560493b5cb30d99708757ab9b6a57a48c48917ea5be4ce8 (matches baseline)
+apps/public aggregate: 4e2ef1f33bd82c74cc6c01ebf21016db5d9ece37ed45c38676cd47b4ec44ac00 (matches baseline)
+pnpm-lock.yaml: 6742b89f5173e693746f12f6c4da12e59d628e1dad673978c81c1625b744d38d (matches baseline)
+wrangler.jsonc: 53b437bc91c8a52d920ae2786bfa7c96a8217a389f173f893771fe619fe16d78 (matches baseline)
+Result: PASS — no forbidden or product-source byte changed.

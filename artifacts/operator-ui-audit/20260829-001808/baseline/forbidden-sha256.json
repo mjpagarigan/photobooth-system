@@ -1,0 +1,23 @@
+{
+  "algorithm": "sha256(path<TAB>sha256 joined by LF, UTF-8)",
+  "trackedForbiddenCount": 374,
+  "trackedForbiddenAggregate": "cead1980663b200cda3b421fecdd1f55977e31c89ad6cc7bb6a205c5cecf34fa",
+  "head": "c5e66af62aa0e4fd3de0cf65b66914d0fdd5c660",
+  "headTree": "16d4183c71f7b2d201270d24e65c320b3d90e3c0",
+  "criticalFiles": {
+    "pnpm-lock.yaml": "6742b89f5173e693746f12f6c4da12e59d628e1dad673978c81c1625b744d38d",
+    "wrangler.jsonc": "53b437bc91c8a52d920ae2786bfa7c96a8217a389f173f893771fe619fe16d78"
+  },
+  "groups": {
+    "apps/kiosk/src/main": { "count": 51, "sha256": "c8e998cd0c504839490fe5bb51cd524e712b2851f1c06f3ef41f4aaea71ed3dc" },
+    "apps/kiosk/src/preload": { "count": 1, "sha256": "e46144d0be4384ecdc23c7340fff5e4a176e7243957894535efa3847603ea69a" },
+    "packages/shared": { "count": 8, "sha256": "9c1d2058d770453e57e373c3f4ac61445ec160456cac0b581a1ece7e49c508bf" },
+    "supabase": { "count": 50, "sha256": "6130eab538b5f7bcc560493b5cb30d99708757ab9b6a57a48c48917ea5be4ce8" },
+    "apps/public": { "count": 20, "sha256": "4e2ef1f33bd82c74cc6c01ebf21016db5d9ece37ed45c38676cd47b4ec44ac00" }
+  },
+  "status": {
+    "trackedModified": [],
+    "deleted": [],
+    "untracked": []
+  }
+}

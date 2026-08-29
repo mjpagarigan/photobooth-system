@@ -18,6 +18,32 @@ import {
 import { Rnd } from 'react-rnd';
 
 import type { CropMode, FrameLayout, FrameSlot, FrameSummary } from '@grace-booth/shared';
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+  Button as CossButton,
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Fieldset,
+  FieldsetLegend,
+  Input,
+  Radio,
+  RadioGroup,
+  Tabs,
+  TabsList,
+  TabsPanel,
+  TabsTab,
+  Toolbar,
+  ToolbarButton,
+  ToolbarGroup,
+  ToolbarSeparator,
+} from '@grace-booth/ui';
 
 import { Button } from '../components/Button';
 import { LOCAL_FIXTURES, mockPhotoFor } from '../local-fixtures';
@@ -71,7 +97,8 @@ export function FrameEditor({
   status,
 }: FrameEditorProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const deleteOpenerRef = useRef<HTMLElement | null>(null);
   // Name edits are scoped to the frame they started on so switching frames never leaks a draft.
   const [nameDraft, setNameDraft] = useState<{ frameId: string; value: string } | null>(null);
 
@@ -82,7 +109,7 @@ export function FrameEditor({
 
   const selectFrame = (frameId: string) => {
     setSelectedId(frameId);
-    setConfirmingDeleteId(null);
+    setDeleteTargetId(null);
   };
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -187,14 +214,7 @@ export function FrameEditor({
     );
   };
 
-  const handleDeleteRow = (frameId: string) => {
-    if (confirmingDeleteId === frameId) {
-      onDeleteFrame(frameId);
-      setConfirmingDeleteId(null);
-    } else {
-      setConfirmingDeleteId(frameId);
-    }
-  };
+  const deleteTarget = frames.find((frame) => frame.id === deleteTargetId) ?? null;
 
   return (
     <div className="frame-editor" data-testid="frame-editor">
@@ -207,25 +227,40 @@ export function FrameEditor({
             Manage every collage frame available at review time and its three-photo slot geometry.
           </p>
         </div>
-        <div className="admin-page-header__actions">
-          <Button
-            data-testid="frame-add"
-            disabled={busy}
-            icon={<FilePng aria-hidden="true" weight="bold" />}
-            onClick={onAddFrame}
-            variant="secondary"
-          >
-            Add frame
-          </Button>
-          <Button
-            disabled={!selectedFrame || busy}
-            icon={<FloppyDisk aria-hidden="true" weight="bold" />}
-            loading={busy}
-            onClick={handleSave}
-          >
-            Save configuration
-          </Button>
-        </div>
+        <Toolbar aria-label="Frame editor actions" className="admin-page-header__actions">
+          <ToolbarGroup>
+            <ToolbarButton
+              render={
+                <CossButton
+                  data-testid="frame-add"
+                  disabled={busy}
+                  icon={<FilePng aria-hidden="true" weight="bold" />}
+                  onClick={onAddFrame}
+                  type="button"
+                  variant="secondary"
+                />
+              }
+            >
+              Add frame
+            </ToolbarButton>
+          </ToolbarGroup>
+          <ToolbarSeparator />
+          <ToolbarGroup>
+            <ToolbarButton
+              render={
+                <CossButton
+                  disabled={!selectedFrame || busy}
+                  icon={<FloppyDisk aria-hidden="true" weight="bold" />}
+                  loading={busy}
+                  onClick={handleSave}
+                  type="button"
+                />
+              }
+            >
+              Save configuration
+            </ToolbarButton>
+          </ToolbarGroup>
+        </Toolbar>
       </header>
       <div className="frame-editor__workspace frame-editor__workspace--library">
         <aside className="frame-library" aria-label="Frame library" data-testid="frame-library">
@@ -248,35 +283,42 @@ export function FrameEditor({
                 </span>
               </button>
               <span className="frame-library__controls">
-                <button
+                <CossButton
                   aria-label={`Move ${item.name} up`}
                   disabled={busy || index === 0}
                   onClick={() => onMoveFrame(item.id, 'up')}
+                  size="icon"
+                  title={`Move ${item.name} up`}
                   type="button"
+                  variant="ghost"
                 >
                   <ArrowUp aria-hidden="true" weight="bold" />
-                </button>
-                <button
+                </CossButton>
+                <CossButton
                   aria-label={`Move ${item.name} down`}
                   disabled={busy || index === frames.length - 1}
                   onClick={() => onMoveFrame(item.id, 'down')}
+                  size="icon"
+                  title={`Move ${item.name} down`}
                   type="button"
+                  variant="ghost"
                 >
                   <ArrowDown aria-hidden="true" weight="bold" />
-                </button>
-                <button
-                  aria-label={
-                    confirmingDeleteId === item.id
-                      ? `Confirm delete ${item.name}`
-                      : `Delete ${item.name}`
-                  }
-                  className={confirmingDeleteId === item.id ? 'is-danger' : ''}
+                </CossButton>
+                <CossButton
+                  aria-label={`Delete ${item.name}`}
                   disabled={busy}
-                  onClick={() => handleDeleteRow(item.id)}
+                  onClick={(event) => {
+                    deleteOpenerRef.current = event.currentTarget;
+                    setDeleteTargetId(item.id);
+                  }}
+                  size="icon"
+                  title={`Delete ${item.name}`}
                   type="button"
+                  variant="ghost"
                 >
                   <Trash aria-hidden="true" weight="bold" />
-                </button>
+                </CossButton>
               </span>
             </div>
           ))}
@@ -357,11 +399,9 @@ export function FrameEditor({
               </div>
             </section>
             <aside className="slot-inspector" aria-label="Selected photo slot settings">
-              <fieldset className="slot-inspector__group">
-                <legend>FRAME NAME</legend>
-                <input
-                  aria-label="Frame name"
-                  className="text-input"
+              <Field className="slot-inspector__group" name="frame-name">
+                <FieldLabel>Frame name</FieldLabel>
+                <Input
                   maxLength={120}
                   onChange={(event) =>
                     setNameDraft({ frameId: selectedFrame.id, value: event.target.value })
@@ -369,102 +409,8 @@ export function FrameEditor({
                   type="text"
                   value={nameValue}
                 />
-              </fieldset>
-              <div className="slot-inspector__heading">
-                <span>SELECTED SLOT</span>
-                <h2>{selectedSlot?.name ?? 'Photo slot'}</h2>
-              </div>
-              <div className="slot-tabs" role="tablist" aria-label="Photo slots">
-                {currentSlots.map((slot) => (
-                  <button
-                    aria-selected={selectedIndex === slot.slotIndex}
-                    className={selectedIndex === slot.slotIndex ? 'is-active' : ''}
-                    key={slot.slotIndex}
-                    onClick={() => setSelectedIndex(slot.slotIndex)}
-                    role="tab"
-                    type="button"
-                  >
-                    {slot.slotIndex}
-                  </button>
-                ))}
-              </div>
-              {selectedSlot ? (
-                <>
-                  <fieldset className="slot-inspector__group">
-                    <legend>POSITION &amp; SCALE (%)</legend>
-                    <div className="coordinate-grid">
-                      {(['x', 'y', 'width', 'height'] as const).map((field) => (
-                        <label key={field}>
-                          <span>
-                            {field === 'x'
-                              ? 'X'
-                              : field === 'y'
-                                ? 'Y'
-                                : field === 'width'
-                                  ? 'Width'
-                                  : 'Height'}{' '}
-                            (%)
-                          </span>
-                          <input
-                            aria-label={`${field} percent`}
-                            max="100"
-                            min="0"
-                            onChange={(event) => updateSelectedPercent(field, event.target.value)}
-                            step="0.1"
-                            type="number"
-                            value={percent(selectedSlot[field])}
-                          />
-                        </label>
-                      ))}
-                    </div>
-                    <p>
-                      Drag the slot on the canvas or enter coordinates. Arrow keys nudge selected
-                      slot.
-                    </p>
-                  </fieldset>
-                  <fieldset className="slot-inspector__group">
-                    <legend>
-                      <Crop aria-hidden="true" weight="bold" /> CROP BEHAVIOR
-                    </legend>
-                    <label
-                      className={`crop-option${selectedSlot.cropMode === 'crop-to-fill' ? ' is-selected' : ''}`}
-                    >
-                      <input
-                        checked={selectedSlot.cropMode === 'crop-to-fill'}
-                        name={`crop-${selectedSlot.slotIndex}`}
-                        onChange={() => setCropMode('crop-to-fill')}
-                        type="radio"
-                      />
-                      <span>
-                        <strong>Crop to fill</strong>
-                        <small>Fill entire slot bounds and crop outer margins.</small>
-                      </span>
-                    </label>
-                    <label
-                      className={`crop-option${selectedSlot.cropMode === 'fit' ? ' is-selected' : ''}`}
-                    >
-                      <input
-                        checked={selectedSlot.cropMode === 'fit'}
-                        name={`crop-${selectedSlot.slotIndex}`}
-                        onChange={() => setCropMode('fit')}
-                        type="radio"
-                      />
-                      <span>
-                        <strong>Fit</strong>
-                        <small>Preserve complete uncropped frame inside bounds.</small>
-                      </span>
-                    </label>
-                  </fieldset>
-                  <Button
-                    icon={<ArrowCounterClockwise aria-hidden="true" weight="bold" />}
-                    onClick={resetSelected}
-                    variant="secondary"
-                    wide
-                  >
-                    Reset slot
-                  </Button>
-                </>
-              ) : null}
+                <FieldDescription>Shown to operators and guests during review.</FieldDescription>
+              </Field>
               {status ? (
                 <p className="form-success" role="status">
                   {status}
@@ -475,6 +421,101 @@ export function FrameEditor({
                   {error}
                 </p>
               ) : null}
+              <div className="slot-inspector__heading">
+                <span>SELECTED SLOT</span>
+                <h2>{selectedSlot?.name ?? 'Photo slot'}</h2>
+              </div>
+              <Tabs
+                className="slot-tabs"
+                onValueChange={(value) => setSelectedIndex(Number(value))}
+                value={String(selectedIndex)}
+              >
+                <TabsList
+                  activateOnFocus
+                  aria-label="Photo slots"
+                  size="lg"
+                  variant="segmented"
+                >
+                  {currentSlots.map((slot) => (
+                    <TabsTab key={slot.slotIndex} value={String(slot.slotIndex)}>
+                      Slot {slot.slotIndex}
+                    </TabsTab>
+                  ))}
+                </TabsList>
+                {selectedSlot ? (
+                  <TabsPanel value={String(selectedIndex)}>
+                  <Fieldset className="slot-inspector__group">
+                    <FieldsetLegend>Position &amp; scale (%)</FieldsetLegend>
+                    <div className="coordinate-grid">
+                      {(['x', 'y', 'width', 'height'] as const).map((field) => (
+                        <Field key={field} name={`${field}-percent`}>
+                          <FieldLabel>
+                            {field === 'x'
+                              ? 'X'
+                              : field === 'y'
+                                ? 'Y'
+                                : field === 'width'
+                                  ? 'Width'
+                                  : 'Height'}{' '}
+                            (%)
+                          </FieldLabel>
+                          <Input
+                            aria-label={`${field} percent`}
+                            max="100"
+                            min="0"
+                            onChange={(event) => updateSelectedPercent(field, event.target.value)}
+                            step="0.1"
+                            type="number"
+                            value={percent(selectedSlot[field])}
+                          />
+                        </Field>
+                      ))}
+                    </div>
+                    <p className="field-description">
+                      Drag the slot on the canvas or enter coordinates. Arrow keys nudge selected
+                      slot.
+                    </p>
+                  </Fieldset>
+                  <Fieldset className="slot-inspector__group">
+                    <FieldsetLegend>
+                      <Crop aria-hidden="true" weight="bold" /> CROP BEHAVIOR
+                    </FieldsetLegend>
+                    <RadioGroup
+                      aria-label="Crop behavior"
+                      onValueChange={(value) => setCropMode(value as CropMode)}
+                      value={selectedSlot.cropMode}
+                    >
+                    <label
+                      className={`crop-option${selectedSlot.cropMode === 'crop-to-fill' ? ' is-selected' : ''}`}
+                    >
+                      <Radio value="crop-to-fill" />
+                      <span>
+                        <strong>Crop to fill</strong>
+                        <small>Fill entire slot bounds and crop outer margins.</small>
+                      </span>
+                    </label>
+                    <label
+                      className={`crop-option${selectedSlot.cropMode === 'fit' ? ' is-selected' : ''}`}
+                    >
+                      <Radio value="fit" />
+                      <span>
+                        <strong>Fit</strong>
+                        <small>Preserve complete uncropped frame inside bounds.</small>
+                      </span>
+                    </label>
+                    </RadioGroup>
+                  </Fieldset>
+                  <Button
+                    icon={<ArrowCounterClockwise aria-hidden="true" weight="bold" />}
+                    onClick={resetSelected}
+                    variant="secondary"
+                    wide
+                  >
+                    Reset slot
+                  </Button>
+                  </TabsPanel>
+                ) : null}
+              </Tabs>
             </aside>
           </>
         ) : (
@@ -485,6 +526,41 @@ export function FrameEditor({
           </section>
         )}
       </div>
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        open={Boolean(deleteTarget)}
+      >
+        <AlertDialogPopup finalFocus={() => deleteOpenerRef.current}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.name ?? 'this frame'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the frame from the review library. Frames already used by saved sessions
+              remain protected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<CossButton type="button" variant="ghost" />}>
+              Cancel
+            </AlertDialogClose>
+            <AlertDialogClose
+              render={
+                <CossButton
+                  disabled={busy}
+                  onClick={() => {
+                    if (deleteTarget) onDeleteFrame(deleteTarget.id);
+                  }}
+                  type="button"
+                  variant="destructive"
+                />
+              }
+            >
+              Delete frame
+            </AlertDialogClose>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
     </div>
   );
 }

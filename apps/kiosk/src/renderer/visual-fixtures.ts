@@ -3,6 +3,7 @@ import type {
   AdminSettings,
   BoothSnapshot,
   FrameSummary,
+  GalleryItem,
   UploadJobSummary,
 } from '@grace-booth/shared';
 
@@ -11,9 +12,15 @@ import { ANNIVERSARY_FRAME_LAYOUT, DEFAULT_FRAME_LAYOUT, LOCAL_FIXTURES } from '
 
 export type VisualSeedPayload = {
   adminView: AdminView | null;
+  cameraSetupOpen?: boolean;
   countdownSeconds?: number;
+  dialog?: { intent: 'admin' | 'bootstrap' | 'restart'; mode: 'bootstrap' | 'login' | 'restart' };
   health: AdminHealth | null;
   jobs: UploadJobSummary[];
+  operatorBusy?: boolean;
+  operatorError?: string | null;
+  operatorStatus?: string | null;
+  recentItems?: GalleryItem[];
   settings: AdminSettings | null;
   snapshot: BoothSnapshot;
 };
@@ -29,7 +36,16 @@ export type VisualFixtureMode =
   | 'recovery-upload'
   | 'recovery-interrupted'
   | 'admin-frame'
-  | 'admin-settings';
+  | 'admin-frame-error'
+  | 'admin-gallery'
+  | 'admin-gallery-empty'
+  | 'admin-settings'
+  | 'admin-settings-degraded'
+  | 'admin-settings-error'
+  | 'operator-login'
+  | 'operator-bootstrap'
+  | 'operator-restart'
+  | 'camera-setup';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FRAME_ID = '22222222-2222-4222-8222-222222222222';
@@ -56,7 +72,7 @@ const DEFAULT_FRAME_2: FrameSummary = {
 };
 
 const SETTINGS: AdminSettings = {
-  googleFormsUrl: 'https://forms.gle/example',
+  googleFormsUrl: 'https://example.invalid/fixture-form',
   localRetentionDays: 60,
   cloudRetentionDays: 30,
   lan: {
@@ -79,10 +95,10 @@ const SETTINGS: AdminSettings = {
     qrDismissSeconds: 45,
   },
   googlePhotos: {
-    connectedEmail: 'ministry@grace.org',
-    albumId: 'mock_album_123',
-    albumTitle: 'Sunday Service Live Stream',
-    albumShareUrl: 'https://photos.app.goo.gl/example',
+    connectedEmail: 'operator@example.invalid',
+    albumId: 'fixture_album',
+    albumTitle: 'Fixture album',
+    albumShareUrl: 'https://example.invalid/fixture-album',
     enabled: true,
   },
   revision: 3,
@@ -327,20 +343,65 @@ export async function createVisualSeedPayload(
     case 'admin-frame':
       adminView = 'frame';
       break;
+    case 'admin-frame-error':
+      adminView = 'frame';
+      break;
+    case 'admin-gallery':
+    case 'admin-gallery-empty':
+      adminView = 'gallery';
+      break;
     case 'admin-settings':
+    case 'admin-settings-degraded':
+    case 'admin-settings-error':
       adminView = 'settings';
+      break;
+    case 'operator-login':
+    case 'operator-bootstrap':
+    case 'operator-restart':
+    case 'camera-setup':
       break;
     default:
       return null;
   }
 
-  const payload = {
+  const galleryItem: GalleryItem | null =
+    mode === 'admin-gallery'
+      ? {
+          sessionId: SESSION_ID,
+          previewDataUrl: await buildReadyCollage(),
+          qrDataUrl: await buildReadyQr(),
+          metadata: {
+            capturedAt: 1_786_883_400_000,
+            photoCount: 3,
+            frameName: DEFAULT_FRAME.name,
+            uploadStatus: 'failed',
+            cloudExpiresAt: 1_789_475_400_000,
+          },
+        }
+      : null;
+  const payload: VisualSeedPayload = {
     adminView,
-    health: adminView ? HEALTH : null,
+    health:
+      mode === 'admin-settings-degraded'
+        ? { ...HEALTH, camera: { ...HEALTH.camera, state: 'degraded', message: 'Preview signal is intermittent.' } }
+        : adminView
+          ? HEALTH
+          : null,
     jobs: adminView ? JOBS : [],
+    operatorBusy: false,
+    operatorError:
+      mode === 'admin-frame-error' || mode === 'admin-settings-error'
+        ? 'The fixture could not save this change. Review the highlighted values and retry.'
+        : null,
+    operatorStatus: mode === 'admin-settings' ? 'Settings are synchronized.' : null,
+    recentItems: galleryItem ? [galleryItem] : [],
     settings: adminView ? SETTINGS : null,
     snapshot,
   };
+  if (mode === 'operator-login') payload.dialog = { intent: 'admin', mode: 'login' };
+  if (mode === 'operator-bootstrap') payload.dialog = { intent: 'bootstrap', mode: 'bootstrap' };
+  if (mode === 'operator-restart') payload.dialog = { intent: 'restart', mode: 'restart' };
+  if (mode === 'camera-setup') payload.cameraSetupOpen = true;
   return countdownSeconds === undefined ? payload : { ...payload, countdownSeconds };
 }
 
