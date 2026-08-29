@@ -1363,7 +1363,7 @@ body,
 
 .photostrip {
   position: relative;
-  background: #000000;
+  background: #ffffff;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-card);
   overflow: hidden;
@@ -1422,7 +1422,7 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #000000;
+  background: transparent;
 }
 
 .photo-slot__media img {

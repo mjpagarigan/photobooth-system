@@ -97,59 +97,103 @@ export const createMinistrySlots = (
 
 export const MINISTRY_FRAMES: Array<{ name: string; file: string; slots: FrameLayout }> = [
   {
-    name: 'Across Ministry',
-    file: 'across-frame.png',
-    slots: createMinistrySlots(0.208333, 0.416667, 0.625),
+    name: 'NextGen Ministry',
+    file: 'nextgen-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.222222, width: 0.851667, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.075, y: 0.430556, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.638889, width: 0.851667, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
   },
   {
     name: 'B1G Singles Ministry',
     file: 'b1g-frame.png',
-    slots: createMinistrySlots(0.226111, 0.434444, 0.642778, 0.068333, 0.065, 0.068333, 0.851667),
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.068333, y: 0.226667, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.065, y: 0.435, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.068333, y: 0.642778, width: 0.85, height: 0.163333, cropMode: 'crop-to-fill' },
+    ]),
   },
   {
-    name: 'Elevate Youth',
-    file: 'elevate-frame.png',
-    slots: createMinistrySlots(0.228889, 0.437222, 0.645556),
-  },
-  {
-    name: 'Exalt Worship Ministry',
-    file: 'exalt-frame.png',
-    slots: createMinistrySlots(0.216111, 0.425, 0.633333),
-  },
-  {
-    name: 'Host Team',
-    file: 'host-team-frame.png',
-    slots: createMinistrySlots(0.228889, 0.437222, 0.645556),
-  },
-  {
-    name: 'Living Free Ministry',
-    file: 'living-free-frame.png',
-    slots: createMinistrySlots(0.21, 0.418333, 0.626667),
-  },
-  {
-    name: 'M.A.T. Ministry',
-    file: 'mat-ministry-frame.png',
-    slots: createMinistrySlots(0.236111, 0.445, 0.653333, 0.07, 0.066667, 0.07, 0.851667),
+    name: 'Across Ministry',
+    file: 'across-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.208889, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.417222, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.625, width: 0.85, height: 0.163333, cropMode: 'crop-to-fill' },
+    ]),
   },
   {
     name: 'Movement Ministry',
     file: 'movement-frame.png',
-    slots: createMinistrySlots(0.199444, 0.408333, 0.616111),
-  },
-  {
-    name: 'NextGen Ministry',
-    file: 'nextgen-frame.png',
-    slots: createMinistrySlots(0.221667, 0.430556, 0.638333),
-  },
-  {
-    name: 'Ushering Ministry',
-    file: 'ushering-frame.png',
-    slots: createMinistrySlots(0.267778, 0.476111, 0.684444),
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.2, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.408333, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.616667, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
   },
   {
     name: 'Women 2 Women (W2W)',
     file: 'w2w-frame.png',
-    slots: createMinistrySlots(0.234444, 0.442778, 0.651111),
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.234444, width: 0.848333, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.075, y: 0.443333, width: 0.848333, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.651111, width: 0.848333, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
+  },
+  {
+    name: 'Living Free Ministry',
+    file: 'living-free-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.21, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.418889, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.626667, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
+  },
+  {
+    name: 'Host Team',
+    file: 'host-team-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.228889, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.437778, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.645556, width: 0.85, height: 0.163333, cropMode: 'crop-to-fill' },
+    ]),
+  },
+  {
+    name: 'Ushering Ministry',
+    file: 'ushering-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.267778, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.476667, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.684444, width: 0.85, height: 0.163333, cropMode: 'crop-to-fill' },
+    ]),
+  },
+  {
+    name: 'Exalt Worship Ministry',
+    file: 'exalt-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.216667, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.425, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.633333, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
+  },
+  {
+    name: 'Elevate Youth',
+    file: 'elevate-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.076667, y: 0.228889, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.073333, y: 0.437778, width: 0.85, height: 0.162222, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.076667, y: 0.645556, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
+  },
+  {
+    name: 'M.A.T. Ministry',
+    file: 'mat-ministry-frame.png',
+    slots: FrameLayoutSchema.parse([
+      { slotIndex: 1, name: 'Photo 1', x: 0.071667, y: 0.236667, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 2, name: 'Photo 2', x: 0.068333, y: 0.445, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+      { slotIndex: 3, name: 'Photo 3', x: 0.071667, y: 0.653333, width: 0.85, height: 0.162778, cropMode: 'crop-to-fill' },
+    ]),
   },
 ];
 
