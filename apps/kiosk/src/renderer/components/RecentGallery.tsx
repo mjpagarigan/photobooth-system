@@ -142,12 +142,14 @@ export function RecentGallery({
                 </Badge>
               </div>
               {item.qrDataUrl ? (
-                <img
-                  alt={`QR code for the photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
-                  className="gallery-tile__qr"
-                  draggable="false"
-                  src={item.qrDataUrl}
-                />
+                <div className="gallery-tile__qr-wrapper">
+                  <img
+                    alt={`QR code for the photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
+                    className="gallery-tile__qr"
+                    draggable="false"
+                    src={item.qrDataUrl}
+                  />
+                </div>
               ) : null}
               {operator ? (
                 <table className="gallery-tile__metadata">
