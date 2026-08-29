@@ -92,16 +92,6 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
     return items;
   }, [selectedDeviceId, videoDevices]);
 
-  const selectedDeviceLabel = useMemo(() => {
-    const match = deviceItems.find((item) => item.value === (selectedDeviceId ?? ''));
-    return match?.label ?? (selectedDeviceId ? `Camera (${selectedDeviceId.slice(0, 8)})` : 'Default system webcam');
-  }, [deviceItems, selectedDeviceId]);
-
-  const selectedResolutionLabel = useMemo(() => {
-    const match = RESOLUTION_ITEMS.find((item) => item.value === selectedResolution);
-    return match?.label ?? '1080p (1920 × 1080) — production quality';
-  }, [selectedResolution]);
-
   useEffect(() => {
     if (cameraStream.ready) {
       void enumerateVideoDevices().then((devices) => {
@@ -248,9 +238,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                     onValueChange={(value) => setSelectedDeviceId(value ?? null)}
                   >
                     <SelectTrigger aria-label="Active device node">
-                      <SelectValue placeholder="Default system webcam">
-                        {selectedDeviceLabel}
-                      </SelectValue>
+                      <SelectValue placeholder="Default system webcam" />
                     </SelectTrigger>
                     <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
                       {deviceItems.map((item) => (
@@ -280,9 +268,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                   onValueChange={(value) => value !== null && setSelectedResolution(value)}
                 >
                   <SelectTrigger aria-label="Capture resolution">
-                    <SelectValue placeholder="Select resolution">
-                      {selectedResolutionLabel}
-                    </SelectValue>
+                    <SelectValue placeholder="Select resolution" />
                   </SelectTrigger>
                   <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
                     {RESOLUTION_ITEMS.map((item) => (

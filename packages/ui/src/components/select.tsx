@@ -53,16 +53,22 @@ export const SelectPopup = forwardRef<HTMLDivElement, SelectPopupProps>(function
 ) {
   return (
     <BaseSelect.Portal {...portalProps}>
-      <BaseSelect.Positioner sideOffset={4} {...positionerProps}>
+      <BaseSelect.Positioner
+        sideOffset={4}
+        {...positionerProps}
+        className={cn('z-[100] outline-none select-none', positionerProps?.className)}
+      >
         <BaseSelect.Popup
           className={cn(
-            'z-50 min-w-[8rem] max-h-96 overflow-y-auto rounded-lg border border-border bg-card p-1 text-card-foreground shadow-xl transition-all duration-150 focus-visible:outline-none',
+            'z-[100] min-w-[var(--anchor-width,8rem)] max-h-96 overflow-y-auto rounded-lg border border-border bg-card p-1 text-card-foreground shadow-xl transition-all duration-150 focus-visible:outline-none',
             className,
           )}
           ref={ref}
           {...props}
         >
-          {children}
+          <BaseSelect.List className="py-1 outline-none">
+            {children}
+          </BaseSelect.List>
         </BaseSelect.Popup>
       </BaseSelect.Positioner>
     </BaseSelect.Portal>
@@ -109,3 +115,5 @@ export function SelectLabel({
 export const SelectGroup = BaseSelect.Group;
 export const SelectGroupLabel = BaseSelect.GroupLabel;
 export const SelectSeparator = BaseSelect.Separator;
+export const SelectList = BaseSelect.List;
+export const SelectPositioner = BaseSelect.Positioner;

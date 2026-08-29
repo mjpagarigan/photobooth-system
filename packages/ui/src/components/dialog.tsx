@@ -29,10 +29,10 @@ export const DialogPopup = forwardRef<HTMLDivElement, DialogPopupProps>(function
   return (
     <BaseDialog.Portal {...portalProps}>
       <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity duration-200" />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <BaseDialog.Popup
           className={cn(
-            'relative flex w-full flex-col rounded-xl border border-border bg-card text-card-foreground shadow-2xl transition-all duration-200 focus-visible:outline-none',
+            'pointer-events-auto relative flex w-full flex-col rounded-xl border border-border bg-card text-card-foreground shadow-2xl transition-all duration-200 focus-visible:outline-none',
             maxWidthClass,
             className,
           )}
