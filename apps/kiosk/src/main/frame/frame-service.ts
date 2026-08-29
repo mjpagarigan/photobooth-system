@@ -13,38 +13,39 @@ import type { PhotoVault } from '../storage/photo-vault.js';
 
 /** 1:3 Vertical photobooth strip aspect of the CCF Alabang Ministry Fair frame (1200 x 3600 pixels). */
 export const SUPPORTED_FRAME_ASPECT = 1 / 3;
-const LEGACY_MINISTRY_FAIR_FRAME_SHA256 =
+export const KNOWN_SHIPPED_LEGACY_HASHES = new Set([
+  'a0a3dfacd86a4a458e1cf510b4a19a395cdafc1c2373863adac083b79603a2eb',
+  '8ce3b927fe240fb205734acc0f28f8f1e15277f420cab612b9e0a688a05d1579',
+]);
+export const LEGACY_MINISTRY_FAIR_FRAME_SHA256 =
   'a0a3dfacd86a4a458e1cf510b4a19a395cdafc1c2373863adac083b79603a2eb';
 
-/**
- * Normalized photo slots calibrated against the transparent camera LCD cutouts in the default 3-strip frame.
- */
 export const MAT_FRAME_SLOTS: FrameLayout = FrameLayoutSchema.parse([
   {
     slotIndex: 1,
     name: 'Photo 1',
-    x: 0.25,
-    y: 0.295556,
-    width: 0.538333,
-    height: 0.142778,
+    x: 0.071667,
+    y: 0.236667,
+    width: 0.85,
+    height: 0.162778,
     cropMode: 'crop-to-fill',
   },
   {
     slotIndex: 2,
     name: 'Photo 2',
-    x: 0.138333,
-    y: 0.491667,
-    width: 0.553333,
-    height: 0.147778,
+    x: 0.068333,
+    y: 0.445,
+    width: 0.85,
+    height: 0.162778,
     cropMode: 'crop-to-fill',
   },
   {
     slotIndex: 3,
     name: 'Photo 3',
-    x: 0.271667,
-    y: 0.742778,
-    width: 0.465,
-    height: 0.126667,
+    x: 0.071667,
+    y: 0.653333,
+    width: 0.85,
+    height: 0.162778,
     cropMode: 'crop-to-fill',
   },
 ]);
@@ -53,28 +54,28 @@ export const ANNIVERSARY_FRAME_SLOTS: FrameLayout = FrameLayoutSchema.parse([
   {
     slotIndex: 1,
     name: 'Photo 1',
-    x: 0.068333,
-    y: 0.28,
-    width: 0.86,
-    height: 0.166111,
+    x: 0.076667,
+    y: 0.222222,
+    width: 0.851667,
+    height: 0.162778,
     cropMode: 'crop-to-fill',
   },
   {
     slotIndex: 2,
     name: 'Photo 2',
-    x: 0.065,
-    y: 0.487778,
-    width: 0.86,
-    height: 0.166667,
+    x: 0.075,
+    y: 0.430556,
+    width: 0.85,
+    height: 0.162778,
     cropMode: 'crop-to-fill',
   },
   {
     slotIndex: 3,
     name: 'Photo 3',
-    x: 0.068333,
-    y: 0.696667,
-    width: 0.86,
-    height: 0.166667,
+    x: 0.076667,
+    y: 0.638889,
+    width: 0.851667,
+    height: 0.162778,
     cropMode: 'crop-to-fill',
   },
 ]);
@@ -489,7 +490,7 @@ function isReplaceable(frame: StoredFrame, library: StoredFrame[]): boolean {
   const legacyNamed =
     frame.name === 'CCF Alabang Ministry Fair Strip' ||
     frame.name === 'CCF Alabang Ministry Fair Strip (Collage 2)';
-  if (legacyNamed && frame.sha256 === LEGACY_MINISTRY_FAIR_FRAME_SHA256) return true;
+  if (legacyNamed && KNOWN_SHIPPED_LEGACY_HASHES.has(frame.sha256)) return true;
   const baseName = frame.name.replace(/ \(Collage 2\)$/, '');
   const original = library.find((candidate) => candidate.name === baseName);
   const isAutomaticDuplicate =

@@ -160,6 +160,27 @@ if (templateDir) {
       target: item.target,
       slots: item.slots,
     });
+    if (item.name === 'M.A.T. Ministry') {
+      await prepareMinistryFrame({
+        name: 'M.A.T. Frame',
+        source: chosenSource,
+        target: 'resources/frames/mat-frame.png',
+        slots: item.slots,
+      });
+      await prepareMinistryFrame({
+        name: 'Default Frame',
+        source: chosenSource,
+        target: 'resources/frames/default-frame.png',
+        slots: item.slots,
+      });
+    } else if (item.name === 'NextGen Ministry') {
+      await prepareMinistryFrame({
+        name: '42nd Anniversary Frame',
+        source: chosenSource,
+        target: 'resources/frames/anniv-frame.png',
+        slots: item.slots,
+      });
+    }
   }
 } else {
   const inputs = [

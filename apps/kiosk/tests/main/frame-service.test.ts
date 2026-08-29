@@ -137,12 +137,12 @@ describe('frame import contract', () => {
       const slot0 = DEFAULT_FRAME_SLOTS[0]!;
       const slot1 = DEFAULT_FRAME_SLOTS[1]!;
       const slot2 = DEFAULT_FRAME_SLOTS[2]!;
-      const updatedSlots = [{ ...slot0, x: 0.2 }, slot1, slot2];
+      const updatedSlots = [{ ...slot0, x: 0.1 }, slot1, slot2];
       service.updateLayout(frame2.id, 'Renamed B', updatedSlots, frame2.revision);
 
       const reloaded = store.repository.getFrame(frame2.id);
       expect(reloaded?.name).toBe('Renamed B');
-      expect(reloaded?.slots[0]?.x).toBe(0.2);
+      expect(reloaded?.slots[0]?.x).toBe(0.1);
     } finally {
       store.close();
     }
