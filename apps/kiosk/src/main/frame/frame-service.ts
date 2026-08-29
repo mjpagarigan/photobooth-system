@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -293,7 +293,7 @@ export class FrameService {
 
   /**
    * Seeds all available ministry template frames into the library so guests have access to all
-   * ministry-specific photostrip layouts. Automatically synchronizes calibrated slot positions.
+   * ministry-specific photostrip layouts. Automatically synchronizes calibrated slot positions and artwork.
    */
   async ensureMinistryFrames(): Promise<StoredFrame[]> {
     const seeded: StoredFrame[] = [];
@@ -303,30 +303,32 @@ export class FrameService {
       const existing = currentLibrary.find(
         (f) => f.name === ministry.name || f.name.toLowerCase() === ministry.name.toLowerCase(),
       );
-      if (existing) {
-        // If the frame is an untouched shipped default with misaligned slots, update its layout to calibrated positions
-        if (existing.revision === 0 && JSON.stringify(existing.slots) !== JSON.stringify(ministry.slots)) {
-          try {
-            const updated = this.repository.updateFrameLayout(
-              existing.id,
-              ministry.slots,
-              existing.revision,
-              ministry.name,
-            );
-            seeded.push(updated);
-          } catch {
-            // Ignore layout update failure
+      try {
+        const filePath = join(framesDir, ministry.file);
+        const bytes = await readFile(filePath);
+        if (existing) {
+          // If the frame is an untouched shipped default (revision 0), ensure artwork and slots are up to date
+          if (existing.revision === 0) {
+            const isSlotMismatch = JSON.stringify(existing.slots) !== JSON.stringify(ministry.slots);
+            const normalized = await this.imageProcessor.normalizeFramePng(bytes);
+            const normalizedSha256 = createHash('sha256').update(normalized.bytes).digest('hex');
+            if (isSlotMismatch || existing.sha256 !== normalizedSha256) {
+              const imported = await this.importLibraryFrame(
+                ministry.name,
+                bytes,
+                ministry.slots,
+                existing.sortOrder,
+                [existing.id],
+              );
+              seeded.push(imported);
+            }
           }
-        }
-      } else {
-        try {
-          const filePath = join(framesDir, ministry.file);
-          const bytes = await readFile(filePath);
+        } else {
           const imported = await this.importLibraryFrame(ministry.name, bytes, ministry.slots);
           seeded.push(imported);
-        } catch {
-          // Additional ministry frame file not available in test harness, skip silently.
         }
+      } catch {
+        // Additional ministry frame file not available in test harness, skip silently.
       }
     }
     return seeded;

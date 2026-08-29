@@ -1708,7 +1708,7 @@ body,
   position: relative;
   height: 520px;
   max-height: calc(100vh - 200px);
-  background: #000000;
+  background: #ffffff;
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
