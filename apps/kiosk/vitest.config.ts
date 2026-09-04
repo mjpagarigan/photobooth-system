@@ -20,5 +20,10 @@ export default defineConfig({
     include: ['tests/**/*.test.{ts,tsx}'],
     restoreMocks: true,
     setupFiles: ['./tests/setup.ts'],
+    server: {
+      deps: {
+        inline: [/@fluentui/, 'tabster', /@grace-booth/],
+      },
+    },
   },
 });

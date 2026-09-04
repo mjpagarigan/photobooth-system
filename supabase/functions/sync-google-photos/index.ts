@@ -152,7 +152,7 @@ export async function processGooglePhotosSyncQueue(
   return { processed: jobs.length, succeeded, failed };
 }
 
-export async function handler(request: Request): Promise<Response> {
+export async function handler(): Promise<Response> {
   const correlationId = requestId();
   try {
     const admin = createAdminClient();

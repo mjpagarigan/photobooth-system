@@ -229,25 +229,6 @@ export class FrameService {
    * occupy their positions permanently.
    */
   async ensureDefaultFrames(): Promise<{ option1: StoredFrame; option2: StoredFrame }> {
-    // Deduplicate any duplicate frames with identical sha256
-    const initialLibrary = this.repository.listFrames();
-    const seenHashes = new Map<string, StoredFrame>();
-    for (const frame of initialLibrary) {
-      if (seenHashes.has(frame.sha256)) {
-        const canonical = seenHashes.get(frame.sha256);
-        if (!canonical) continue;
-        this.repository.repointFramePointer(frame.id, canonical.id);
-        this.repository.deleteFrameRow(frame.id);
-        try {
-          this.vault.delete(frame.encryptedPath);
-        } catch {
-          // The library row removal is authoritative; a missing PNG is not a deletion failure.
-        }
-      } else {
-        seenHashes.set(frame.sha256, frame);
-      }
-    }
-
     const definitions: [PackagedFrameDefinition, PackagedFrameDefinition] = [
       {
         name: MAT_FRAME_NAME,
@@ -264,8 +245,17 @@ export class FrameService {
       readFile(definitions[0].path),
       readFile(definitions[1].path),
     ]);
+    const allFrames = this.repository.listAllFrames();
     const seeded: StoredFrame[] = [];
     for (const [index, definition] of definitions.entries()) {
+      const isArchived = allFrames.some(
+        (f) =>
+          f.archived &&
+          (f.name === definition.name || f.name.toLowerCase() === definition.name.toLowerCase()),
+      );
+      if (isArchived) {
+        continue;
+      }
       const library = this.repository.listFrames();
       const occupant = library[index] ?? null;
       if (occupant && !isReplaceable(occupant, library)) {
@@ -284,12 +274,14 @@ export class FrameService {
         ),
       );
     }
-    const [option1, option2] = seeded;
-    if (!option1 || !option2) {
+    const active = this.repository.listFrames();
+    const option1 = active[0] ?? seeded[0];
+    const option2 = active[1] ?? active[0] ?? seeded[1] ?? seeded[0];
+    if (!option1) {
       throw new AppError('frame_missing', 'The photo frames could not be prepared.');
     }
-    this.ensureSequentialSeedOrder(option1, option2);
-    return { option1, option2 };
+    this.ensureSequentialSeedOrder(option1, option2 ?? option1);
+    return { option1, option2: option2 ?? option1 };
   }
 
   /**
@@ -299,11 +291,15 @@ export class FrameService {
   async ensureMinistryFrames(): Promise<StoredFrame[]> {
     const seeded: StoredFrame[] = [];
     const framesDir = dirname(this.packagedFramePaths.option1);
+    const allFrames = this.repository.listAllFrames();
     for (const ministry of MINISTRY_FRAMES) {
-      const currentLibrary = this.repository.listFrames();
-      const existing = currentLibrary.find(
+      const existing = allFrames.find(
         (f) => f.name === ministry.name || f.name.toLowerCase() === ministry.name.toLowerCase(),
       );
+      if (existing?.archived) {
+        // Operator archived this frame. Never resurrect.
+        continue;
+      }
       try {
         const filePath = join(framesDir, ministry.file);
         const bytes = await readFile(filePath);
@@ -384,26 +380,34 @@ export class FrameService {
   }
 
   /**
-   * Deletes an unused library entry. Frames referenced by any recorded session are rejected so
-   * archived collages can always be traced back to their artwork.
+   * Deletes or archives a library entry. Referenced frames are soft-archived to preserve historical
+   * collage integrity, while unreferenced frames are deleted along with their vault PNG asset.
+   * Guarantees at least one active frame remains in the library.
    */
   deleteFrame(frameId: string): StoredFrame[] {
     const frame = this.repository.getFrame(frameId);
-    if (!frame) throw new AppError('frame_missing', 'The selected frame no longer exists.');
-    const usage = this.repository.countSessionsReferencingFrame(frameId);
-    if (usage > 0) {
+    if (!frame || frame.archived) {
+      throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    }
+    const activeFrames = this.repository.listFrames();
+    if (activeFrames.length <= 1) {
       throw new AppError(
-        'frame_in_use',
-        'This frame is used by saved photo sessions and cannot be deleted.',
+        'frame_last_active',
+        'Cannot delete the only remaining active frame in the library.',
       );
     }
-    const replacement = this.repository.listFrames().find((candidate) => candidate.id !== frameId);
+    const usage = this.repository.countSessionsReferencingFrame(frameId);
+    const replacement = activeFrames.find((candidate) => candidate.id !== frameId);
     this.repository.repointFramePointer(frameId, replacement?.id ?? null);
-    this.repository.deleteFrameRow(frameId);
-    try {
-      this.vault.delete(frame.encryptedPath);
-    } catch {
-      // The library row removal is authoritative; a missing PNG is not a deletion failure.
+    if (usage > 0) {
+      this.repository.archiveFrame(frameId);
+    } else {
+      this.repository.deleteFrameRow(frameId);
+      try {
+        this.vault.delete(frame.encryptedPath);
+      } catch {
+        // The library row removal is authoritative; a missing PNG is not a deletion failure.
+      }
     }
     return this.repository.listFrames();
   }
@@ -465,6 +469,7 @@ export class FrameService {
       sha256: stored.sha256,
       revision: 0,
       sortOrder: sortOrder === undefined ? this.repository.nextSortOrder() : sortOrder,
+      archived: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -518,13 +523,52 @@ export class FrameService {
       throw error;
     }
   }
+
+  /**
+   * Replaces an existing frame's artwork with a normalized transparent PNG,
+   * atomically bumping revision while preserving ID, ordering, name, and slot geometry.
+   */
+  async replaceFrameArtwork(frameId: string, bytes: Uint8Array): Promise<StoredFrame> {
+    const existing = this.repository.getFrame(frameId);
+    if (!existing || existing.archived) {
+      throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    }
+    const normalized = await this.imageProcessor.normalizeFramePng(bytes);
+    if (!hasExactProductionStripAspect(normalized.width, normalized.height)) {
+      throw new AppError(
+        'frame_aspect',
+        'The frame must use an exact 1:3 vertical photobooth strip aspect.',
+      );
+    }
+    const stored = this.vault.write('frames', normalized.bytes);
+    try {
+      const updated = this.repository.updateFrameArtwork(existing.id, {
+        encryptedPath: stored.relativePath,
+        width: normalized.width,
+        height: normalized.height,
+        byteSize: stored.byteSize,
+        sha256: stored.sha256,
+      });
+      try {
+        this.vault.delete(existing.encryptedPath);
+      } catch {
+        // The updated row is authoritative; an already-missing superseded PNG is harmless.
+      }
+      return updated;
+    } catch (error) {
+      this.vault.delete(stored.relativePath);
+      throw error;
+    }
+  }
 }
 
 function isReplaceable(frame: StoredFrame, library: StoredFrame[]): boolean {
   if (frame.revision > 0) return false;
   const legacyNamed =
     frame.name === 'CCF Alabang Ministry Fair Strip' ||
-    frame.name === 'CCF Alabang Ministry Fair Strip (Collage 2)';
+    frame.name === 'CCF Alabang Ministry Fair Strip (Collage 2)' ||
+    frame.name === 'CCF Alabang Celebration Strip' ||
+    frame.name === 'CCF Alabang Celebration Strip (Collage 2)';
   if (legacyNamed && KNOWN_SHIPPED_LEGACY_HASHES.has(frame.sha256)) return true;
   const baseName = frame.name.replace(/ \(Collage 2\)$/, '');
   const original = library.find((candidate) => candidate.name === baseName);

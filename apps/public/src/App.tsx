@@ -1,13 +1,17 @@
 import {
-  ApertureIcon as Aperture,
-  ArrowClockwiseIcon as ArrowClockwise,
-  DownloadSimpleIcon as DownloadSimple,
-  HandHeartIcon as HandHeart,
-  ShieldCheckIcon as ShieldCheck,
-  WarningOctagonIcon as WarningOctagon,
-} from '@phosphor-icons/react';
+  Aperture,
+  ArrowClockwise,
+  Badge,
+  Button,
+  CalendarBlank,
+  DownloadSimple,
+  HandHeart,
+  Info,
+  ShieldCheck,
+  Skeleton,
+  WarningOctagon,
+} from '@grace-booth/ui';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Skeleton } from '@grace-booth/ui';
 import {
   fetchPhotoDownload,
   fetchPhotoImage,
@@ -31,7 +35,7 @@ function Brand(): React.JSX.Element {
       </span>
       <div className="brand-text">
         <strong>M.A.T.</strong>
-        <small>PHOTOBOOTH</small>
+        <span className="brand-sub">Photobooth</span>
       </div>
     </div>
   );
@@ -42,12 +46,14 @@ function PageFrame({ children }: { children: React.ReactNode }): React.JSX.Eleme
     <div className="page-frame isolate relative min-h-screen">
       <header className="site-header">
         <Brand />
-        <span className="header-badge">ARCHIVE // DISPATCH</span>
+        <Badge variant="info" className="header-badge">
+          Private photo
+        </Badge>
       </header>
       {children}
       <footer className="site-footer">
-        <p>M.A.T. PHOTOBOOTH // SECURE GUEST PHOTO RETRIEVAL</p>
-        <p className="footer-meta">PRIVATE LINK · 30-DAY RETENTION HORIZON</p>
+        <p>M.A.T. Photobooth</p>
+        <p className="footer-meta">Private link · Available for 30 days</p>
       </footer>
     </div>
   );
@@ -64,15 +70,28 @@ function LoadingView(): React.JSX.Element {
       tabIndex={0}
     >
       <section className="detail-panel loading-panel">
-        <p className="eyebrow">RETRIEVING ENCRYPTED ARCHIVE</p>
-        <h1>Your moment is almost here.</h1>
-        <p>Opening and decrypting the keepsake connected to this QR token.</p>
-        <Skeleton className="h-4 w-full max-w-sm my-2" />
-        <Skeleton className="h-4 w-3/4 max-w-xs my-2" />
+        <div className="eyebrow-wrapper">
+          <Badge variant="info" size="sm" className="eyebrow">
+            Loading your photo
+          </Badge>
+        </div>
+        <h1>Your photo is almost ready</h1>
+        <p className="lead-copy">
+          We’re securely opening the photo connected to this QR code.
+        </p>
+        <div className="skeleton-lines">
+          <Skeleton className="h-4 w-full max-w-sm my-1.5" />
+          <Skeleton className="h-4 w-3/4 max-w-xs my-1.5" />
+        </div>
         <span className="sr-only">Loading photo</span>
       </section>
       <section className="photo-stage skeleton-stage" aria-label="Loading your photo">
-        <div className="skeleton-photo" />
+        <div className="stage-label" aria-hidden="true">
+          <span>Loading keepsake</span>
+        </div>
+        <div className="photo-mat">
+          <div className="skeleton-photo" />
+        </div>
       </section>
     </main>
   );
@@ -90,21 +109,25 @@ function ErrorView({
   return (
     <main className="error-layout" data-state="error">
       <section className="error-card" aria-labelledby="error-title">
-        <p className="eyebrow">ARCHIVE UNAVAILABLE</p>
         <div className="error-symbol" aria-hidden="true">
-          <WarningOctagon size={38} weight="bold" />
+          <WarningOctagon size={32} weight="bold" />
         </div>
+        <Badge variant="error" size="sm" className="error-badge">
+          Photo unavailable
+        </Badge>
         <h1 id="error-title">We could not open this photo.</h1>
-        <p>{message}</p>
+        <p className="error-message">{message}</p>
         <p className="muted-copy">
           Verify the complete QR URL was opened. Tokens expire automatically after 30 days.
         </p>
         {retryable ? (
           <Button
             className="compact-button mt-4"
-            icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+            icon={<ArrowClockwise size={16} aria-hidden="true" weight="bold" />}
             onClick={onRetry}
+            size="default"
             type="button"
+            variant="secondary"
           >
             <span>Try again</span>
           </Button>
@@ -154,10 +177,12 @@ function ReadyView({
     <main className="photo-layout" data-state="ready">
       <section className="detail-panel" aria-labelledby="photo-title">
         <div>
-          <p className="eyebrow success-eyebrow">
-            <ShieldCheck size={16} weight="bold" aria-hidden="true" />
-            <span>ARCHIVE READY</span>
-          </p>
+          <div className="eyebrow-wrapper">
+            <Badge variant="success" className="eyebrow success-eyebrow">
+              <ShieldCheck size={14} weight="bold" aria-hidden="true" />
+              <span>Photo ready</span>
+            </Badge>
+          </div>
           <h1 id="photo-title">Hold on to this moment.</h1>
           <p className="lead-copy">
             Your finished 3-frame photobooth strip is prepared for download. Save it directly to
@@ -169,26 +194,29 @@ function ReadyView({
           <Button
             className="primary-button w-full"
             disabled={downloadState === 'working'}
-            icon={<DownloadSimple aria-hidden="true" weight="bold" />}
+            icon={<DownloadSimple size={20} aria-hidden="true" weight="bold" />}
             loading={downloadState === 'working'}
             onClick={() => void downloadPhoto()}
             size="lg"
             type="button"
+            variant="primary"
           >
             <span>{downloadState === 'working' ? 'Preparing download…' : 'Download photo'}</span>
           </Button>
           <a
             className="secondary-button"
-            href="https://volunteer-management.ccf.org.ph/recruitment/form"
+            href={
+              details.googleFormsUrl ?? 'https://volunteer-management.ccf.org.ph/recruitment/form'
+            }
             target="_blank"
             rel="noopener noreferrer external"
           >
-            <HandHeart size={18} weight="bold" aria-hidden="true" />
-            <span>Join a Ministry</span>
+            <HandHeart size={20} weight="bold" aria-hidden="true" />
+            <span>Join a ministry</span>
           </a>
           <p className="mobile-save-hint">
-            <span>💡</span> Tip: On iPhone/iPad, you can also touch &amp; hold the photo to Save to
-            Photos.
+            <Info aria-hidden="true" size={16} />
+            <span>On iPhone or iPad, touch and hold the photo to save it to Photos.</span>
           </p>
           {downloadState === 'error' ? (
             <p className="inline-error" role="alert">
@@ -198,38 +226,22 @@ function ReadyView({
         </div>
 
         <div className="availability-note">
-          <span className="day-stamp" aria-hidden="true">
-            30
-            <small>DAYS</small>
-          </span>
+          <CalendarBlank className="availability-note__icon" aria-hidden="true" size={20} />
           <p>
             <strong>Available until {availableUntil}</strong>
-            This private link and cloud copy expire automatically.
+            <span>This private link and cloud copy expire automatically.</span>
           </p>
         </div>
       </section>
 
       <section className="photo-stage" aria-label="Your finished photo">
         <div className="stage-label" aria-hidden="true">
-          <span>M.A.T. PHOTOBOOTH // COMPOSITE</span>
-          <span className="crosshair-icon">+</span>
+          <span>Your finished photo</span>
         </div>
         <div className="photo-mat">
-          <span className="mat-crosshair mat-crosshair--tl" aria-hidden="true">
-            +
-          </span>
-          <span className="mat-crosshair mat-crosshair--tr" aria-hidden="true">
-            +
-          </span>
-          <span className="mat-crosshair mat-crosshair--bl" aria-hidden="true">
-            +
-          </span>
-          <span className="mat-crosshair mat-crosshair--br" aria-hidden="true">
-            +
-          </span>
           <img src={imageUrl} alt="M.A.T. Photobooth finished event collage" />
         </div>
-        <p className="stage-caption">HIGH-RESOLUTION KEEPSAKE · VERIFIED REPOSITORY OUTPUT</p>
+        <p className="stage-caption">High-resolution photobooth keepsake</p>
       </section>
     </main>
   );

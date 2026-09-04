@@ -2,8 +2,11 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CANONICAL_FRAME_HEIGHT,
+  CANONICAL_FRAME_WIDTH,
   isSafeSourceByteLength,
   isSafeSourceGeometry,
+  normalizeFramePng,
   validateSourceJpeg,
 } from '../../src/main/image/image-validation.js';
 
@@ -34,3 +37,46 @@ describe('worker-side source image safety limits', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('frame PNG normalization', () => {
+  it('rejects an opaque PNG without transparency', async () => {
+    const opaque = await sharp({
+      create: { width: 1200, height: 3600, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    await expect(normalizeFramePng(opaque)).rejects.toThrow(/transparent pixels/i);
+  });
+
+  it('rejects a transparent PNG that violates the exact 1:3 aspect ratio', async () => {
+    const square = await sharp({
+      create: { width: 1000, height: 1000, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    await expect(normalizeFramePng(square)).rejects.toThrow(/1:3 vertical photobooth strip aspect/i);
+  });
+
+  it('normalizes a valid 600x1800 transparent PNG to canonical 1200x3600', async () => {
+    const halfScale = await sharp({
+      create: { width: 600, height: 1800, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const result = await normalizeFramePng(halfScale);
+    expect(result.width).toBe(CANONICAL_FRAME_WIDTH);
+    expect(result.height).toBe(CANONICAL_FRAME_HEIGHT);
+  });
+
+  it('accepts and preserves a valid 1200x3600 transparent PNG', async () => {
+    const fullScale = await sharp({
+      create: { width: 1200, height: 3600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const result = await normalizeFramePng(fullScale);
+    expect(result.width).toBe(1200);
+    expect(result.height).toBe(3600);
+  });
+});
+

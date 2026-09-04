@@ -1,7 +1,4 @@
-import {
-  CalendarBlankIcon as CalendarBlank,
-  CheckCircleIcon as CheckCircle,
-} from '@phosphor-icons/react';
+import { CalendarBlank, CheckCircle } from '@grace-booth/ui';
 
 import { Button } from './Button';
 
@@ -9,14 +6,20 @@ type QrPanelProps = {
   qrImageUrl: string;
   onDone: () => void;
   busy?: boolean | undefined;
+  heading?: string;
 };
 
-export function QrPanel({ busy = false, onDone, qrImageUrl }: QrPanelProps) {
+export function QrPanel({
+  busy = false,
+  onDone,
+  qrImageUrl,
+  heading = 'Please scan the QR Code beside to download the photo',
+}: QrPanelProps) {
   return (
     <section className="qr-panel" aria-labelledby="qr-title">
       <div className="qr-panel__copy">
         <h1 id="qr-title" data-screen-heading tabIndex={-1}>
-          All set!
+          {heading}
         </h1>
         <p>Scan the QR code with your phone camera to download your collage.</p>
       </div>

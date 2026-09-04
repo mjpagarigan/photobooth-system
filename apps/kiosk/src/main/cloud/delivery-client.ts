@@ -49,7 +49,7 @@ export type DeliveryClient = {
   getGooglePhotosStatus?(): Promise<GooglePhotosStatus>;
   saveGooglePhotosConfig?(config: GooglePhotosConfig): Promise<void>;
   createGooglePhotosAlbum?(title: string): Promise<{ albumId: string; albumTitle: string; shareUrl: string }>;
-  listGooglePhotosAlbums?(): Promise<Array<{ id: string; title: string; shareUrl?: string }>>;
+  listGooglePhotosAlbums?(): Promise<{ id: string; title: string; shareUrl?: string }[]>;
   resolveGooglePhotosAlbum?(shareUrl: string): Promise<{ albumId: string; albumTitle: string; shareUrl: string }>;
   syncGooglePhotosNow?(): Promise<{ processed: number; succeeded: number; failed: number }>;
   testGooglePhotosUpload?(): Promise<{ success: boolean; message: string }>;
@@ -299,14 +299,14 @@ export class SupabaseDeliveryClient implements DeliveryClient {
     return res.data;
   }
 
-  async listGooglePhotosAlbums(): Promise<Array<{ id: string; title: string; shareUrl?: string }>> {
+  async listGooglePhotosAlbums(): Promise<{ id: string; title: string; shareUrl?: string }[]> {
     const res = (await this.invokeFunction('google-photos-auth', {
       action: 'list-albums',
     })) as {
       ok: boolean;
-      data: { albums: Array<{ id: string; title: string; shareUrl?: string }> };
+      data: { albums: { id: string; title: string; shareUrl?: string }[] };
     };
-    return res.data?.albums || [];
+    return res.data.albums;
   }
 
   async resolveGooglePhotosAlbum(

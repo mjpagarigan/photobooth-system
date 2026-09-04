@@ -1,13 +1,7 @@
 import { Toast } from '@base-ui/react/toast';
-import {
-  CheckCircleIcon as CheckCircle,
-  InfoIcon as Info,
-  SpinnerGapIcon as SpinnerGap,
-  WarningCircleIcon as WarningCircle,
-  WarningIcon as Warning,
-} from '@phosphor-icons/react';
 import type React from 'react';
 
+import { CheckCircle, Info, SpinnerGap, Warning, WarningCircle } from './icons';
 import { cn } from '../lib/utils';
 
 const icons = {
@@ -39,7 +33,7 @@ function Toasts({
     <Toast.Portal {...portalProps}>
       <Toast.Viewport
         className={cn(
-          'fixed z-[70] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3 outline-none',
+          'fixed z-[70] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 outline-none',
           position.startsWith('top') ? 'top-4' : 'bottom-4',
           position.endsWith('left') && 'left-4',
           position.endsWith('right') && 'right-4',
@@ -50,12 +44,12 @@ function Toasts({
           const Icon = toast.type ? icons[toast.type as keyof typeof icons] : null;
           return (
             <Toast.Root
-              className="rounded-xl border border-border bg-card text-card-foreground shadow-2xl transition-[transform,opacity] data-starting-style:translate-y-2 data-starting-style:opacity-0 data-ending-style:translate-y-2 data-ending-style:opacity-0"
+              className="rounded-[4px] border border-[#e0e0e0] bg-white text-[#242424] shadow-[var(--shadow-16)] transition-[transform,opacity] data-starting-style:translate-y-2 data-starting-style:opacity-0 data-ending-style:translate-y-2 data-ending-style:opacity-0 motion-reduce:transition-none"
               key={toast.id}
               swipeDirection={position.startsWith('top') ? 'up' : 'down'}
               toast={toast}
             >
-              <Toast.Content className="flex min-h-14 items-start gap-3 px-4 py-3.5">
+              <Toast.Content className="flex min-h-12 items-start gap-3 px-3 py-3">
                 {Icon ? (
                   <Icon
                     aria-hidden="true"
@@ -63,15 +57,14 @@ function Toasts({
                       'mt-0.5 size-5 shrink-0',
                       toast.type === 'loading' && 'animate-spin',
                     )}
-                    weight="bold"
                   />
                 ) : null}
                 <div className="min-w-0 flex-1">
-                  <Toast.Title className="font-semibold" />
-                  <Toast.Description className="mt-0.5 text-sm text-muted-foreground" />
+                  <Toast.Title className="text-sm font-semibold leading-5" />
+                  <Toast.Description className="text-sm leading-5 text-muted-foreground" />
                 </div>
                 {toast.actionProps ? (
-                  <Toast.Action className="min-h-11 rounded-md px-3 font-semibold" />
+                  <Toast.Action className="min-h-8 rounded-[4px] px-3 text-sm font-semibold" />
                 ) : null}
               </Toast.Content>
             </Toast.Root>

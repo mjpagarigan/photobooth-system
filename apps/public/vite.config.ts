@@ -203,6 +203,11 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./tests/setup.ts'],
       clearMocks: true,
       restoreMocks: true,
+      server: {
+        deps: {
+          inline: [/@fluentui/, 'tabster', /@grace-booth/],
+        },
+      },
     },
   };
 });

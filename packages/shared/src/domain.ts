@@ -79,19 +79,14 @@ export type FrameLayout = z.infer<typeof FrameLayoutSchema>;
 export function isAllowedGoogleFormsUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    if (
-      url.protocol !== 'https:' ||
-      url.username !== '' ||
-      url.password !== '' ||
-      (url.port !== '' && url.port !== '443')
-    ) {
-      return false;
-    }
-    const hostname = url.hostname.toLowerCase();
-    if (hostname === 'forms.gle' || hostname === 'forms.google.com') {
-      return true;
-    }
-    return hostname === 'docs.google.com' && url.pathname.startsWith('/forms/');
+    return (
+      url.protocol === 'https:' &&
+      url.username === '' &&
+      url.password === '' &&
+      (url.port === '' || url.port === '443') &&
+      url.hostname.length > 0 &&
+      value.length <= 2_048
+    );
   } catch {
     return false;
   }
@@ -104,7 +99,7 @@ export const OptionalGoogleFormsUrlSchema = z
       .string()
       .trim()
       .max(2_048)
-      .refine(isAllowedGoogleFormsUrl, 'Enter a valid HTTPS Google Forms URL'),
+      .refine(isAllowedGoogleFormsUrl, 'Enter a valid HTTPS URL'),
     z.null(),
   ])
   .transform((value) => (value === '' ? null : value));
@@ -173,6 +168,7 @@ export const QrStationStateSchema = z
     durationSeconds: z.number().int().positive(),
     message: z.string().nullable(),
     canRetryUpload: z.boolean().default(false),
+    queuedCount: z.number().int().nonnegative().default(0),
   })
   .strict();
 export type QrStationState = z.infer<typeof QrStationStateSchema>;

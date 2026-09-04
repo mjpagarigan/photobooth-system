@@ -1,16 +1,6 @@
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/jetbrains-mono/500.css';
-import '@fontsource/jetbrains-mono/600.css';
-import '@fontsource/jetbrains-mono/700.css';
-import '@fontsource/montserrat/700.css';
-import '@fontsource/montserrat/800.css';
-import '@fontsource/montserrat/900.css';
-
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { GraceBoothFluentProvider } from '@grace-booth/ui';
 
 import { App } from './App';
 import { QrStationScreen } from './screens/QrStationScreen';
@@ -27,6 +17,8 @@ const isQrStation = params.get('view') === 'qr-station';
 
 createRoot(rootElement).render(
   <StrictMode>
-    {isQrStation ? <QrStationScreen /> : <App />}
+    <GraceBoothFluentProvider>
+      {isQrStation ? <QrStationScreen /> : <App />}
+    </GraceBoothFluentProvider>
   </StrictMode>,
 );

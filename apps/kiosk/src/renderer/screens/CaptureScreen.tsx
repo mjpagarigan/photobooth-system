@@ -1,6 +1,4 @@
-import {
-  CheckCircleIcon as CheckCircle,
-} from '@phosphor-icons/react';
+import { CheckCircle } from '@grace-booth/ui';
 
 import { ProgressStepper } from '../components/ProgressStepper';
 import { mockPhotoFor } from '../local-fixtures';
@@ -16,7 +14,7 @@ type CaptureScreenProps = {
 const POSE_COPY = [
   'Made to Serve · Warm smiles & eyes on lens!',
   'Discover Your Gift · Fun & playful pose!',
-  'Ministry Fair · Grand celebratory finale!',
+  'Celebrate Together · Grand celebratory finale!',
 ] as const;
 
 export function CaptureScreen({

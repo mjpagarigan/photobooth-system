@@ -1,24 +1,34 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import {
-  Button as CossButton,
-  type ButtonProps as CossButtonProps,
+  Button as FluentButton,
+  type ButtonProps as FluentButtonProps,
 } from '@grace-booth/ui';
 
-type LegacyVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'ghost' | 'outline' | 'default' | 'destructive';
+type LegacyVariant =
+  | 'primary'
+  | 'secondary'
+  | 'quiet'
+  | 'danger'
+  | 'ghost'
+  | 'outline'
+  | 'default'
+  | 'destructive'
+  | 'subtle';
 
 export type ButtonProps = {
   children: ReactNode;
   icon?: ReactNode;
   iconAfter?: ReactNode;
   loading?: boolean;
+  size?: FluentButtonProps['size'];
   variant?: LegacyVariant;
   wide?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
-function mapVariant(v?: LegacyVariant): CossButtonProps['variant'] {
-  if (!v || v === 'primary' || v === 'default') return 'default';
+function mapVariant(v?: LegacyVariant): FluentButtonProps['variant'] {
+  if (!v || v === 'primary' || v === 'default') return 'primary';
   if (v === 'secondary') return 'secondary';
-  if (v === 'quiet' || v === 'ghost') return 'ghost';
+  if (v === 'quiet' || v === 'ghost' || v === 'subtle') return 'subtle';
   if (v === 'danger' || v === 'destructive') return 'destructive';
   return 'outline';
 }
@@ -31,6 +41,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     icon,
     iconAfter,
     loading = false,
+    size,
     type = 'button',
     variant = 'primary',
     wide = false,
@@ -42,7 +53,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const legacyVariantClass = `button button--${variant}${wide ? ' button--wide' : ''}`;
 
   return (
-    <CossButton
+    <FluentButton
       aria-busy={loading ? 'true' : undefined}
       className={`${legacyVariantClass} ${wide ? 'w-full' : ''} ${className}`.trim()}
       disabled={disabled ? true : loading}
@@ -50,11 +61,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       iconAfter={iconAfter}
       loading={loading}
       ref={ref}
+      size={size}
       type={type}
       variant={mappedVariant}
       {...props}
     >
       <span className="button__label">{children}</span>
-    </CossButton>
+    </FluentButton>
   );
 });

@@ -1,3 +1,4 @@
+export * from './theme/fluent-theme';
 export * from './components/alert-dialog';
 export * from './components/alert';
 export * from './components/badge';
@@ -8,6 +9,7 @@ export * from './components/field';
 export * from './components/fieldset';
 export * from './components/form';
 export * from './components/input';
+export * from './components/icons';
 export * from './components/progress';
 export * from './components/radio-group';
 export * from './components/select';

@@ -1,7 +1,4 @@
-import {
-  SpinnerGapIcon as SpinnerGap,
-  ArrowClockwiseIcon as ArrowClockwise,
-} from '@phosphor-icons/react';
+import { ArrowClockwise, SpinnerGap } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -862,6 +859,7 @@ export function App() {
 
   const openRecentGallery = useCallback(async () => {
     if (visualSeed) {
+      setRecent((current) => ({ ...current, open: true }));
       return;
     }
     const bridge = getBridge();
@@ -1066,141 +1064,146 @@ export function App() {
   if (adminOpen && adminSettings) {
     return (
       <ToastProvider>
-      <AnchoredToastProvider>
-      <>
-        <AdminShell onExit={() => void exitAdmin()} onViewChange={setAdminView} view={adminView}>
-          {adminView === 'frame' ? (
-            <FrameEditor
-              busy={adminBusy}
-              error={adminError}
-              frames={adminSettings.frames ?? [adminSettings.activeFrame]}
-              onAddFrame={() => void addFrame()}
-              onDeleteFrame={(frameId) => void deleteFrame(frameId)}
-              onMoveFrame={(frameId, direction) => void moveFrame(frameId, direction)}
-              onSave={(frameId, name, slots, expectedRevision) =>
-                void saveFrame(frameId, name, slots, expectedRevision)
-              }
-              status={adminStatus}
+        <AnchoredToastProvider>
+          <>
+            <AdminShell
+              onExit={() => void exitAdmin()}
+              onViewChange={setAdminView}
+              view={adminView}
+            >
+              {adminView === 'frame' ? (
+                <FrameEditor
+                  busy={adminBusy}
+                  error={adminError}
+                  frames={adminSettings.frames ?? [adminSettings.activeFrame]}
+                  onAddFrame={() => void addFrame()}
+                  onDeleteFrame={(frameId) => void deleteFrame(frameId)}
+                  onMoveFrame={(frameId, direction) => void moveFrame(frameId, direction)}
+                  onSave={(frameId, name, slots, expectedRevision) =>
+                    void saveFrame(frameId, name, slots, expectedRevision)
+                  }
+                  status={adminStatus}
+                />
+              ) : adminView === 'gallery' ? (
+                <section className="admin-page" aria-label="Recent photos">
+                  <header className="admin-page-header">
+                    <div>
+                      <h1 data-screen-heading tabIndex={-1}>
+                        Recent photos
+                      </h1>
+                      <p>Every finished collage with delivery status and metadata.</p>
+                    </div>
+                    <div className="admin-page-header__actions">
+                      <Button
+                        icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                        loading={recent.busy}
+                        onClick={() => void loadOperatorGallery()}
+                        variant="secondary"
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                  </header>
+                  <RecentGallery
+                    busy={recent.busy}
+                    error={recent.error}
+                    items={recent.items}
+                    jobs={jobs}
+                    onClose={() => setAdminView('settings')}
+                    onRetryJob={(jobId) => void retryJob(jobId)}
+                    operator={true}
+                  />
+                </section>
+              ) : (
+                <AdminSettings
+                  key={`${adminSettings.activeFrame.id}:${adminSettings.revision}`}
+                  busy={adminBusy}
+                  error={adminError}
+                  health={health}
+                  jobs={jobs}
+                  onChangePasscode={(currentPasscode, newPasscode) =>
+                    void changePasscode(currentPasscode, newPasscode)
+                  }
+                  onChooseLanCertificate={(passphrase) => void chooseLanCertificate(passphrase)}
+                  onConnectCloud={(email, password, supabaseUrl, supabasePublishableKey) =>
+                    void connectCloud(email, password, supabaseUrl, supabasePublishableKey)
+                  }
+                  onOpenCameras={() => setCameraSetupOpen(true)}
+                  onRefresh={() => void refreshAdminData()}
+                  onRetryJob={(jobId: string) => void retryJob(jobId)}
+                  onSaveSettings={(input) => void saveSettings(input)}
+                  settings={adminSettings}
+                  status={adminStatus}
+                />
+              )}
+            </AdminShell>
+            <CameraSetupModal
+              isOpen={cameraSetupOpen}
+              onClose={() => setCameraSetupOpen(false)}
+              onCameraSaved={(_adapter, deviceId, resolution) => {
+                setSelectedCameraDeviceId(deviceId);
+                setSelectedCameraResolution(resolution);
+                void refreshAdminData();
+              }}
             />
-          ) : adminView === 'gallery' ? (
-            <section className="admin-page" aria-label="Recent photos">
-              <header className="admin-page-header">
-                <div>
-                  <h1 data-screen-heading tabIndex={-1}>
-                    RECENT PHOTOS
-                  </h1>
-                  <p>Every finished collage with delivery status and metadata.</p>
-                </div>
-                <div className="admin-page-header__actions">
-                  <Button
-                    icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
-                    loading={recent.busy}
-                    onClick={() => void loadOperatorGallery()}
-                    variant="secondary"
-                  >
-                    Refresh
-                  </Button>
-                </div>
-              </header>
-              <RecentGallery
-                busy={recent.busy}
-                error={recent.error}
-                items={recent.items}
-                jobs={jobs}
-                onClose={() => setAdminView('settings')}
-                onRetryJob={(jobId) => void retryJob(jobId)}
-                operator={true}
-              />
-            </section>
-          ) : (
-            <AdminSettings
-              key={`${adminSettings.activeFrame.id}:${adminSettings.revision}`}
-              busy={adminBusy}
-              error={adminError}
-              health={health}
-              jobs={jobs}
-              onChangePasscode={(currentPasscode, newPasscode) =>
-                void changePasscode(currentPasscode, newPasscode)
-              }
-              onChooseLanCertificate={(passphrase) => void chooseLanCertificate(passphrase)}
-              onConnectCloud={(email, password, supabaseUrl, supabasePublishableKey) =>
-                void connectCloud(email, password, supabaseUrl, supabasePublishableKey)
-              }
-              onOpenCameras={() => setCameraSetupOpen(true)}
-              onRefresh={() => void refreshAdminData()}
-              onRetryJob={(jobId: string) => void retryJob(jobId)}
-              onSaveSettings={(input) => void saveSettings(input)}
-              settings={adminSettings}
-              status={adminStatus}
-            />
-          )}
-        </AdminShell>
-        <CameraSetupModal
-          isOpen={cameraSetupOpen}
-          onClose={() => setCameraSetupOpen(false)}
-          onCameraSaved={(_adapter, deviceId, resolution) => {
-            setSelectedCameraDeviceId(deviceId);
-            setSelectedCameraResolution(resolution);
-            void refreshAdminData();
-          }}
-        />
-      </>
-      </AnchoredToastProvider>
+          </>
+        </AnchoredToastProvider>
       </ToastProvider>
     );
   }
 
   return (
     <ToastProvider>
-    <AnchoredToastProvider>
-    <>
-      <div
-        aria-hidden={dialog || cameraSetupOpen || recent.open ? true : undefined}
-        className="guest-layer"
-        inert={dialog || cameraSetupOpen || recent.open ? true : undefined}
-      >
-        {guestContent}
-        {cancelArmed ? (
-          <div className="cancel-session-hint" data-testid="cancel-hint" role="status">
-            Press ESC again to cancel
+      <AnchoredToastProvider>
+        <>
+          <div
+            aria-hidden={dialog || cameraSetupOpen || recent.open ? true : undefined}
+            className="guest-layer"
+            inert={dialog || cameraSetupOpen || recent.open ? true : undefined}
+          >
+            {guestContent}
+            {cancelArmed ? (
+              <div className="cancel-session-hint" data-testid="cancel-hint" role="status">
+                Press ESC again to cancel
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
-      {dialog ? (
-        <PasscodeDialog
-          busy={dialogBusy}
-          dismissible={dialog.intent !== 'bootstrap'}
-          error={dialogError}
-          mode={dialog.mode}
-          onCancel={() => {
-            if (!dialogBusy && dialog.intent !== 'bootstrap') {
-              setDialog(null);
-              setDialogError(null);
-            }
-          }}
-          onSubmit={(passcode) => void submitPasscode(passcode)}
-        />
-      ) : null}
-      <CameraSetupModal
-        isOpen={cameraSetupOpen}
-        onClose={() => setCameraSetupOpen(false)}
-        onCameraSaved={(_adapter, deviceId, resolution) => {
-          setSelectedCameraDeviceId(deviceId);
-          setSelectedCameraResolution(resolution);
-          void refreshAdminData();
-        }}
-      />
-      {recent.open && !adminOpen ? (
-        <RecentGallery
-          busy={recent.busy}
-          error={recent.error}
-          items={recent.items}
-          onClose={closeRecentGallery}
-          operator={false}
-        />
-      ) : null}
-    </>
-    </AnchoredToastProvider>
+          {dialog ? (
+            <PasscodeDialog
+              busy={dialogBusy}
+              dismissible={dialog.intent !== 'bootstrap'}
+              error={dialogError}
+              mode={dialog.mode}
+              onCancel={() => {
+                if (!dialogBusy && dialog.intent !== 'bootstrap') {
+                  setDialog(null);
+                  setDialogError(null);
+                }
+              }}
+              onClearError={() => setDialogError(null)}
+              onSubmit={(passcode) => void submitPasscode(passcode)}
+            />
+          ) : null}
+          <CameraSetupModal
+            isOpen={cameraSetupOpen}
+            onClose={() => setCameraSetupOpen(false)}
+            onCameraSaved={(_adapter, deviceId, resolution) => {
+              setSelectedCameraDeviceId(deviceId);
+              setSelectedCameraResolution(resolution);
+              void refreshAdminData();
+            }}
+          />
+          {recent.open && !adminOpen ? (
+            <RecentGallery
+              busy={recent.busy}
+              error={recent.error}
+              items={recent.items}
+              onClose={closeRecentGallery}
+              operator={false}
+            />
+          ) : null}
+        </>
+      </AnchoredToastProvider>
     </ToastProvider>
   );
 }

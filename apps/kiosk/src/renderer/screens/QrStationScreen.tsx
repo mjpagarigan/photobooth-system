@@ -1,8 +1,4 @@
-import {
-  CalendarBlankIcon as CalendarBlank,
-  CheckCircleIcon as CheckCircle,
-  ImagesIcon as Images,
-} from '@phosphor-icons/react';
+import { CalendarBlank, CheckCircle, Images } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
@@ -23,6 +19,7 @@ const DEFAULT_QR_STATE: QrStationState = {
   qrImageUrl: null,
   expiresAt: null,
   durationSeconds: 45,
+  queuedCount: 0,
   message: null,
   canRetryUpload: false,
 };
@@ -37,6 +34,16 @@ export function QrStationScreen(): React.ReactElement {
 
   // Subscribe to QR station state
   useEffect(() => {
+    if (
+      import.meta.env.DEV &&
+      new URLSearchParams(window.location.search).get('visual') === 'qr-station-active'
+    ) {
+      void import('../visual-fixtures').then(async ({ createQrStationVisualState }) => {
+        setStationState(await createQrStationVisualState());
+      });
+      return;
+    }
+
     const bridge = getBridge();
     if (!bridge) return;
 
@@ -53,7 +60,7 @@ export function QrStationScreen(): React.ReactElement {
     };
   }, []);
 
-  // Countdown timer for active QR
+  // Countdown timer for active QR display
   useEffect(() => {
     if (stationState.status !== 'active' || !stationState.expiresAt) {
       return;
@@ -63,11 +70,6 @@ export function QrStationScreen(): React.ReactElement {
       const remainingMs = (stationState.expiresAt ?? 0) - Date.now();
       const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
       setSecondsRemaining(remainingSec);
-
-      if (remainingSec <= 0) {
-        const bridge = getBridge();
-        void bridge?.qrStation.dismiss();
-      }
     };
 
     updateTimer();
@@ -80,11 +82,11 @@ export function QrStationScreen(): React.ReactElement {
   const handleDismiss = useCallback(async () => {
     const bridge = getBridge();
     if (!bridge) return;
-    const result = await bridge.qrStation.dismiss();
+    const result = await bridge.qrStation.dismiss(stationState.sessionId);
     if (result.ok) {
       setStationState(result.data);
     }
-  }, []);
+  }, [stationState.sessionId]);
 
   const openRecentGallery = useCallback(async () => {
     const bridge = getBridge();
@@ -196,17 +198,13 @@ export function QrStationScreen(): React.ReactElement {
         <section className="qr-panel" aria-labelledby="qr-station-title">
           <div className="qr-panel__copy">
             <h1 id="qr-station-title" data-screen-heading tabIndex={-1}>
-              Scan to Download
+              Please scan the QR Code beside to download the photo
             </h1>
             <p>Scan the QR code with your phone camera to download your photo strip.</p>
           </div>
 
           <div className="qr-panel__code">
-            <img
-              src={stationState.qrImageUrl}
-              alt="QR code for photo download"
-              draggable="false"
-            />
+            <img src={stationState.qrImageUrl} alt="QR code for photo download" draggable="false" />
           </div>
 
           <div className="qr-station__timer-bar" aria-hidden="true">
@@ -218,7 +216,12 @@ export function QrStationScreen(): React.ReactElement {
 
           <div className="qr-panel__notice">
             <CalendarBlank aria-hidden="true" weight="bold" />
-            <span>Auto-clearing in {secondsRemaining}s • Available for 30 days</span>
+            <span>
+              {stationState.queuedCount > 0
+                ? `Next photo replaces this in ${secondsRemaining}s`
+                : `Auto-clearing in ${secondsRemaining}s`}{' '}
+              • Available for 30 days
+            </span>
           </div>
 
           <div className="qr-panel__actions">

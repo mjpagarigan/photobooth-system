@@ -42,9 +42,15 @@ export class BoothWorkflow {
     qrImageUrl: null,
     expiresAt: null,
     durationSeconds: 45,
+    queuedCount: 0,
     message: null,
     canRetryUpload: false,
   };
+  private readonly qrStationQueue: Array<{
+    sessionId: string;
+    collageUrl: string | null;
+    qrImageUrl: string;
+  }> = [];
   private qrDismissTimer: NodeJS.Timeout | null = null;
   private activeSessionId: string | null = null;
   private countdownEndsAt: number | null = null;
@@ -128,10 +134,22 @@ export class BoothWorkflow {
     return this.qrStationState;
   }
 
-  dismissQrStation(): QrStationState {
+  dismissQrStation(expectedSessionId?: string | null): QrStationState {
+    if (
+      expectedSessionId &&
+      this.qrStationState.sessionId &&
+      this.qrStationState.sessionId !== expectedSessionId
+    ) {
+      return this.qrStationState;
+    }
     if (this.qrDismissTimer) {
       clearTimeout(this.qrDismissTimer);
       this.qrDismissTimer = null;
+    }
+    const nextItem = this.qrStationQueue.shift();
+    if (nextItem) {
+      this.presentQrStationItem(nextItem);
+      return this.qrStationState;
     }
     this.qrStationState = {
       status: 'idle',
@@ -140,11 +158,41 @@ export class BoothWorkflow {
       qrImageUrl: null,
       expiresAt: null,
       durationSeconds: 45,
+      queuedCount: 0,
       message: null,
       canRetryUpload: false,
     };
     this.emitQrStation();
     return this.qrStationState;
+  }
+
+  private presentQrStationItem(item: {
+    sessionId: string;
+    collageUrl: string | null;
+    qrImageUrl: string;
+  }): void {
+    const settings = this.repository.getSettings();
+    const duration = settings.qrDismissSeconds || 45;
+    const expiresAt = this.now() + duration * 1000;
+    this.qrStationState = {
+      status: 'active',
+      sessionId: item.sessionId,
+      collageUrl: item.collageUrl,
+      qrImageUrl: item.qrImageUrl,
+      expiresAt,
+      durationSeconds: duration,
+      queuedCount: this.qrStationQueue.length,
+      message: null,
+      canRetryUpload: false,
+    };
+    if (this.qrDismissTimer) {
+      clearTimeout(this.qrDismissTimer);
+      this.qrDismissTimer = null;
+    }
+    this.qrDismissTimer = setTimeout(() => {
+      this.dismissQrStation(item.sessionId);
+    }, duration * 1000);
+    this.emitQrStation();
   }
 
   isDualDisplayActive(): boolean {
@@ -557,6 +605,7 @@ export class BoothWorkflow {
         qrImageUrl: null,
         expiresAt: null,
         durationSeconds: 45,
+        queuedCount: this.qrStationQueue.length,
         message: 'Upload failed. You can finish offline or retry.',
         canRetryUpload: true,
       };
@@ -579,27 +628,22 @@ export class BoothWorkflow {
     }
     const sessionAssets = this.repository.listCurrentAssets(sessionId);
     const collage = sessionAssets.find((asset) => asset.kind === 'collage');
-    const settings = this.repository.getSettings();
-    const duration = settings.qrDismissSeconds || 45;
-    const expiresAt = this.now() + duration * 1000;
-    this.qrStationState = {
-      status: 'active',
+    const item = {
       sessionId,
       collageUrl: collage ? mediaUrl(collage.id) : null,
       qrImageUrl: qr.imageDataUrl,
-      expiresAt,
-      durationSeconds: duration,
-      message: null,
-      canRetryUpload: false,
     };
-    if (this.qrDismissTimer) {
-      clearTimeout(this.qrDismissTimer);
-      this.qrDismissTimer = null;
+    if (this.qrStationState.status === 'active' && this.qrStationState.sessionId !== sessionId) {
+      this.qrStationQueue.push(item);
+      this.qrStationState = {
+        ...this.qrStationState,
+        queuedCount: this.qrStationQueue.length,
+      };
+      this.emitQrStation();
+      this.emitIfActive(sessionId);
+      return;
     }
-    this.qrDismissTimer = setTimeout(() => {
-      this.dismissQrStation();
-    }, duration * 1000);
-    this.emitQrStation();
+    this.presentQrStationItem(item);
     this.emitIfActive(sessionId);
   }
 

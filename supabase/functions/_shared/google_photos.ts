@@ -114,8 +114,8 @@ export async function createAlbumInGooglePhotos(
 export async function listGooglePhotosAlbums(
   accessToken: string,
   deps: GooglePhotosDependencies = DEFAULT_DEPENDENCIES,
-): Promise<Array<{ id: string; title: string; shareUrl?: string | undefined; productUrl?: string | undefined }>> {
-  const albums: Array<{ id: string; title: string; shareUrl?: string | undefined; productUrl?: string | undefined }> = [];
+): Promise<{ id: string; title: string; shareUrl?: string | undefined; productUrl?: string | undefined }[]> {
+  const albums: { id: string; title: string; shareUrl?: string | undefined; productUrl?: string | undefined }[] = [];
   const seenIds = new Set<string>();
 
   // 1. Fetch user/app created albums
@@ -125,7 +125,7 @@ export async function listGooglePhotosAlbums(
     });
     if (res.ok) {
       const data = (await res.json()) as {
-        albums?: Array<{ id: string; title?: string; productUrl?: string; shareInfo?: { shareableUrl?: string } }>;
+        albums?: { id: string; title?: string; productUrl?: string; shareInfo?: { shareableUrl?: string } }[];
       };
       if (data.albums) {
         for (const a of data.albums) {
@@ -152,7 +152,7 @@ export async function listGooglePhotosAlbums(
     });
     if (resShared.ok) {
       const data = (await resShared.json()) as {
-        sharedAlbums?: Array<{ id: string; title?: string; productUrl?: string; shareInfo?: { shareableUrl?: string } }>;
+        sharedAlbums?: { id: string; title?: string; productUrl?: string; shareInfo?: { shareableUrl?: string } }[];
       };
       if (data.sharedAlbums) {
         for (const a of data.sharedAlbums) {
@@ -255,10 +255,10 @@ export async function addMediaItemToAlbum(
   }
 
   const data = (await response.json()) as {
-    newMediaItemResults?: Array<{
+    newMediaItemResults?: {
       status?: { message?: string; code?: number };
       mediaItem?: { id?: string; productUrl?: string };
-    }>;
+    }[];
   };
 
   const firstResult = data.newMediaItemResults?.[0];

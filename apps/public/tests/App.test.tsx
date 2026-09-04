@@ -37,7 +37,7 @@ describe('public photo page', () => {
 
   it('shows loading, the action panel before the photostrip in DOM, and the Join a Ministry link', async () => {
     const { container } = render(<App />);
-    expect(screen.getByText('Your moment is almost here.')).toBeInTheDocument();
+    expect(screen.getByText('Your photo is almost ready')).toBeInTheDocument();
     expect(await screen.findByRole('img', { name: /finished event collage/i })).toHaveAttribute(
       'src',
       expect.stringContaining('blob:'),

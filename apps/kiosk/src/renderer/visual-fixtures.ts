@@ -4,6 +4,7 @@ import type {
   BoothSnapshot,
   FrameSummary,
   GalleryItem,
+  QrStationState,
   UploadJobSummary,
 } from '@grace-booth/shared';
 
@@ -45,7 +46,8 @@ export type VisualFixtureMode =
   | 'operator-login'
   | 'operator-bootstrap'
   | 'operator-restart'
-  | 'camera-setup';
+  | 'camera-setup'
+  | 'recent-gallery';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FRAME_ID = '22222222-2222-4222-8222-222222222222';
@@ -213,8 +215,8 @@ function drawFixtureSlot(
 }
 
 async function buildReadyCollage(): Promise<string> {
-  const width = 600;
-  const height = 1_800;
+  const width = 1200;
+  const height = 3600;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -240,7 +242,21 @@ async function buildReadyCollage(): Promise<string> {
   }
 
   context.drawImage(await loadFixtureImage(DEFAULT_FRAME.mediaUrl), 0, 0, width, height);
-  return canvas.toDataURL('image/jpeg', 0.9);
+  return canvas.toDataURL('image/jpeg', 0.95);
+}
+
+export async function createQrStationVisualState(): Promise<QrStationState> {
+  return {
+    status: 'active',
+    sessionId: SESSION_ID,
+    collageUrl: await buildReadyCollage(),
+    qrImageUrl: await buildReadyQr(),
+    expiresAt: Date.now() + 45_000,
+    durationSeconds: 45,
+    queuedCount: 2,
+    message: null,
+    canRetryUpload: false,
+  };
 }
 
 export async function createVisualSeedPayload(
@@ -359,13 +375,14 @@ export async function createVisualSeedPayload(
     case 'operator-bootstrap':
     case 'operator-restart':
     case 'camera-setup':
+    case 'recent-gallery':
       break;
     default:
       return null;
   }
 
   const galleryItem: GalleryItem | null =
-    mode === 'admin-gallery'
+    mode === 'admin-gallery' || mode === 'recent-gallery'
       ? {
           sessionId: SESSION_ID,
           previewDataUrl: await buildReadyCollage(),
@@ -383,7 +400,14 @@ export async function createVisualSeedPayload(
     adminView,
     health:
       mode === 'admin-settings-degraded'
-        ? { ...HEALTH, camera: { ...HEALTH.camera, state: 'degraded', message: 'Preview signal is intermittent.' } }
+        ? {
+            ...HEALTH,
+            camera: {
+              ...HEALTH.camera,
+              state: 'degraded',
+              message: 'Preview signal is intermittent.',
+            },
+          }
         : adminView
           ? HEALTH
           : null,
@@ -394,7 +418,19 @@ export async function createVisualSeedPayload(
         ? 'The fixture could not save this change. Review the highlighted values and retry.'
         : null,
     operatorStatus: mode === 'admin-settings' ? 'Settings are synchronized.' : null,
-    recentItems: galleryItem ? [galleryItem] : [],
+    recentItems:
+      galleryItem && mode === 'recent-gallery'
+        ? Array.from({ length: 8 }, (_, index) => ({
+            ...galleryItem,
+            sessionId: `${String(index + 1).padStart(8, '0')}-0000-4000-8000-000000000000`,
+            metadata: {
+              ...galleryItem.metadata,
+              capturedAt: galleryItem.metadata.capturedAt - index * 60_000,
+            },
+          }))
+        : galleryItem
+          ? [galleryItem]
+          : [],
     settings: adminView ? SETTINGS : null,
     snapshot,
   };

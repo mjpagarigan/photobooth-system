@@ -1,11 +1,11 @@
 import {
-  ArrowCounterClockwiseIcon as ArrowCounterClockwise,
-  ArrowRightIcon as ArrowRight,
-  CaretLeftIcon as CaretLeft,
-  CaretRightIcon as CaretRight,
-  CheckCircleIcon as CheckCircle,
-  SquaresFourIcon as SquaresFour,
-} from '@phosphor-icons/react';
+  ArrowCounterClockwise,
+  ArrowRight,
+  CaretLeft,
+  CaretRight,
+  CheckCircle,
+  SquaresFour,
+} from '@grace-booth/ui';
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FrameSummary } from '@grace-booth/shared';
@@ -182,13 +182,13 @@ export function ReviewScreen({
       <div className="review-layout">
         <div className="review-carousel-column">
           <div className="review-carousel-header">
-            <span className="review-carousel-heading">Choose Layout</span>
+            <span className="review-carousel-heading">Choose layout</span>
             <Button
               icon={<SquaresFour aria-hidden="true" weight="bold" />}
               onClick={() => setLayoutsModalOpen(true)}
               variant="secondary"
             >
-              All Layouts ({options.length})
+              All layouts ({options.length})
             </Button>
           </div>
 
@@ -316,7 +316,7 @@ export function ReviewScreen({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <SquaresFour aria-hidden="true" weight="bold" className="size-5 text-primary" />
-              <span>All Frame Layouts</span>
+              <span>All frame layouts</span>
             </DialogTitle>
             <DialogDescription>
               Choose from all {options.length} photo templates for your photostrip.

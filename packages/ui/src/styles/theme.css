@@ -2,62 +2,96 @@
 @source "../components";
 
 @theme {
-  --color-charcoal: #464646;
-  --color-obsidian: #000000;
-  --color-concrete: #9c9a9a;
-  --color-terracotta: #a35e47;
-  --color-terracotta-hover: #8f503c;
-  --color-crimson: #c62828;
-  --color-sage: #3d7a5a;
-  --color-white: #ffffff;
-  --color-surface-tint: #1c1c1c;
-  --color-surface-secondary: #2e2e2e;
+  /* Microsoft Fluent 2 Web - Brand Ramp */
+  --color-brand-background: #0f6cbd;
+  --color-brand-background-hover: #115ea3;
+  --color-brand-background-pressed: #0c3b5e;
+  --color-brand-background2: #ebf3fc;
+  --color-brand-foreground1: #0f6cbd;
+  --color-brand-foreground2: #115ea3;
 
-  /* coss semantic token mappings */
-  --color-background: #464646;
-  --color-foreground: #ffffff;
+  /* Microsoft Fluent 2 Web - Neutral Foregrounds */
+  --color-neutral-foreground1: #242424;
+  --color-neutral-foreground2: #424242;
+  --color-neutral-foreground3: #616161;
+  --color-neutral-foreground-disabled: #bdbdbd;
+  --color-neutral-foreground-on-brand: #ffffff;
 
-  --color-card: #000000;
-  --color-card-foreground: #ffffff;
+  /* Microsoft Fluent 2 Web - Neutral Backgrounds & Surfaces */
+  --color-neutral-background1: #ffffff;
+  --color-neutral-background2: #fafafa;
+  --color-neutral-background3: #f5f5f5;
+  --color-neutral-background4: #f0f0f0;
+  --color-neutral-background1-hover: #f5f5f5;
+  --color-neutral-background1-pressed: #e0e0e0;
+  --color-neutral-background1-selected: #ebebeb;
 
-  --color-popover: #000000;
-  --color-popover-foreground: #ffffff;
+  /* Microsoft Fluent 2 Web - Strokes & Dividers */
+  --color-neutral-stroke1: #d1d1d1;
+  --color-neutral-stroke2: #e0e0e0;
+  --color-neutral-stroke-subtle: #ebebeb;
 
-  --color-primary: #a35e47;
+  /* Semantic token mappings */
+  --color-background: #f5f5f5;
+  --color-foreground: #242424;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #242424;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #242424;
+
+  --color-primary: #0f6cbd;
+  --color-primary-hover: #115ea3;
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: #2e2e2e;
-  --color-secondary-foreground: #ffffff;
+  --color-secondary: #fafafa;
+  --color-secondary-foreground: #242424;
 
-  --color-muted: #1c1c1c;
-  --color-muted-foreground: #9c9a9a;
+  --color-muted: #f0f0f0;
+  --color-muted-foreground: #616161;
 
-  --color-accent: #2e2e2e;
-  --color-accent-foreground: #ffffff;
+  --color-accent: #ebf3fc;
+  --color-accent-foreground: #0f6cbd;
 
-  --color-destructive: #c62828;
+  --color-destructive: #c50f1f;
   --color-destructive-foreground: #ffffff;
 
-  --color-success: #3d7a5a;
+  --color-success: #107c41;
   --color-success-foreground: #ffffff;
 
-  --color-border: #9c9a9a;
-  --color-input: #9c9a9a;
-  --color-ring: #a35e47;
+  --color-border: #d1d1d1;
+  --color-input: #d1d1d1;
+  --color-ring-inner: #ffffff;
+  --color-ring-outer: #000000;
 
-  /* Radius tokens */
+  /* Fluent 2 Radius tokens */
   --radius-xs: 2px;
   --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
   --radius-full: 9999px;
 
-  /* Typography contracts */
-  --font-heading: 'Montserrat', sans-serif;
-  --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Fluent 2 Typography contracts */
+  --font-heading: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: Consolas, 'Courier New', monospace;
+
+  /* Microsoft Fluent 2 Web type ramp */
+  --font-size-caption: 12px;
+  --line-height-caption: 16px;
+  --font-size-body: 14px;
+  --line-height-body: 20px;
+  --font-size-subtitle: 20px;
+  --line-height-subtitle: 28px;
+
+  /* Fluent elevation */
+  --shadow-2: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
+  --shadow-4: 0 0 2px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.14);
+  --shadow-8: 0 0 2px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.14);
+  --shadow-16: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
+  --shadow-64: 0 0 8px rgba(0, 0, 0, 0.2), 0 32px 64px rgba(0, 0, 0, 0.24);
 }
 
 @layer base {
@@ -71,5 +105,23 @@
     font-family: var(--font-sans);
     position: relative;
     -webkit-font-smoothing: antialiased;
+  }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-ring-inner);
+    outline-offset: 0;
+    box-shadow: 0 0 0 2px var(--color-ring-outer);
+  }
+}
+
+@media (forced-colors: active) {
+  * {
+    forced-color-adjust: auto;
+  }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
   }
 }

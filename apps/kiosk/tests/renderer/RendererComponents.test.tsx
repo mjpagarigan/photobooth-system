@@ -149,7 +149,7 @@ describe('guest screen components', () => {
     render(<CaptureScreen phase="countdown" secondsRemaining={5} shotNumber={3} />);
     expect(screen.getByText('Photo 3 of 3')).toBeVisible();
     expect(screen.getByTestId('countdown-value')).toHaveTextContent('5');
-    expect(screen.getByText(/Ministry Fair · Grand celebratory finale!/i)).toBeVisible();
+    expect(screen.getByText(/Celebrate Together · Grand celebratory finale!/i)).toBeVisible();
   });
 
   it('renders only whole-set review actions across two collage options', async () => {

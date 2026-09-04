@@ -1,10 +1,4 @@
-import {
-  ArrowLeftIcon as ArrowLeft,
-  FrameCornersIcon as FrameCorners,
-  GearIcon as Gear,
-  ImagesIcon as Images,
-  SignOutIcon as SignOut,
-} from '@phosphor-icons/react';
+import { ArrowLeft, FrameCorners, Gear, Images, SignOut } from '@grace-booth/ui';
 import type { ReactNode } from 'react';
 
 import {
@@ -91,7 +85,7 @@ export function AdminShell({ children, onExit, onViewChange, view }: AdminShellP
           </Button>
           <span className="admin-nav__lock-note">
             <SignOut aria-hidden="true" weight="bold" />
-            <span>ACCESS LOCKS ON DISMISSAL</span>
+            <span>Access locks when you leave</span>
           </span>
         </SidebarFooter>
       </Sidebar>

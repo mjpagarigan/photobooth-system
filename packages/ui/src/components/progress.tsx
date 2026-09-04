@@ -7,7 +7,7 @@ export const ProgressValue = BaseProgress.Value;
 
 export type ProgressProps = {
   indicatorClassName?: string;
-} & React.ComponentPropsWithoutRef<typeof BaseProgress.Root>
+} & React.ComponentPropsWithoutRef<typeof BaseProgress.Root>;
 
 export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progress(
   { className, indicatorClassName, value, children, ...props },
@@ -15,16 +15,16 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
 ) {
   return (
     <BaseProgress.Root
-      className={cn('flex flex-col gap-1.5 w-full', className)}
+      className={cn('flex w-full flex-col gap-1.5 text-sm leading-5', className)}
       ref={ref}
       value={value}
       {...props}
     >
       {children}
-      <BaseProgress.Track className="relative h-2 w-full overflow-hidden rounded-full bg-secondary/80 border border-border/40">
+      <BaseProgress.Track className="relative h-0.5 w-full overflow-hidden bg-[#e0e0e0]">
         <BaseProgress.Indicator
           className={cn(
-            'h-full bg-primary transition-all duration-300 ease-in-out',
+            'h-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none',
             indicatorClassName,
           )}
           style={{ width: `${Math.max(0, Math.min(100, Number(value) || 0))}%` }}

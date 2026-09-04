@@ -288,6 +288,7 @@ function createBridge(
       updateFrameLayout: vi.fn().mockResolvedValue(ok(FRAME)),
       deleteFrame: vi.fn().mockResolvedValue(ok([FRAME])),
       moveFrame: vi.fn().mockResolvedValue(ok([FRAME])),
+      replaceFrameImage: vi.fn().mockResolvedValue(ok(FRAME)),
       chooseLanCertificate: vi.fn().mockResolvedValue(ok(null)),
       listUploadJobs: vi.fn().mockResolvedValue(ok({ items: [], nextCursor: null })),
       retryUpload: vi.fn(),

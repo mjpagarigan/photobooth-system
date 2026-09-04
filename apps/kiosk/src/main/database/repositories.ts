@@ -96,6 +96,7 @@ export type StoredFrame = {
   sha256: string;
   revision: number;
   sortOrder: number | null;
+  archived: boolean;
   createdAt: number;
   updatedAt: number;
   slots: FrameLayout;
@@ -405,16 +406,43 @@ export class LocalRepository {
   listFrames(): StoredFrame[] {
     return loadFrameRows(
       this.database,
+      'WHERE archived = 0 ORDER BY (sort_order IS NULL), sort_order, created_at, id',
+      [],
+    );
+  }
+
+  listAllFrames(): StoredFrame[] {
+    return loadFrameRows(
+      this.database,
       'ORDER BY (sort_order IS NULL), sort_order, created_at, id',
       [],
     );
   }
 
+  countActiveFrames(): number {
+    const row = this.database.raw
+      .prepare('SELECT COUNT(*) AS n FROM frames WHERE archived = 0')
+      .get() as { n: number };
+    return row.n;
+  }
+
   nextSortOrder(): number {
     const row = this.database.raw
-      .prepare('SELECT MAX(sort_order) AS max_order FROM frames')
+      .prepare('SELECT MAX(sort_order) AS max_order FROM frames WHERE archived = 0')
       .get() as { max_order: number | null };
     return (row.max_order ?? 0) + 1;
+  }
+
+  archiveFrame(frameId: string, now = Date.now()): void {
+    const result = this.database.raw
+      .prepare(
+        'UPDATE frames SET archived = 1, sort_order = NULL, revision = revision + 1, updated_at = ? WHERE id = ?',
+      )
+      .run(now, frameId);
+    if (result.changes !== 1) {
+      throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    }
+    this.recordAudit('frame_change', 'success', 'frame_archived', now);
   }
 
   setFrameSortOrder(frameId: string, sortOrder: number | null, now = Date.now()): void {
@@ -1313,9 +1341,9 @@ export class LocalRepository {
     this.database.raw
       .prepare(
         `INSERT INTO frames
-          (id, name, encrypted_path, width, height, byte_size, sha256, revision, sort_order,
+          (id, name, encrypted_path, width, height, byte_size, sha256, revision, sort_order, archived,
             created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         frame.id,
@@ -1327,6 +1355,7 @@ export class LocalRepository {
         frame.sha256,
         frame.revision,
         frame.sortOrder,
+        frame.archived ? 1 : 0,
         frame.createdAt,
         frame.updatedAt,
       );
@@ -1381,30 +1410,54 @@ function loadFrameRows(database: BoothDatabase, suffix: string, params: unknown[
   const rows = database.raw
     .prepare(
       `SELECT id, name, encrypted_path, width, height, byte_size, sha256,
-        revision, sort_order, created_at, updated_at FROM frames ${suffix}`,
+        revision, sort_order, archived, created_at, updated_at FROM frames ${suffix}`,
     )
     .all(...params);
-  const slotsStatement = database.raw.prepare(
-    `SELECT slot_index, name, x, y, width, height, crop_mode
-    FROM frame_slots WHERE frame_id = ? ORDER BY slot_index`,
-  );
+  if (rows.length === 0) return [];
+  const placeholders = rows.map(() => '?').join(',');
+  const allSlots = database.raw
+    .prepare(
+      `SELECT frame_id, slot_index, name, x, y, width, height, crop_mode
+      FROM frame_slots WHERE frame_id IN (${placeholders}) ORDER BY slot_index`,
+    )
+    .all(...rows.map((r) => String((r as Record<string, unknown>).id))) as Record<
+    string,
+    unknown
+  >[];
+  const slotsByFrameId = new Map<
+    string,
+    {
+      slotIndex: number;
+      name: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      cropMode: string;
+    }[]
+  >();
+  for (const slot of allSlots) {
+    const fId = String(slot.frame_id);
+    let list = slotsByFrameId.get(fId);
+    if (!list) {
+      list = [];
+      slotsByFrameId.set(fId, list);
+    }
+    list.push({
+      slotIndex: Number(slot.slot_index),
+      name: String(slot.name),
+      x: Number(slot.x),
+      y: Number(slot.y),
+      width: Number(slot.width),
+      height: Number(slot.height),
+      cropMode: String(slot.crop_mode),
+    });
+  }
   const frames: StoredFrame[] = [];
   for (const row of rows) {
     const record = row as Record<string, unknown>;
-    const parsedSlots = FrameLayoutSchema.safeParse(
-      slotsStatement.all(String(record.id)).map((slot) => {
-        const value = slot as Record<string, unknown>;
-        return {
-          slotIndex: Number(value.slot_index),
-          name: String(value.name),
-          x: Number(value.x),
-          y: Number(value.y),
-          width: Number(value.width),
-          height: Number(value.height),
-          cropMode: String(value.crop_mode),
-        };
-      }),
-    );
+    const rawSlots = slotsByFrameId.get(String(record.id)) ?? [];
+    const parsedSlots = FrameLayoutSchema.safeParse(rawSlots);
     if (!parsedSlots.success) continue;
     frames.push({
       id: String(record.id),
@@ -1419,6 +1472,7 @@ function loadFrameRows(database: BoothDatabase, suffix: string, params: unknown[
         record.sort_order === null || record.sort_order === undefined
           ? null
           : Number(record.sort_order),
+      archived: Boolean(record.archived),
       createdAt: Number(record.created_at),
       updatedAt: Number(record.updated_at),
       slots: parsedSlots.data,

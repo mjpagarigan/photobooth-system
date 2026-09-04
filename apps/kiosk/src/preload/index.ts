@@ -64,7 +64,7 @@ const bridge: GraceBoothBridge = {
   },
   qrStation: {
     getState: () => invoke('qr-station:get-state', {}),
-    dismiss: () => invoke('qr-station:dismiss', {}),
+    dismiss: (sessionId?: string | null) => invoke('qr-station:dismiss', { sessionId }),
     subscribe: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
         const parsed = QrStationEventSchema.safeParse(value);
@@ -103,6 +103,7 @@ const bridge: GraceBoothBridge = {
     updateFrameLayout: (input) => invoke('admin:update-frame-layout', input),
     deleteFrame: (frameId) => invoke('admin:delete-frame', { frameId }),
     moveFrame: (input) => invoke('admin:move-frame', input),
+    replaceFrameImage: (input) => invoke('admin:replace-frame-image', input),
     chooseLanCertificate: (passphrase) => invoke('admin:choose-lan-certificate', { passphrase }),
     listUploadJobs: (input = {}) => invoke('admin:list-upload-jobs', input),
     retryUpload: (uploadJobId) => invoke('admin:retry-upload', { uploadJobId }),

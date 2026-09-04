@@ -30,7 +30,7 @@ export type RecentGalleryDependencies = {
     >;
 };
 
-const PREVIEW_LONG_EDGE = 360;
+const PREVIEW_LONG_EDGE = 3600;
 
 type SessionDelivery = {
   qrDataUrl: string | null;

@@ -6,7 +6,7 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
     return (
       <div
         className={cn(
-          'flex flex-col rounded-xl border border-border/50 bg-card text-card-foreground shadow-md',
+          'flex flex-col rounded-[4px] border border-[#e0e0e0] bg-white text-[#242424] shadow-[var(--shadow-2)]',
           className,
         )}
         ref={ref}
@@ -22,7 +22,7 @@ export function CardHeader({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex flex-col gap-1.5 p-6', className)} {...props}>
+    <div className={cn('flex flex-col gap-1 p-4', className)} {...props}>
       {children}
     </div>
   );
@@ -32,7 +32,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadi
   function CardTitle({ className, ...props }, ref) {
     return (
       <h3
-        className={cn('font-heading text-base font-bold tracking-tight text-foreground', className)}
+        className={cn('font-heading text-base font-semibold leading-[22px] tracking-normal text-[#242424]', className)}
         ref={ref}
         {...props}
       />
@@ -46,7 +46,7 @@ export const CardDescription = forwardRef<
 >(function CardDescription({ className, ...props }, ref) {
   return (
     <p
-      className={cn('text-xs text-muted-foreground', className)}
+      className={cn('text-sm leading-5 text-[#616161]', className)}
       ref={ref}
       {...props}
     />
@@ -59,7 +59,7 @@ export function CardPanel({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex-1 p-6 pt-0', className)} {...props}>
+    <div className={cn('flex-1 p-4 pt-0', className)} {...props}>
       {children}
     </div>
   );
@@ -72,7 +72,7 @@ export function CardFooter({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('flex items-center p-6 pt-0', className)}
+      className={cn('flex items-center p-4 pt-0', className)}
       {...props}
     >
       {children}

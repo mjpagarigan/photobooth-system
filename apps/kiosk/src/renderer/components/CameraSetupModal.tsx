@@ -7,13 +7,13 @@ import {
   type CameraStatus,
 } from '@grace-booth/shared';
 import {
-  CameraIcon as Camera,
-  CheckCircleIcon as CheckCircle,
-  VideoCameraIcon as VideoCamera,
-  XIcon as X,
-  WarningCircleIcon as WarningCircle,
-  ArrowsClockwiseIcon as ArrowsClockwise,
-} from '@phosphor-icons/react';
+  ArrowsClockwise,
+  Camera,
+  CheckCircle,
+  VideoCamera,
+  WarningCircle,
+  X,
+} from '@grace-booth/ui';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -167,7 +167,11 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
 
   return (
     <Dialog onOpenChange={(open) => !open && !saving && onClose()} open={isOpen}>
-      <DialogPopup className="camera-setup-dialog" maxWidthClass="max-w-4xl" showCloseButton={false}>
+      <DialogPopup
+        className="camera-setup-dialog"
+        maxWidthClass="max-w-4xl"
+        showCloseButton={false}
+      >
         <DialogHeader className="camera-setup-dialog__header">
           <div className="camera-setup-dialog__icon">
             <Camera aria-hidden="true" weight="bold" size={32} />
@@ -242,7 +246,9 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                     </SelectTrigger>
                     <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
                       {deviceItems.map((item) => (
-                        <SelectItem key={item.value ? item.value : 'default'} value={item.value}>{item.label}</SelectItem>
+                        <SelectItem key={item.value ? item.value : 'default'} value={item.value}>
+                          {item.label}
+                        </SelectItem>
                       ))}
                     </SelectPopup>
                   </Select>
@@ -272,7 +278,9 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                   </SelectTrigger>
                   <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
                     {RESOLUTION_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
                     ))}
                   </SelectPopup>
                 </Select>
@@ -378,7 +386,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
             <Alert className="camera-info-card">
               <div className="camera-info-card__badge">
                 <WarningCircle size={20} weight="bold" />
-                <span>NATIVE SONY PC REMOTE ADAPTER — NOT AVAILABLE</span>
+                <span>Sony PC Remote adapter unavailable</span>
               </div>
               <p>Use the Sony ILCE-7M4 as a standard webcam instead:</p>
               <ul className="camera-info-card__list">
@@ -392,8 +400,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               </ul>
               {cameraStatus && (
                 <div className="camera-status-pill">
-                  STATUS: <strong>{cameraStatus.state.toUpperCase()}</strong> (
-                  {cameraStatus.operatorMessage})
+                  Status: <strong>{cameraStatus.state}</strong> ({cameraStatus.operatorMessage})
                 </div>
               )}
             </Alert>
@@ -403,7 +410,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
             <Alert className="camera-info-card">
               <div className="camera-info-card__badge">
                 <ArrowsClockwise size={20} weight="bold" />
-                <span>MOCK CAMERA EMULATOR</span>
+                <span>Mock camera emulator</span>
               </div>
               <p>
                 Simulates three guest shots using bundled test fixtures. Ideal for offline staging

@@ -121,7 +121,12 @@ export const IpcContracts = {
     response: rpcResultSchema(QrStationStateSchema),
   },
   'qr-station:dismiss': {
-    request: EmptyRequestSchema,
+    request: z
+      .object({
+        sessionId: OpaqueIdSchema.optional().nullable(),
+      })
+      .strict()
+      .default({}),
     response: rpcResultSchema(QrStationStateSchema),
   },
   'gallery:get-recent': {
@@ -258,6 +263,10 @@ export const IpcContracts = {
     request: EmptyRequestSchema,
     response: rpcResultSchema(FrameSummarySchema.nullable()),
   },
+  'admin:replace-frame-image': {
+    request: z.object({ frameId: OpaqueIdSchema }).strict(),
+    response: rpcResultSchema(FrameSummarySchema.nullable()),
+  },
   'admin:update-frame-layout': {
     request: z
       .object({
@@ -370,7 +379,7 @@ export type GraceBoothBridge = {
   };
   qrStation: {
     getState(): Promise<RpcResult<QrStationState>>;
-    dismiss(): Promise<RpcResult<QrStationState>>;
+    dismiss(sessionId?: string | null): Promise<RpcResult<QrStationState>>;
     subscribe(listener: (state: QrStationState) => void): () => void;
   };
   gallery: {
@@ -396,7 +405,7 @@ export type GraceBoothBridge = {
     createGooglePhotosAlbum(
       title: string,
     ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
-    listGooglePhotosAlbums(): Promise<RpcResult<Array<{ id: string; title: string; shareUrl?: string | undefined }>>>;
+    listGooglePhotosAlbums(): Promise<RpcResult<({ id: string; title: string; shareUrl?: string | undefined })[]>>;
     resolveGooglePhotosAlbum(
       shareUrl: string,
     ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
@@ -410,6 +419,7 @@ export type GraceBoothBridge = {
     saveDualDisplaySettings(input: DualDisplaySettings): Promise<RpcResult<DualDisplaySettings>>;
     listFrames(): Promise<RpcResult<FrameSummary[]>>;
     addFrame(): Promise<RpcResult<FrameSummary | null>>;
+    replaceFrameImage(input: { frameId: string }): Promise<RpcResult<FrameSummary | null>>;
     updateFrameLayout(input: {
       frameId: string;
       name: string;

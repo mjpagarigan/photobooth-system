@@ -67,6 +67,41 @@ describe('photo API client', () => {
     expect(init?.body).toBe(JSON.stringify({ token }));
   });
 
+  it('accepts and preserves a valid custom googleFormsUrl', async () => {
+    const customUrl = 'https://custom-ministry.org/signup?ref=booth';
+    vi.mocked(fetch).mockResolvedValue(
+      responseAt(
+        `${apiOrigin}/functions/v1/photo/resolve`,
+        JSON.stringify({
+          status: 'ready',
+          expiresAt: '2026-09-16T10:00:00.000Z',
+          googleFormsUrl: customUrl,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const result = await resolvePhoto(token);
+    expect(result.googleFormsUrl).toBe(customUrl);
+  });
+
+  it('rejects an invalid googleFormsUrl returned by resolve payload', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      responseAt(
+        `${apiOrigin}/functions/v1/photo/resolve`,
+        JSON.stringify({
+          status: 'ready',
+          expiresAt: '2026-09-16T10:00:00.000Z',
+          googleFormsUrl: 'http://insecure.org/form',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    await expect(resolvePhoto(token)).rejects.toThrow('could not load');
+  });
+
+
   it('uses separate controlled image and download POST routes', async () => {
     vi.mocked(fetch).mockImplementation(() => Promise.resolve(jpegResponse(apiOrigin, false)));
 

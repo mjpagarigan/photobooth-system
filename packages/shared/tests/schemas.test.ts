@@ -46,14 +46,37 @@ describe('shared boundary schemas', () => {
     ).toThrow();
   });
 
-  it('allows only expected HTTPS Google Forms hosts', () => {
+  it('allows any valid HTTPS URL without credentials or custom ports', () => {
     expect(isAllowedGoogleFormsUrl('https://forms.gle/abc123')).toBe(true);
     expect(isAllowedGoogleFormsUrl('https://docs.google.com/forms/d/e/example/viewform')).toBe(
       true,
     );
-    expect(isAllowedGoogleFormsUrl('http://forms.gle/abc123')).toBe(false);
-    expect(isAllowedGoogleFormsUrl('https://forms.gle.evil.example/abc123')).toBe(false);
+    expect(
+      isAllowedGoogleFormsUrl('https://volunteer-management.ccf.org.ph/recruitment/form'),
+    ).toBe(true);
+    expect(isAllowedGoogleFormsUrl('https://custom.ministry.org/signup?ref=booth')).toBe(true);
+    expect(isAllowedGoogleFormsUrl('https://example.org:443/form')).toBe(true);
+
+    // Rejected cases
+    expect(isAllowedGoogleFormsUrl('http://example.org/join')).toBe(false);
+    expect(isAllowedGoogleFormsUrl('https://user:pass@example.org/join')).toBe(false);
+    expect(isAllowedGoogleFormsUrl('https://example.org:8080/join')).toBe(false);
+    expect(isAllowedGoogleFormsUrl(`https://example.org/${'a'.repeat(2050)}`)).toBe(false);
+
     expect(OptionalGoogleFormsUrlSchema.parse('')).toBeNull();
+    expect(
+      OptionalGoogleFormsUrlSchema.parse('https://volunteer-management.ccf.org.ph/recruitment/form'),
+    ).toBe('https://volunteer-management.ccf.org.ph/recruitment/form');
+    expect(() => OptionalGoogleFormsUrlSchema.parse('http://insecure.org')).toThrow();
+  });
+
+  it('validates QrStationState with queuedCount and CAS dismiss contract', () => {
+    expect(
+      IpcContracts['qr-station:dismiss'].request.parse({
+        sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
+      }),
+    ).toEqual({ sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022' });
+    expect(IpcContracts['qr-station:dismiss'].request.parse({})).toEqual({});
   });
 
   it('rejects extra IPC payload fields and weak passcodes', () => {
@@ -89,6 +112,7 @@ describe('shared boundary schemas', () => {
 
     expect(IpcContracts['admin:list-frames'].request.parse({})).toEqual({});
     expect(IpcContracts['admin:add-frame'].request.parse({})).toEqual({});
+    expect(IpcContracts['admin:replace-frame-image'].request.parse({ frameId })).toEqual({ frameId });
     expect(
       IpcContracts['admin:update-frame-layout'].request.parse({
         frameId,

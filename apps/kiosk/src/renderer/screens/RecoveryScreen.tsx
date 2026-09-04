@@ -1,11 +1,11 @@
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  CheckCircleIcon as CheckCircle,
-  CloudSlashIcon as CloudSlash,
-  LockKeyIcon as LockKey,
-  SpinnerGapIcon as SpinnerGap,
-  VideoCameraSlashIcon as VideoCameraSlash,
-} from '@phosphor-icons/react';
+  ArrowClockwise,
+  CheckCircle,
+  CloudSlash,
+  LockKey,
+  SpinnerGap,
+  VideoCameraSlash,
+} from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
 
 import { Button } from '../components/Button';

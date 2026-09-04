@@ -9,6 +9,7 @@ import {
   ANNIVERSARY_FRAME_SLOTS,
   DEFAULT_FRAME_SLOTS,
   FrameService,
+  LEGACY_MINISTRY_FAIR_FRAME_SHA256,
   MAT_FRAME_SLOTS,
   MAT_FRAME_NAME,
   MINISTRY_FRAMES,
@@ -22,9 +23,6 @@ const PACKAGED_FRAMES = {
   option1: fileURLToPath(new URL('../../resources/frames/mat-frame.png', import.meta.url)),
   option2: fileURLToPath(new URL('../../resources/frames/anniv-frame.png', import.meta.url)),
 };
-const LEGACY_FRAME_PATH = fileURLToPath(
-  new URL('../../resources/frames/default-frame.png', import.meta.url),
-);
 
 describe('frame import contract', () => {
   it('rejects a decoded transparent frame outside the supported portrait aspect', async () => {
@@ -176,7 +174,7 @@ describe('frame import contract', () => {
     }
   });
 
-  it('deletes unused library entries but refuses frames used by recorded sessions', async () => {
+  it('soft-archives referenced frames, deletes unreferenced frames, and guards the last active frame', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -187,6 +185,7 @@ describe('frame import contract', () => {
     try {
       const disposable = await service.importFrame('Disposable', Buffer.from('png1'));
       const used = await service.importFrame('Used', Buffer.from('png2'));
+      const extra = await service.importFrame('Extra', Buffer.from('png3'));
 
       const sessionId = randomUUID();
       store.repository.createSession(sessionId, 1_000);
@@ -194,12 +193,118 @@ describe('frame import contract', () => {
         .prepare("UPDATE sessions SET state = 'final', selected_frame_id = ? WHERE id = ?")
         .run(used.id, sessionId);
 
-      expect(() => service.deleteFrame(used.id)).toThrow(/used by saved photo sessions/i);
-      expect(store.repository.getFrame(used.id)).not.toBeNull();
+      // Deleting a referenced frame soft-archives it, excluding it from active lists
+      const afterArchive = service.deleteFrame(used.id);
+      expect(afterArchive.map((frame) => frame.id)).not.toContain(used.id);
+      expect(service.listFrames().map((frame) => frame.id)).not.toContain(used.id);
+      const archivedFrame = store.repository.getFrame(used.id);
+      expect(archivedFrame).not.toBeNull();
+      expect(archivedFrame?.archived).toBe(true);
 
+      // Deleting an unreferenced frame deletes the row and file
       const remaining = service.deleteFrame(disposable.id);
-      expect(remaining.map((frame) => frame.id)).toEqual([used.id]);
+      expect(remaining.map((frame) => frame.id)).toEqual([extra.id]);
       expect(store.repository.getFrame(disposable.id)).toBeNull();
+
+      // Attempting to delete the last active frame must be rejected
+      expect(() => service.deleteFrame(extra.id)).toThrow(/Cannot delete the only remaining active frame/i);
+      expect(store.repository.getFrame(extra.id)).not.toBeNull();
+    } finally {
+      store.close();
+    }
+  });
+
+  it('permits identical artwork as separate entries without deduplication on ensureDefaultFrames', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      PACKAGED_FRAMES,
+      fakeProcessor(1_200, 3_600),
+    );
+    try {
+      const first = await service.importFrame('Custom Strip 1', Buffer.from('identical-png'));
+      const second = await service.importFrame('Custom Strip 2', Buffer.from('identical-png'));
+
+      expect(first.sha256).toBe(second.sha256);
+      expect(first.id).not.toBe(second.id);
+      expect(service.listFrames()).toHaveLength(2);
+
+      // ensureDefaultFrames should NOT deduplicate them
+      await service.ensureDefaultFrames();
+      const frames = service.listFrames();
+      expect(frames.map((f) => f.id)).toContain(first.id);
+      expect(frames.map((f) => f.id)).toContain(second.id);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('replaces frame artwork while preserving ID, sortOrder, name, and slots', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      UNUSED_PACKAGED_FRAMES,
+      passthroughProcessor(),
+    );
+    try {
+      const initial = await service.importFrame('Custom Frame', Buffer.from('png-v1'));
+      expect(initial.revision).toBe(0);
+
+      const replaced = await service.replaceFrameArtwork(initial.id, Buffer.from('png-v2'));
+      expect(replaced.id).toBe(initial.id);
+      expect(replaced.name).toBe(initial.name);
+      expect(replaced.sortOrder).toBe(initial.sortOrder);
+      expect(replaced.slots).toEqual(initial.slots);
+      expect(replaced.revision).toBe(1);
+      expect(replaced.sha256).not.toBe(initial.sha256);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('never resurrects archived frames in ensureDefaultFrames or ensureMinistryFrames', async () => {
+    const store = createTestStore();
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      PACKAGED_FRAMES,
+      fakeProcessor(1_200, 3_600),
+    );
+    try {
+      const defaults = await service.ensureDefaultFrames();
+      const option2Id = defaults.option2.id;
+
+      // Add a session reference so option2 is archived rather than deleted
+      const sId = randomUUID();
+      store.repository.createSession(sId, 1_000);
+      store.database.raw
+        .prepare("UPDATE sessions SET state = 'final', selected_frame_id = ? WHERE id = ?")
+        .run(option2Id, sId);
+
+      // Archive option2
+      service.deleteFrame(option2Id);
+      expect(service.listFrames().map((f) => f.id)).not.toContain(option2Id);
+      expect(store.repository.getFrame(option2Id)?.archived).toBe(true);
+
+      // Running ensureDefaultFrames must not resurrect option2
+      await service.ensureDefaultFrames();
+      expect(service.listFrames().map((f) => f.id)).not.toContain(option2Id);
+      expect(service.listFrames().find((f) => f.name === defaults.option2.name)).toBeUndefined();
+
+      // Running ensureMinistryFrames must not resurrect an archived ministry frame
+      const importedMinistry = await service.importFrame('NextGen Ministry', Buffer.from('nextgen-png'));
+      const sId2 = randomUUID();
+      store.repository.createSession(sId2, 1_000);
+      store.database.raw
+        .prepare("UPDATE sessions SET state = 'final', selected_frame_id = ? WHERE id = ?")
+        .run(importedMinistry.id, sId2);
+      service.deleteFrame(importedMinistry.id);
+      expect(service.listFrames().map((f) => f.id)).not.toContain(importedMinistry.id);
+
+      await service.ensureMinistryFrames();
+      expect(service.listFrames().map((f) => f.id)).not.toContain(importedMinistry.id);
     } finally {
       store.close();
     }
@@ -239,17 +344,39 @@ describe('packaged frame seeding', () => {
     const processor = passthroughProcessor();
     const service = new FrameService(store.repository, store.vault, PACKAGED_FRAMES, processor);
     try {
-      const legacyBytes = readFileSync(LEGACY_FRAME_PATH);
-      const legacy1 = await service.importFrame(
-        'CCF Alabang Ministry Fair Strip',
-        legacyBytes,
-        DEFAULT_FRAME_SLOTS,
-      );
-      const legacy2 = await service.importFrame(
-        'CCF Alabang Ministry Fair Strip (Collage 2)',
-        legacyBytes,
-        DEFAULT_FRAME_SLOTS,
-      );
+      const stored1 = store.vault.write('frames', Buffer.from('legacy-art-1'));
+      const stored2 = store.vault.write('frames', Buffer.from('legacy-art-2'));
+      const now = Date.now();
+      const legacy1 = {
+        id: randomUUID(),
+        name: 'CCF Alabang Celebration Strip',
+        encryptedPath: stored1.relativePath,
+        width: 1200,
+        height: 3600,
+        byteSize: stored1.byteSize,
+        sha256: LEGACY_MINISTRY_FAIR_FRAME_SHA256,
+        revision: 0,
+        sortOrder: 1,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const legacy2 = {
+        id: randomUUID(),
+        name: 'CCF Alabang Celebration Strip (Collage 2)',
+        encryptedPath: stored2.relativePath,
+        width: 1200,
+        height: 3600,
+        byteSize: stored2.byteSize,
+        sha256: LEGACY_MINISTRY_FAIR_FRAME_SHA256,
+        revision: 0,
+        sortOrder: 2,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.repository.insertLibraryFrame(legacy1, DEFAULT_FRAME_SLOTS);
+      store.repository.insertLibraryFrame(legacy2, DEFAULT_FRAME_SLOTS);
 
       const defaults = await service.ensureDefaultFrames();
 
@@ -273,7 +400,7 @@ describe('packaged frame seeding', () => {
     );
     try {
       const custom1 = await service.importFrame(
-        'CCF Alabang Ministry Fair Strip',
+        'CCF Alabang Celebration Strip',
         Buffer.from('operator artwork one'),
         DEFAULT_FRAME_SLOTS,
       );
@@ -294,16 +421,16 @@ describe('packaged frame seeding', () => {
 
   it('preserves edited slot geometry on a formerly shipped default', async () => {
     const store = createTestStore();
-    const service = new FrameService(
-      store.repository,
-      store.vault,
-      PACKAGED_FRAMES,
-      passthroughProcessor(),
-    );
+    const processor = passthroughProcessor();
+    const service = new FrameService(store.repository, store.vault, PACKAGED_FRAMES, processor);
     try {
+      const legacyBytes = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAADCAYAAABS3WWCAAAAEElEQVR42mNk+M9QzwAEGAAe/wP553Zf2wAAAABJRU5ErkJggg==',
+        'base64',
+      );
       const legacy = await service.importFrame(
-        'CCF Alabang Ministry Fair Strip',
-        readFileSync(LEGACY_FRAME_PATH),
+        'CCF Alabang Celebration Strip',
+        legacyBytes,
         DEFAULT_FRAME_SLOTS,
       );
       const editedSlots = legacy.slots.map((slot, index) =>

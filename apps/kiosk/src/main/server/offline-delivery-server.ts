@@ -151,7 +151,7 @@ export class OfflineDeliveryServer {
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Grace Booth</title>
-<style>body{font-family:sans-serif;background:#0f172a;color:#fff;text-align:center;padding:3rem 1rem;}</style>
+<style>body{font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;background:#f5f5f5;color:#242424;text-align:center;padding:3rem 1rem;}h1{font-size:24px;line-height:32px;font-weight:600}p{color:#424242;font-size:14px;line-height:20px}</style>
 </head><body><h1>Photo not found</h1><p>This photo may have expired or is not available on this booth.</p></body></html>`);
       return;
     }
@@ -165,13 +165,13 @@ export class OfflineDeliveryServer {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #090d16;
-      color: #f8fafc;
+      font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #242424;
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
+      min-height: 100dvh;
       padding: 1.25rem 1rem 2.5rem;
     }
     .header {
@@ -180,32 +180,31 @@ export class OfflineDeliveryServer {
     }
     .header h1 {
       font-size: 1.5rem;
-      font-weight: 800;
-      letter-spacing: -0.025em;
-      color: #ffffff;
+      font-weight: 600;
+      color: #242424;
     }
     .header p {
       font-size: 0.875rem;
-      color: #94a3b8;
+      color: #616161;
       margin-top: 0.25rem;
     }
     .card {
-      background: #131d2e;
-      border: 1px solid #1e293b;
-      border-radius: 1.25rem;
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
       padding: 0.875rem;
       max-width: 440px;
       width: 100%;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     .image-container {
       width: 100%;
-      border-radius: 0.875rem;
+      border-radius: 4px;
       overflow: hidden;
-      background: #000;
+      background: #f5f5f5;
       display: flex;
       justify-content: center;
     }
@@ -213,7 +212,7 @@ export class OfflineDeliveryServer {
       width: 100%;
       height: auto;
       display: block;
-      border-radius: 0.875rem;
+      border-radius: 2px;
     }
     .actions {
       width: 100%;
@@ -226,23 +225,23 @@ export class OfflineDeliveryServer {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #2563eb;
+      background: #0f6cbd;
       color: #ffffff;
       text-decoration: none;
-      font-weight: 700;
-      font-size: 1.05rem;
-      padding: 0.95rem 1.5rem;
-      border-radius: 0.875rem;
-      box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
-      transition: background 0.15s ease, transform 0.1s ease;
+      font-weight: 600;
+      font-size: 1rem;
+      min-height: 48px;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
+      transition: background 0.1s ease;
     }
     .download-btn:active {
-      background: #1d4ed8;
-      transform: scale(0.98);
+      background: #0c3b5e;
     }
     .tip {
       font-size: 0.775rem;
-      color: #64748b;
+      color: #616161;
       text-align: center;
       line-height: 1.4;
       padding: 0 0.5rem;
@@ -252,7 +251,7 @@ export class OfflineDeliveryServer {
 <body>
   <div class="header">
     <h1>Grace Booth</h1>
-    <p>Your photobooth collage is ready!</p>
+    <p>Your photobooth collage is ready</p>
   </div>
   <div class="card">
     <div class="image-container">
@@ -260,7 +259,7 @@ export class OfflineDeliveryServer {
     </div>
     <div class="actions">
       <a href="/photo/${token}/image?download=1" download="grace-booth-photo.jpg" class="download-btn">
-        Save Image
+        Save image
       </a>
       <p class="tip">Tap and hold the image to save directly to your camera roll, or tap the button above.</p>
     </div>
@@ -282,13 +281,13 @@ export class OfflineDeliveryServer {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #090d16;
-      color: #f8fafc;
+      font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #242424;
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
+      min-height: 100dvh;
       padding: 1.25rem 1rem 2.5rem;
     }
     .header {
@@ -297,23 +296,22 @@ export class OfflineDeliveryServer {
     }
     .header h1 {
       font-size: 1.5rem;
-      font-weight: 800;
-      letter-spacing: -0.025em;
-      color: #ffffff;
+      font-weight: 600;
+      color: #242424;
     }
     .header p {
       font-size: 0.875rem;
-      color: #94a3b8;
+      color: #616161;
       margin-top: 0.25rem;
     }
     .card {
-      background: #131d2e;
-      border: 1px solid #1e293b;
-      border-radius: 1.25rem;
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
       padding: 0.875rem;
       max-width: 440px;
       width: 100%;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -321,9 +319,9 @@ export class OfflineDeliveryServer {
     .image-container {
       width: 100%;
       min-height: 300px;
-      border-radius: 0.875rem;
+      border-radius: 4px;
       overflow: hidden;
-      background: #000;
+      background: #f5f5f5;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -332,7 +330,7 @@ export class OfflineDeliveryServer {
       width: 100%;
       height: auto;
       display: block;
-      border-radius: 0.875rem;
+      border-radius: 2px;
     }
     .actions {
       width: 100%;
@@ -345,30 +343,30 @@ export class OfflineDeliveryServer {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #2563eb;
+      background: #0f6cbd;
       color: #ffffff;
       text-decoration: none;
-      font-weight: 700;
-      font-size: 1.05rem;
-      padding: 0.95rem 1.5rem;
-      border-radius: 0.875rem;
-      box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
-      transition: background 0.15s ease, transform 0.1s ease;
+      font-weight: 600;
+      font-size: 1rem;
+      min-height: 48px;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
+      transition: background 0.1s ease;
     }
     .download-btn:active {
-      background: #1d4ed8;
-      transform: scale(0.98);
+      background: #0c3b5e;
     }
     .tip {
       font-size: 0.775rem;
-      color: #64748b;
+      color: #616161;
       text-align: center;
       line-height: 1.4;
       padding: 0 0.5rem;
     }
     .error-msg {
       display: none;
-      color: #f87171;
+      color: #c50f1f;
       padding: 1.5rem 0;
       font-weight: 500;
     }
@@ -377,17 +375,17 @@ export class OfflineDeliveryServer {
 <body>
   <div class="header">
     <h1>Grace Booth</h1>
-    <p>Your photobooth collage is ready!</p>
+    <p>Your photobooth collage is ready</p>
   </div>
   <div class="card">
     <div class="image-container">
       <img id="photo-img" style="display:none;" alt="Grace Booth Photobooth Collage" />
-      <p id="loading-txt" style="color:#94a3b8;">Loading your photo...</p>
+      <p id="loading-txt" style="color:#616161;">Loading your photo…</p>
       <p id="error-txt" class="error-msg">Photo not found or link has expired.</p>
     </div>
     <div class="actions" id="actions-panel" style="display:none;">
       <a id="download-link" href="#" download="grace-booth-photo.jpg" class="download-btn">
-        Save Image
+        Save image
       </a>
       <p class="tip">Tap and hold the image to save directly to your camera roll, or tap the button above.</p>
     </div>

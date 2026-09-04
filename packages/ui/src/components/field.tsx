@@ -8,7 +8,7 @@ export const Field = forwardRef<
 >(function Field({ className, ...props }, ref) {
   return (
     <BaseField.Root
-      className={cn('flex flex-col gap-1.5', className)}
+      className={cn('flex flex-col gap-1', className)}
       ref={ref}
       {...props}
     />
@@ -21,7 +21,7 @@ export const FieldLabel = forwardRef<
 >(function FieldLabel({ className, ...props }, ref) {
   return (
     <BaseField.Label
-      className={cn('font-sans text-xs font-semibold tracking-wide text-foreground uppercase select-none', className)}
+      className={cn('font-sans text-sm font-semibold leading-5 text-foreground select-none', className)}
       ref={ref}
       {...props}
     />
@@ -34,7 +34,7 @@ export const FieldDescription = forwardRef<
 >(function FieldDescription({ className, ...props }, ref) {
   return (
     <BaseField.Description
-      className={cn('text-xs text-muted-foreground', className)}
+      className={cn('text-xs leading-4 text-muted-foreground', className)}
       ref={ref}
       {...props}
     />
@@ -47,7 +47,7 @@ export const FieldError = forwardRef<
 >(function FieldError({ className, ...props }, ref) {
   return (
     <BaseField.Error
-      className={cn('text-xs font-medium text-destructive', className)}
+      className={cn('text-xs leading-4 text-destructive', className)}
       ref={ref}
       {...props}
     />

@@ -1,36 +1,41 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { useRender } from '@base-ui/react/use-render';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { Spinner } from '@fluentui/react-components';
 import { cn } from '../lib/utils';
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-md font-sans text-sm font-semibold tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
+  'inline-flex items-center justify-center gap-1.5 rounded-[4px] border font-sans text-sm font-semibold leading-5 tracking-normal transition-[background-color,border-color,color,box-shadow] duration-100 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-0 focus-visible:shadow-[0_0_0_2px_#000] disabled:pointer-events-none disabled:shadow-none select-none cursor-pointer',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground hover:bg-[#8f503c] active:bg-[#7d4432] shadow-sm',
+          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#115ea3] active:bg-[#0c3b5e] active:shadow-none disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
+        primary:
+          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#115ea3] active:bg-[#0c3b5e] active:shadow-none disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-[#3a3a3a] active:bg-[#252525] border border-border/50',
+          'border-[#d1d1d1] bg-white text-[#242424] shadow-[var(--shadow-2)] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] active:shadow-none disabled:border-[#e0e0e0] disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
         outline:
-          'border border-border bg-transparent text-foreground hover:bg-secondary/60 active:bg-secondary',
+          'border-[#d1d1d1] bg-white text-[#242424] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] disabled:border-[#e0e0e0] disabled:bg-transparent disabled:text-[#bdbdbd]',
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-[#a51d1d] active:bg-[#8a1818] shadow-sm',
+          'border-transparent bg-[#c50f1f] text-white shadow-[var(--shadow-2)] hover:bg-[#b10e1c] active:bg-[#960b18] disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
         'destructive-outline':
-          'border border-destructive text-destructive bg-transparent hover:bg-destructive/10 active:bg-destructive/20',
-        ghost: 'text-foreground hover:bg-secondary/60 active:bg-secondary',
-        link: 'text-primary underline-offset-4 hover:underline p-0 h-auto font-normal',
+          'border-[#c50f1f] text-[#c50f1f] bg-transparent hover:bg-[#fdf3f4] active:bg-[#f9d9dc] disabled:border-[#e0e0e0] disabled:text-[#bdbdbd]',
+        ghost: 'border-transparent text-[#242424] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] disabled:text-[#bdbdbd]',
+        subtle: 'border-transparent text-[#242424] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] disabled:text-[#bdbdbd]',
+        link: 'h-auto border-transparent p-0 font-normal text-primary underline-offset-4 hover:underline',
       },
       size: {
-        xs: 'h-7 px-2.5 text-xs',
-        sm: 'h-9 px-3 text-xs',
-        default: 'h-11 px-5 text-sm min-h-[44px]',
-        lg: 'h-14 px-7 text-base font-bold min-h-[56px]',
-        xl: 'h-16 px-8 text-lg font-bold min-h-[64px]',
-        'icon-xs': 'size-7 p-0',
-        'icon-sm': 'size-9 p-0',
-        icon: 'size-11 p-0 min-w-[44px] min-h-[44px]',
-        'icon-lg': 'size-14 p-0 min-w-[56px] min-h-[56px]',
+        xs: 'h-6 px-2 text-xs',
+        sm: 'h-8 px-3 text-sm',
+        default: 'h-10 min-h-[40px] px-3 text-sm',
+        lg: 'h-12 min-h-[48px] px-5 text-base font-semibold',
+        xl: 'h-14 px-7 text-base font-semibold min-h-[56px]',
+        'icon-xs': 'size-6 p-0',
+        'icon-sm': 'size-8 p-0',
+        icon: 'size-10 p-0 min-w-[40px] min-h-[40px]',
+        'icon-lg': 'size-12 p-0 min-w-[48px] min-h-[48px]',
+        'icon-xl': 'size-14 p-0 min-w-[56px] min-h-[56px]',
       },
     },
     defaultVariants: {
@@ -77,10 +82,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       children: (
         <>
           {loading ? (
-            <span
-              aria-hidden="true"
-              className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-            />
+            <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center">
+              <Spinner size="tiny" />
+            </span>
           ) : icon ? (
             <span className="inline-flex shrink-0 items-center justify-center [&>svg]:size-5">
               {icon}

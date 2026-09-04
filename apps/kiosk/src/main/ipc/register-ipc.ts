@@ -83,7 +83,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   };
 
   register('qr-station:get-state', () => dependencies.workflow.getQrStationState());
-  register('qr-station:dismiss', () => dependencies.workflow.dismissQrStation());
+  register('qr-station:dismiss', (_event, input) => dependencies.workflow.dismissQrStation(input?.sessionId));
   register('admin:google-photos:get-status', async (event) => {
     requireAdmin(event);
     const localSettings = dependencies.repository.getSettings();
@@ -383,7 +383,10 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     dependencies.onNetworkSettingsChanged();
     return adminSettings(dependencies.repository, dependencies.frameService);
   });
-  register('admin:list-frames', () => dependencies.frameService.getFrameSummaries());
+  register('admin:list-frames', (event) => {
+    requireAdmin(event);
+    return dependencies.frameService.getFrameSummaries();
+  });
   register('admin:add-frame', async (event) => {
     requireAdmin(event);
     const owner = BrowserWindow.fromWebContents(event.sender);
@@ -403,6 +406,25 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     );
     return dependencies.frameService.toSummary(frame);
   });
+  register('admin:replace-frame-image', async (event, input) => {
+    requireAdmin(event);
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const dialogOptions: OpenDialogOptions = {
+      title: 'Choose a replacement transparent PNG frame',
+      properties: ['openFile'],
+      filters: [{ name: 'Transparent PNG', extensions: ['png'] }],
+    };
+    const result = owner
+      ? await dialog.showOpenDialog(owner, dialogOptions)
+      : await dialog.showOpenDialog(dialogOptions);
+    const selected = result.filePaths[0];
+    if (result.canceled || !selected) return null;
+    const frame = await dependencies.frameService.replaceFrameArtwork(
+      input.frameId,
+      await readFile(selected),
+    );
+    return dependencies.frameService.toSummary(frame);
+  });
   register('admin:update-frame-layout', (event, input) => {
     requireAdmin(event);
     return dependencies.frameService.toSummary(
@@ -416,11 +438,15 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   });
   register('admin:delete-frame', (event, input) => {
     requireAdmin(event);
-    return dependencies.frameService.deleteFrame(input.frameId);
+    return dependencies.frameService
+      .deleteFrame(input.frameId)
+      .map((frame) => dependencies.frameService.toSummary(frame));
   });
   register('admin:move-frame', (event, input) => {
     requireAdmin(event);
-    return dependencies.frameService.moveFrame(input.frameId, input.direction);
+    return dependencies.frameService
+      .moveFrame(input.frameId, input.direction)
+      .map((frame) => dependencies.frameService.toSummary(frame));
   });
   register('admin:choose-lan-certificate', async (event, input) => {
     requireAdmin(event);
@@ -509,7 +535,7 @@ async function adminSettings(
 ): Promise<AdminSettings> {
   const settings = repository.getSettings();
   await frames.ensureDefaultFrames();
-  await frames.ensureMinistryFrames?.();
+  await frames.ensureMinistryFrames();
   const library = frames.getFrameSummaries();
   const activeFrame = library.find((frame) => frame.id === settings.activeFrameId) ?? library[0];
   if (!activeFrame) {

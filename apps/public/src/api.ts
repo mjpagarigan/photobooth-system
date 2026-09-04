@@ -21,17 +21,12 @@ function allowedGoogleFormsUrl(value: unknown): string | null | undefined {
   if (typeof value !== 'string' || value.length > 2048) return undefined;
   try {
     const url = new URL(value);
-    const host = url.hostname.toLowerCase();
-    const allowed =
-      host === 'forms.gle' ||
-      host === 'forms.google.com' ||
-      (host === 'docs.google.com' && url.pathname.startsWith('/forms/'));
     if (
       url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      (url.port && url.port !== '443') ||
-      !allowed
+      url.username !== '' ||
+      url.password !== '' ||
+      (url.port !== '' && url.port !== '443') ||
+      url.hostname.length === 0
     ) {
       return undefined;
     }

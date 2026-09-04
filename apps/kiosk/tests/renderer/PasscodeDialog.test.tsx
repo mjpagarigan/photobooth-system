@@ -86,4 +86,47 @@ describe('PasscodeDialog keyboard behavior', () => {
     expect(input).toHaveAttribute('minLength', '8');
     expect(input).toHaveAttribute('maxLength', '64');
   });
+
+  it('allows immediate retry after an incorrect passcode error without form blocking', async () => {
+    const onClearError = vi.fn();
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <PasscodeDialog
+        error="Incorrect passcode."
+        mode="login"
+        onCancel={() => undefined}
+        onClearError={onClearError}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    // Displays error in accessible alert
+    expect(screen.getByRole('alert')).toHaveTextContent('Incorrect passcode.');
+
+    // User types new passcode
+    const input = screen.getByLabelText('Passcode');
+    await user.type(input, 'newpasscode');
+
+    // onClearError should be called on keystrokes
+    expect(onClearError).toHaveBeenCalled();
+
+    // Rerender as parent clears the error
+    rerender(
+      <PasscodeDialog
+        error={null}
+        mode="login"
+        onCancel={() => undefined}
+        onClearError={onClearError}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    // Submitting the form should succeed and call onSubmit with the new passcode
+    const unlockBtn = screen.getByRole('button', { name: 'Unlock' });
+    await user.click(unlockBtn);
+    expect(onSubmit).toHaveBeenCalledWith('newpasscode');
+  });
 });
+

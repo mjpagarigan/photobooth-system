@@ -1,11 +1,4 @@
-import {
-  ApertureIcon as Aperture,
-  CameraIcon as Camera,
-  CheckCircleIcon as CheckCircle,
-  GearIcon as Gear,
-  ImagesIcon as Images,
-  LockKeyIcon as LockKey,
-} from '@phosphor-icons/react';
+import { Aperture, Camera, CheckCircle, Gear, Images, LockKey } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
 
 import { Button } from '../components/Button';
@@ -93,8 +86,8 @@ export function AttractScreen({
           </div>
         </div>
 
-        <h1 id="attract-title">M.A.T. PHOTOBOOTH</h1>
-        <p className="attract-card__subtitle">MINISTRY FAIR // CELEBRATION ARCHIVE</p>
+        <h1 id="attract-title">M.A.T. Photobooth</h1>
+        <p className="attract-card__subtitle">Capture your moment</p>
         <p className="attract-card__lead">
           Take three photos, receive your finished collage, and scan to download instantly.
         </p>

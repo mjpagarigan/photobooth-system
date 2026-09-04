@@ -13,18 +13,14 @@ const GoogleFormsUrlSchema = z
   .superRefine((value, context) => {
     if (value === null) return;
     const url = new URL(value);
-    const host = url.hostname.toLowerCase();
-    const hostAllowed = host === 'forms.gle' ||
-      host === 'forms.google.com' ||
-      (host === 'docs.google.com' && url.pathname.startsWith('/forms/'));
     if (
       url.protocol !== 'https:' ||
       url.username !== '' ||
       url.password !== '' ||
       (url.port !== '' && url.port !== '443') ||
-      !hostAllowed
+      url.hostname.length === 0
     ) {
-      context.addIssue({ code: 'custom', message: 'Invalid Google Forms URL' });
+      context.addIssue({ code: 'custom', message: 'Invalid URL' });
     }
   });
 

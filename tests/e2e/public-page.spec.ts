@@ -89,7 +89,7 @@ test('resolves, displays, and downloads a private photo without leaking the toke
 
   await expect(page.getByRole('heading', { name: 'Hold on to this moment.' })).toBeVisible();
   await expect(page.getByAltText('M.A.T. Photobooth finished event collage')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Join a Ministry' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Join a ministry' })).toHaveAttribute(
     'href',
     'https://volunteer-management.ccf.org.ph/recruitment/form',
   );
@@ -101,6 +101,11 @@ test('resolves, displays, and downloads a private photo without leaking the toke
   expect(download.suggestedFilename()).toBe('mat-photobooth-keepsake.jpg');
   expect(calls.map((call) => call.route)).toEqual(['resolve', 'image', 'download']);
   expect(calls.every((call) => call.token === TOKEN && !call.url.includes(TOKEN))).toBe(true);
+
+  await expect(page).toHaveScreenshot('public-ready-desktop.png', {
+    animations: 'disabled',
+    fullPage: true,
+  });
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   const seriousOrCritical = accessibility.violations.filter(
@@ -150,4 +155,8 @@ test('rejects a malformed fragment locally and remains usable on a phone viewpor
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+  await expect(page).toHaveScreenshot('public-unavailable-mobile-390x844.png', {
+    animations: 'disabled',
+    fullPage: true,
+  });
 });

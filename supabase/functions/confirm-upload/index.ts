@@ -182,12 +182,11 @@ export async function handler(request: Request): Promise<Response> {
     }
 
     try {
-      // @ts-ignore EdgeRuntime global
-      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-        // @ts-ignore EdgeRuntime global
-        EdgeRuntime.waitUntil(processGooglePhotosSyncQueue(admin));
+      const edgeRuntime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (edgeRuntime && typeof edgeRuntime.waitUntil === 'function') {
+        edgeRuntime.waitUntil(processGooglePhotosSyncQueue(admin));
       } else {
-        void processGooglePhotosSyncQueue(admin).catch(() => {});
+        void processGooglePhotosSyncQueue(admin).catch(() => undefined);
       }
     } catch {
       // Non-blocking fail-open

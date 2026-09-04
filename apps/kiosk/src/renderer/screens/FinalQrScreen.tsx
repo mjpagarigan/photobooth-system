@@ -1,4 +1,4 @@
-import { ImagesIcon as Images } from '@phosphor-icons/react';
+import { Images } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
 
 import { Photostrip } from '../components/Photostrip';

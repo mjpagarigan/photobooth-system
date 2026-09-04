@@ -49,6 +49,7 @@ export const frames = sqliteTable('frames', {
   sha256: text('sha256').notNull(),
   revision: integer('revision').notNull(),
   sortOrder: integer('sort_order'),
+  archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

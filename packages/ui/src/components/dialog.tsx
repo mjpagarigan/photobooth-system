@@ -1,5 +1,5 @@
 import { Dialog as BaseDialog } from '@base-ui/react';
-import { XIcon as X } from '@phosphor-icons/react';
+import { Dismiss20Regular } from '@fluentui/react-icons';
 import React, { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../lib/utils';
 
@@ -12,7 +12,7 @@ export type DialogPopupProps = {
   showCloseButton?: boolean;
   onClose?: () => void;
   maxWidthClass?: string;
-} & React.ComponentPropsWithoutRef<typeof BaseDialog.Popup>
+} & React.ComponentPropsWithoutRef<typeof BaseDialog.Popup>;
 
 export const DialogPopup = forwardRef<HTMLDivElement, DialogPopupProps>(function DialogPopup(
   {
@@ -28,11 +28,11 @@ export const DialogPopup = forwardRef<HTMLDivElement, DialogPopupProps>(function
 ) {
   return (
     <BaseDialog.Portal {...portalProps}>
-      <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity duration-200" />
+      <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/40 transition-opacity duration-100 motion-reduce:transition-none" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <BaseDialog.Popup
           className={cn(
-            'pointer-events-auto relative flex w-full flex-col rounded-xl border border-border bg-card text-card-foreground shadow-2xl transition-all duration-200 focus-visible:outline-none',
+            'pointer-events-auto relative flex w-full flex-col gap-2 rounded-[8px] bg-white p-6 text-[#242424] shadow-[var(--shadow-64)] transition-opacity duration-100 focus-visible:outline-none motion-reduce:transition-none',
             maxWidthClass,
             className,
           )}
@@ -42,11 +42,11 @@ export const DialogPopup = forwardRef<HTMLDivElement, DialogPopupProps>(function
           {showCloseButton && (
             <BaseDialog.Close
               aria-label="Close dialog"
-              className="absolute top-4 right-4 z-10 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring cursor-pointer"
+              className="absolute top-5 right-5 z-10 grid size-8 cursor-pointer place-items-center rounded-[4px] border-0 bg-transparent text-[#424242] transition-colors hover:bg-[#f5f5f5] active:bg-[#e0e0e0] focus-visible:outline-2 focus-visible:outline-white focus-visible:shadow-[0_0_0_2px_#000]"
               onClick={onClose}
               render={<button type="button" />}
             >
-              <X aria-hidden="true" className="size-5" weight="bold" />
+              <Dismiss20Regular aria-hidden="true" />
             </BaseDialog.Close>
           )}
           {children}
@@ -63,7 +63,7 @@ export function DialogHeader({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('flex flex-col gap-1.5 p-6 border-b border-border/40', className)}
+      className={cn('flex flex-col gap-1 pr-10', className)}
       {...props}
     >
       {children}
@@ -77,7 +77,7 @@ export const DialogTitle = forwardRef<
 >(function DialogTitle({ className, ...props }, ref) {
   return (
     <BaseDialog.Title
-      className={cn('font-heading text-lg font-bold tracking-tight text-foreground', className)}
+      className={cn('font-heading text-xl font-semibold leading-7 tracking-normal text-[#242424]', className)}
       ref={ref}
       {...props}
     />
@@ -90,7 +90,7 @@ export const DialogDescription = forwardRef<
 >(function DialogDescription({ className, ...props }, ref) {
   return (
     <BaseDialog.Description
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-sm leading-5 text-[#424242]', className)}
       ref={ref}
       {...props}
     />
@@ -103,7 +103,7 @@ export function DialogPanel({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex-1 overflow-y-auto p-6', className)} {...props}>
+    <div className={cn('flex-1 overflow-y-auto py-1 text-sm leading-5 text-[#242424]', className)} {...props}>
       {children}
     </div>
   );
@@ -118,8 +118,8 @@ export function DialogFooter({
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-3 p-6',
-        variant === 'default' && 'border-t border-border/40 bg-surface-tint/30 rounded-b-xl',
+        'flex items-center justify-end gap-2 pt-1',
+        variant === 'default' && 'bg-white',
         className,
       )}
       {...props}

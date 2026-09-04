@@ -620,6 +620,7 @@ describe('dual display handoff', () => {
         sha256: 'a'.repeat(64),
         sortOrder: 0,
         revision: 0,
+        archived: false,
         createdAt: 1000,
         updatedAt: 1000,
       },
@@ -652,6 +653,169 @@ describe('dual display handoff', () => {
     const dismissed = workflow.dismissQrStation();
     expect(dismissed.status).toBe('idle');
     expect(workflow.getQrStationState().status).toBe('idle');
+  });
+
+  it('enforces FIFO presentation queue and CAS-style dismiss', async () => {
+    const queue = new FakeUploadQueue();
+    const camera = new SequencedCamera(['ready']);
+    const testStore = createTestStore();
+    store = testStore;
+    queue.testStore = testStore;
+
+    const imageProcessor: ImageProcessor = {
+      process: () => Promise.reject(new Error('not used')),
+      validateSourceJpeg: () => Promise.reject(new Error('not used')),
+      normalizeFramePng: () => Promise.reject(new Error('not used')),
+      createThumbnail: () => Promise.reject(new Error('not used')),
+      close: () => Promise.resolve(),
+    };
+    const frameService = {
+      ensureDefaultFrame: () => Promise.resolve(undefined),
+      ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+      getFrameOptions: () => [null, null],
+      getFrameSummaries: () => [],
+      listFrames: () => [],
+    } as unknown as FrameService;
+    const qrService = {
+      render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+    } as unknown as QrService;
+
+    let currentTime = 10_000;
+    workflow = new BoothWorkflow(
+      testStore.repository,
+      testStore.vault,
+      camera,
+      frameService,
+      imageProcessor,
+      queue as unknown as UploadQueue,
+      qrService,
+      {
+        shotCountdownsMs: [0, 0, 0],
+        now: () => currentTime,
+        isDualDisplayActive: () => true,
+      },
+    );
+
+    await workflow.initialize();
+    testStore.repository.setDualDisplaySettings('enabled', false, 45);
+
+    const session1 = testStore.repository.createSession(randomUUID(), currentTime);
+    const session2 = testStore.repository.createSession(randomUUID(), currentTime);
+    const session3 = testStore.repository.createSession(randomUUID(), currentTime);
+
+    // 1. First session finishes upload: presented immediately
+    await queue.completeOffline(session1.id);
+    let qrState = workflow.getQrStationState();
+    expect(qrState.status).toBe('active');
+    expect(qrState.sessionId).toBe(session1.id);
+    expect(qrState.queuedCount).toBe(0);
+    expect(qrState.expiresAt).toBe(currentTime + 45_000);
+
+    // 2. Second session finishes upload while session 1 is active: enqueued in FIFO order
+    currentTime = 20_000;
+    await queue.completeOffline(session2.id);
+    qrState = workflow.getQrStationState();
+    expect(qrState.status).toBe('active');
+    expect(qrState.sessionId).toBe(session1.id);
+    expect(qrState.queuedCount).toBe(1);
+    expect(qrState.expiresAt).toBe(10_000 + 45_000);
+
+    // 3. Upload failure for session 3 does NOT disturb active QR session 1
+    testStore.database.raw
+      .prepare("UPDATE sessions SET state = 'ready' WHERE id = ?")
+      .run(session3.id);
+    queue.emit('failed', session3.id);
+    qrState = workflow.getQrStationState();
+    expect(qrState.status).toBe('active');
+    expect(qrState.sessionId).toBe(session1.id);
+    expect(qrState.queuedCount).toBe(1);
+
+    // 4. CAS dismiss with wrong sessionId is ignored
+    workflow.dismissQrStation('wrong-session-id');
+    expect(workflow.getQrStationState().sessionId).toBe(session1.id);
+
+    // 5. CAS dismiss matching session1 promotes session2 with full duration
+    currentTime = 30_000;
+    const afterDismiss = workflow.dismissQrStation(session1.id);
+    expect(afterDismiss.status).toBe('active');
+    expect(afterDismiss.sessionId).toBe(session2.id);
+    expect(afterDismiss.queuedCount).toBe(0);
+    expect(afterDismiss.expiresAt).toBe(currentTime + 45_000);
+
+    // 6. Dismissing session2 returns station to idle
+    const finalDismiss = workflow.dismissQrStation(session2.id);
+    expect(finalDismiss.status).toBe('idle');
+    expect(finalDismiss.sessionId).toBeNull();
+    expect(finalDismiss.queuedCount).toBe(0);
+  });
+
+  it('promotes next queued item on authoritative timer expiration', async () => {
+    vi.useFakeTimers();
+    try {
+      const queue = new FakeUploadQueue();
+      const camera = new SequencedCamera(['ready']);
+      const testStore = createTestStore();
+      store = testStore;
+      queue.testStore = testStore;
+
+      const imageProcessor: ImageProcessor = {
+        process: () => Promise.reject(new Error('not used')),
+        validateSourceJpeg: () => Promise.reject(new Error('not used')),
+        normalizeFramePng: () => Promise.reject(new Error('not used')),
+        createThumbnail: () => Promise.reject(new Error('not used')),
+        close: () => Promise.resolve(),
+      };
+      const frameService = {
+        ensureDefaultFrame: () => Promise.resolve(undefined),
+        ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+        getFrameOptions: () => [null, null],
+        getFrameSummaries: () => [],
+        listFrames: () => [],
+      } as unknown as FrameService;
+      const qrService = {
+        render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+      } as unknown as QrService;
+
+      workflow = new BoothWorkflow(
+        testStore.repository,
+        testStore.vault,
+        camera,
+        frameService,
+        imageProcessor,
+        queue as unknown as UploadQueue,
+        qrService,
+        {
+          shotCountdownsMs: [0, 0, 0],
+          isDualDisplayActive: () => true,
+        },
+      );
+
+      await workflow.initialize();
+      testStore.repository.setDualDisplaySettings('enabled', false, 45);
+
+      const s1 = testStore.repository.createSession(randomUUID(), Date.now());
+      const s2 = testStore.repository.createSession(randomUUID(), Date.now());
+
+      await queue.completeOffline(s1.id);
+      await queue.completeOffline(s2.id);
+
+      expect(workflow.getQrStationState().sessionId).toBe(s1.id);
+      expect(workflow.getQrStationState().queuedCount).toBe(1);
+
+      // Advance time by 45s: session 1 expires, promoting session 2
+      vi.advanceTimersByTime(45_000);
+
+      expect(workflow.getQrStationState().sessionId).toBe(s2.id);
+      expect(workflow.getQrStationState().queuedCount).toBe(0);
+
+      // Advance time by 45s: session 2 expires, returning to idle
+      vi.advanceTimersByTime(45_000);
+
+      expect(workflow.getQrStationState().status).toBe('idle');
+      expect(workflow.getQrStationState().sessionId).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

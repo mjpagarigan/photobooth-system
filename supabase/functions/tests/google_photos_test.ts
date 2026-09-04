@@ -9,7 +9,7 @@ import {
 } from '../_shared/google_photos.ts';
 
 Deno.test('refreshGoogleAccessToken parses valid access token response', async () => {
-  const mockFetch: typeof fetch = (_input, _init) => {
+  const mockFetch: typeof fetch = () => {
     return Promise.resolve(
       new Response(JSON.stringify({ access_token: 'test_token_123', expires_in: 3600 }), {
         status: 200,
@@ -23,7 +23,7 @@ Deno.test('refreshGoogleAccessToken parses valid access token response', async (
 });
 
 Deno.test('refreshGoogleAccessToken rejects invalid credentials with 401', async () => {
-  const mockFetch: typeof fetch = (_input, _init) => {
+  const mockFetch: typeof fetch = () => {
     return Promise.resolve(
       new Response(JSON.stringify({ error: 'invalid_grant' }), {
         status: 400,
@@ -47,7 +47,7 @@ Deno.test('createAlbumInGooglePhotos creates and shares album', async () => {
         new Response(
           JSON.stringify({
             id: 'created_album_123',
-            title: 'Ministry Fair 2026',
+            title: 'Celebration 2026',
             productUrl: 'https://photos.google.com/lr/album/created_album_123',
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -67,17 +67,17 @@ Deno.test('createAlbumInGooglePhotos creates and shares album', async () => {
     return Promise.reject(new Error('Unknown url'));
   };
 
-  const result = await createAlbumInGooglePhotos('token', 'Ministry Fair 2026', {
+  const result = await createAlbumInGooglePhotos('token', 'Celebration 2026', {
     fetchImpl: mockFetch,
   });
 
   assertEquals(result.albumId, 'created_album_123');
-  assertEquals(result.albumTitle, 'Ministry Fair 2026');
+  assertEquals(result.albumTitle, 'Celebration 2026');
   assertEquals(result.shareUrl, 'https://photos.app.goo.gl/share123');
 });
 
 Deno.test('listGooglePhotosAlbums returns array of albums', async () => {
-  const mockFetch: typeof fetch = (_input, _init) => {
+  const mockFetch: typeof fetch = () => {
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -144,7 +144,7 @@ Deno.test('addMediaItemToAlbum creates media item in album', async () => {
 });
 
 Deno.test('resolveAlbumShareUrl resolves share URL to album title and ID', async () => {
-  const mockFetch: typeof fetch = (_input, _init) => {
+  const mockFetch: typeof fetch = () => {
     return Promise.resolve(
       new Response(
         JSON.stringify({

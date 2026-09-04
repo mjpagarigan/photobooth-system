@@ -1,10 +1,4 @@
-import {
-  CheckIcon as Check,
-  CloudArrowUpIcon as CloudArrowUp,
-  FilmStripIcon as FilmStrip,
-  LockKeyIcon as LockKey,
-  QrCodeIcon as QrCode,
-} from '@phosphor-icons/react';
+import { Check, CloudArrowUp, FilmStrip, LockKey, QrCode } from '@grace-booth/ui';
 import { LottieLight } from 'lottie-react';
 import { useEffect, useState } from 'react';
 

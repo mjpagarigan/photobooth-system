@@ -185,7 +185,7 @@ describe('CameraSetupModal resolution preferences', () => {
     installBridge(vi.fn().mockResolvedValue(cameraConfiguration('sony', null)));
     render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(await screen.findByText(/NATIVE SONY PC REMOTE ADAPTER — NOT AVAILABLE/i)).toBeVisible();
+    expect(await screen.findByText(/Sony PC Remote adapter unavailable/i)).toBeVisible();
     expect(screen.getByRole('button', { name: /apply & save/i })).toBeDisabled();
     expect(getUserMedia).not.toHaveBeenCalled();
   });

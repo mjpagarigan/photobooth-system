@@ -1,11 +1,11 @@
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  CloudArrowUpIcon as CloudArrowUp,
-  ImagesIcon as Images,
-  MagnifyingGlassPlusIcon as MagnifyingGlassPlus,
-  QrCodeIcon as QrCode,
-  XIcon as X,
-} from '@phosphor-icons/react';
+  ArrowClockwise,
+  CloudArrowUp,
+  Images,
+  MagnifyingGlassPlus,
+  QrCode,
+  X,
+} from '@grace-booth/ui';
 import { useState } from 'react';
 
 import type { GalleryItem, GalleryUploadStatus, UploadJobSummary } from '@grace-booth/shared';

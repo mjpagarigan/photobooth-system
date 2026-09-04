@@ -153,11 +153,11 @@ export class E2eDeliveryClient implements DeliveryClient {
     });
   }
 
-  listGooglePhotosAlbums(): Promise<Array<{ id: string; title: string; shareUrl?: string }>> {
+  listGooglePhotosAlbums(): Promise<{ id: string; title: string; shareUrl?: string }[]> {
     return Promise.resolve([
       {
         id: 'e2e_album_1',
-        title: 'Ministry Fair 2026',
+        title: 'Celebration 2026',
         shareUrl: 'https://photos.app.goo.gl/e2e1',
       },
     ]);

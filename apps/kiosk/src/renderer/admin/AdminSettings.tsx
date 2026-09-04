@@ -1,23 +1,23 @@
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  ArrowsLeftRightIcon as ArrowsLeftRight,
-  ArrowSquareOutIcon as ArrowSquareOut,
-  CameraIcon as Camera,
-  CheckCircleIcon as CheckCircle,
-  CloudIcon as Cloud,
-  DatabaseIcon as Database,
-  DesktopIcon as Desktop,
-  FileLockIcon as FileLock,
-  KeyIcon as Key,
-  LinkSimpleIcon as LinkSimple,
-  LockKeyIcon as LockKey,
-  ShieldCheckIcon as ShieldCheck,
-  WifiHighIcon as WifiHigh,
-  CopyIcon as Copy,
-  ImagesIcon as Images,
-  PaperPlaneTiltIcon as PaperPlaneTilt,
-  TrashIcon as Trash,
-} from '@phosphor-icons/react';
+  ArrowClockwise,
+  ArrowsLeftRight,
+  ArrowSquareOut,
+  Camera,
+  CheckCircle,
+  Cloud,
+  Copy,
+  Database,
+  Desktop,
+  FileLock,
+  Images,
+  Key,
+  LinkSimple,
+  LockKey,
+  PaperPlaneTilt,
+  ShieldCheck,
+  Trash,
+  WifiHigh,
+} from '@grace-booth/ui';
 import { useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -75,6 +75,11 @@ function jobLabel(job: UploadJobSummary): string {
   return job.state.replaceAll('_', ' ');
 }
 
+function sentenceCase(value: string): string {
+  const normalized = value.replaceAll('_', ' ');
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 type AdminSettingsProps = {
   busy?: boolean;
   error?: string | null;
@@ -117,6 +122,7 @@ export function AdminSettings({
   settings,
   status,
 }: AdminSettingsProps) {
+  const [googleFormsUrl, setGoogleFormsUrl] = useState(settings.googleFormsUrl ?? '');
   const [lanEnabled, setLanEnabled] = useState(settings.lan.enabled);
   const [lanBindHost, setLanBindHost] = useState(settings.lan.bindHost);
   const [lanPort, setLanPort] = useState(String(settings.lan.port));
@@ -267,7 +273,9 @@ export function AdminSettings({
       if (res.ok) {
         setAvailableAlbums(res.data);
         if (res.data.length === 0) {
-          setGoogleFeedback('No albums found in your Google Photos library. Use "Create & Select" above to make one.');
+          setGoogleFeedback(
+            'No albums found in your Google Photos library. Use "Create & Select" above to make one.',
+          );
         } else {
           setGoogleFeedback(`Loaded ${res.data.length} album(s) from Google Photos.`);
         }
@@ -287,7 +295,9 @@ export function AdminSettings({
     try {
       const res = await bridge.admin.syncGooglePhotosNow();
       if (res.ok) {
-        setGoogleFeedback(`Sync complete: ${res.data.succeeded} uploaded, ${res.data.failed} failed (${res.data.processed} processed).`);
+        setGoogleFeedback(
+          `Sync complete: ${res.data.succeeded} uploaded, ${res.data.failed} failed (${res.data.processed} processed).`,
+        );
         onRefresh();
       } else {
         setGoogleFeedback(`Sync operation failed: ${res.error.message}`);
@@ -323,7 +333,9 @@ export function AdminSettings({
   };
 
   const handleConnectGoogleOAuth = () => {
-    const baseUrl = supabaseUrl ? supabaseUrl.replace(/\/$/, '') : 'https://bejgkclvsfbkpkflftxu.supabase.co';
+    const baseUrl = supabaseUrl
+      ? supabaseUrl.replace(/\/$/, '')
+      : 'https://bejgkclvsfbkpkflftxu.supabase.co';
     const authUrl = `${baseUrl}/functions/v1/google-photos-auth`;
 
     const bridge = window.graceBooth;
@@ -446,8 +458,35 @@ export function AdminSettings({
       setLocalError('LAN port must be between 1024 and 65535.');
       return;
     }
+    const trimmedUrl = googleFormsUrl.trim();
+    let validatedUrl: string | null = null;
+    if (trimmedUrl.length > 0) {
+      if (trimmedUrl.length > 2048) {
+        setLocalError('Join a ministry URL must not exceed 2048 characters.');
+        return;
+      }
+      try {
+        const parsed = new URL(trimmedUrl);
+        if (
+          parsed.protocol !== 'https:' ||
+          parsed.username !== '' ||
+          parsed.password !== '' ||
+          (parsed.port !== '' && parsed.port !== '443') ||
+          parsed.hostname.length === 0
+        ) {
+          setLocalError(
+            'Join a ministry URL must be a valid HTTPS URL without credentials or custom ports.',
+          );
+          return;
+        }
+        validatedUrl = parsed.toString();
+      } catch {
+        setLocalError('Join a ministry URL must be a valid HTTPS URL.');
+        return;
+      }
+    }
     onSaveSettings({
-      googleFormsUrl: settings.googleFormsUrl,
+      googleFormsUrl: validatedUrl,
       lanEnabled,
       lanBindHost,
       lanPort: parsedPort,
@@ -512,7 +551,7 @@ export function AdminSettings({
       <header className="admin-page-header admin-page-header--settings">
         <div>
           <h1 data-screen-heading tabIndex={-1}>
-            SETTINGS &amp; TELEMETRY
+            Settings and health
           </h1>
           <p>Hardware diagnostics, network interfaces, cloud persistence, and access tokens.</p>
         </div>
@@ -556,624 +595,768 @@ export function AdminSettings({
             <TabsTab value="queue">Upload Queue</TabsTab>
           </TabsList>
 
-        <TabsPanel className="settings-tabs__panel" value="overview">
-
-        <section className="settings-section" aria-labelledby="health-title">
-          <div className="settings-section__heading">
-            <h2 id="health-title">SYSTEM HEALTH &amp; SUBSYSTEMS</h2>
-            <p>
-              Live diagnostics across optical hardware, database, encrypted storage, and cloud
-              gateway.
-            </p>
-          </div>
-          <div className="health-grid">
-            {(Object.keys(HEALTH_ICONS) as (keyof typeof HEALTH_ICONS)[]).map((key) => {
-              const Icon = HEALTH_ICONS[key];
-              const service = health?.[key];
-              const state = service?.state ?? 'unavailable';
-              return (
-                <article className="health-card" key={key}>
-                  <Icon aria-hidden="true" weight="bold" />
-                  <div>
-                    <strong>{key.toUpperCase()}</strong>
-                    <span className={`health-state health-state--${state}`}>
-                      {state.toUpperCase()}
-                    </span>
-                  </div>
-                  <p>{service?.message ?? 'Subsystem telemetry offline.'}</p>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="camera-settings-title">
-          <div className="settings-section__heading">
-            <h2 id="camera-settings-title">OPTICAL CAPTURE HARDWARE</h2>
-            <p>Active optical device configuration and diagnostic test pattern feed.</p>
-          </div>
-          <div className="settings-card camera-settings-card">
-            <div className="camera-settings-card__info">
-              <div>
-                <strong>Active Source: </strong>
-                <span className="camera-adapter-tag">
-                  {settings.cameraAdapter === 'sony'
-                    ? 'Sony A7 Mirrorless'
-                    : settings.cameraAdapter === 'mock'
-                      ? 'Mock Camera'
-                      : 'Laptop / Internal Webcam'}
-                </span>
-              </div>
-              {settings.cameraDeviceId && (
-                <div className="camera-device-id-text">
-                  <small>Device ID: {settings.cameraDeviceId}</small>
-                </div>
-              )}
-              <div className="camera-device-id-text">
-                <small>Resolution: {settings.cameraResolution}</small>
-              </div>
-            </div>
-            {onOpenCameras && (
-              <Button
-                icon={<Camera aria-hidden="true" weight="bold" />}
-                onClick={onOpenCameras}
-                variant="secondary"
-              >
-                Configure Camera &amp; Test Feed
-              </Button>
-            )}
-          </div>
-        </section>
-
-          <article className="settings-card retention-card">
-            <div className="settings-card__title">
-              <FileLock aria-hidden="true" weight="bold" />
-              <div><h2>Retention</h2><p>Locked privacy windows for every guest photo.</p></div>
-            </div>
-            <div className="retention-values">
-              <div><strong>{settings.cloudRetentionDays}</strong><span>days in cloud storage</span></div>
-              <div><strong>{settings.localRetentionDays}</strong><span>days on this booth</span></div>
-            </div>
-            <p><LockKey aria-hidden="true" weight="bold" /> Retention periods cannot be changed from the booth.</p>
-          </article>
-        </TabsPanel>
-
-        <TabsPanel className="settings-tabs__panel" value="network">
-          <Form className="settings-card settings-form" noValidate onSubmit={saveSettings}>
-            <div className="settings-card__title">
-              <LinkSimple aria-hidden="true" weight="bold" />
-              <div>
-                <h2>Network &amp; delivery</h2>
-                <p>Configure local network access for kiosk operations.</p>
-              </div>
-            </div>
-            <Fieldset className="lan-fieldset">
-              <FieldsetLegend>Trusted network access</FieldsetLegend>
-              <label className="switch-row">
-                <span>
-                  <strong>Allow LAN admin access</strong>
-                  <small>Off by default. Enable only on a trusted private network.</small>
-                </span>
-                <Switch
-                  checked={lanEnabled}
-                  onCheckedChange={setLanEnabled}
-                />
-              </label>
-              <div className="two-field-grid">
-                <Field name="lan-bind-host">
-                  <FieldLabel>Bind address</FieldLabel>
-                  <Input
-                    disabled={!lanEnabled}
-                    onChange={(event) => setLanBindHost(event.target.value)}
-                    type="text"
-                    value={lanBindHost}
-                  />
-                </Field>
-                <Field invalid={Boolean(localError?.includes('port'))} name="lan-port">
-                  <FieldLabel>Port</FieldLabel>
-                  <Input
-                    disabled={!lanEnabled}
-                    onChange={(event) => setLanPort(event.target.value)}
-                    type="number"
-                    value={lanPort}
-                  />
-                  <FieldError>{localError?.includes('port') ? localError : null}</FieldError>
-                </Field>
-              </div>
-              <p className="certificate-state">
-                <ShieldCheck aria-hidden="true" weight="bold" />
-                {settings.lan.tlsConfigured
-                  ? 'TLS certificate configured'
-                  : 'TLS certificate required before LAN access'}
-              </p>
-              <Field name="certificate-passphrase">
-                <FieldLabel>Certificate passphrase</FieldLabel>
-                <div className="certificate-actions">
-                <Input
-                  autoComplete="new-password"
-                  onChange={(event) => setCertificatePassphrase(event.target.value)}
-                  placeholder="Used once to import the certificate"
-                  type="password"
-                  value={certificatePassphrase}
-                />
-                <Button
-                  disabled={busy}
-                  icon={<FileLock aria-hidden="true" weight="bold" />}
-                  onClick={chooseCertificate}
-                  variant="secondary"
-                >
-                  Choose certificate
-                </Button>
-                </div>
-                <FieldDescription>Used once to import the protected certificate.</FieldDescription>
-              </Field>
-            </Fieldset>
-            <Button
-              icon={<CheckCircle aria-hidden="true" weight="bold" />}
-              loading={busy}
-              type="submit"
-            >
-              Save settings
-            </Button>
-          </Form>
-        </TabsPanel>
-
-        <TabsPanel className="settings-tabs__panel" value="displays">
-          <Form className="settings-card settings-form" onSubmit={handleSaveDualDisplay}>
-            <div className="settings-card__title">
-              <Desktop aria-hidden="true" weight="bold" />
-              <div>
-                <h2>Dual-Monitor Setup</h2>
+          <TabsPanel className="settings-tabs__panel" value="overview">
+            <section className="settings-section" aria-labelledby="health-title">
+              <div className="settings-section__heading">
+                <h2 id="health-title">System health</h2>
                 <p>
-                  Configure Screen 1 (Capture) and Screen 2 (QR Delivery) monitors ({displays.length}{' '}
-                  detected).
+                  Live diagnostics across optical hardware, database, encrypted storage, and cloud
+                  gateway.
                 </p>
               </div>
-            </div>
-            <Field name="dual-mode">
-            <FieldLabel>Dual display mode</FieldLabel>
-            <Select
-              items={[{label:'Auto (Enabled when 2 monitors connected)',value:'auto'},{label:'Force Enabled',value:'enabled'},{label:'Disabled (Single Monitor Only)',value:'disabled'}]}
-              value={dualMode}
-              onValueChange={(value) => value !== null && setDualMode(value)}
-            >
-              <SelectTrigger aria-label="Dual display mode"><SelectValue /></SelectTrigger>
-              <SelectPopup>{(['auto','enabled','disabled'] as const).map((value) => <SelectItem key={value} value={value}>{value === 'auto' ? 'Auto (Enabled when 2 monitors connected)' : value === 'enabled' ? 'Force Enabled' : 'Disabled (Single Monitor Only)'}</SelectItem>)}</SelectPopup>
-            </Select>
-            </Field>
-            <Field name="qr-timeout">
-            <FieldLabel>QR auto-dismiss duration</FieldLabel>
-            <Select
-              items={[30,45,60,90].map((value) => ({ label: `${value} seconds`, value }))}
-              value={qrDismissSeconds}
-              onValueChange={(value) => value !== null && setQrDismissSeconds(value)}
-            >
-              <SelectTrigger aria-label="QR auto-dismiss duration"><SelectValue /></SelectTrigger>
-              <SelectPopup>{[30,45,60,90].map((value) => <SelectItem key={value} value={value}>{value} seconds{value === 45 ? ' (Default)' : ''}</SelectItem>)}</SelectPopup>
-            </Select>
-            </Field>
-            <div className="two-field-grid">
-              <Button
-                icon={<ArrowsLeftRight aria-hidden="true" weight="bold" />}
-                loading={busy}
-                onClick={handleSwap}
-                type="button"
-                variant="secondary"
-              >
-                Swap Displays
-              </Button>
+              <div className="health-grid">
+                {(Object.keys(HEALTH_ICONS) as (keyof typeof HEALTH_ICONS)[]).map((key) => {
+                  const Icon = HEALTH_ICONS[key];
+                  const service = health?.[key];
+                  const state = service?.state ?? 'unavailable';
+                  return (
+                    <article className="health-card" key={key}>
+                      <Icon aria-hidden="true" weight="bold" />
+                      <div>
+                        <strong>{sentenceCase(key)}</strong>
+                        <span className={`health-state health-state--${state}`}>
+                          {sentenceCase(state)}
+                        </span>
+                      </div>
+                      <p>{service?.message ?? 'Subsystem telemetry offline.'}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="settings-section" aria-labelledby="camera-settings-title">
+              <div className="settings-section__heading">
+                <h2 id="camera-settings-title">Capture hardware</h2>
+                <p>Active optical device configuration and diagnostic test pattern feed.</p>
+              </div>
+              <div className="settings-card camera-settings-card">
+                <div className="camera-settings-card__info">
+                  <div>
+                    <strong>Active source: </strong>
+                    <span className="camera-adapter-tag">
+                      {settings.cameraAdapter === 'sony'
+                        ? 'Sony A7 Mirrorless'
+                        : settings.cameraAdapter === 'mock'
+                          ? 'Mock Camera'
+                          : 'Laptop / Internal Webcam'}
+                    </span>
+                  </div>
+                  {settings.cameraDeviceId && (
+                    <div className="camera-device-id-text">
+                      <small>Device ID: {settings.cameraDeviceId}</small>
+                    </div>
+                  )}
+                  <div className="camera-device-id-text">
+                    <small>Resolution: {settings.cameraResolution}</small>
+                  </div>
+                </div>
+                {onOpenCameras && (
+                  <Button
+                    icon={<Camera aria-hidden="true" weight="bold" />}
+                    onClick={onOpenCameras}
+                    variant="secondary"
+                  >
+                    Configure camera and test feed
+                  </Button>
+                )}
+              </div>
+            </section>
+
+            <article className="settings-card retention-card">
+              <div className="settings-card__title">
+                <FileLock aria-hidden="true" weight="bold" />
+                <div>
+                  <h2>Retention</h2>
+                  <p>Locked privacy windows for every guest photo.</p>
+                </div>
+              </div>
+              <div className="retention-values">
+                <div>
+                  <strong>{settings.cloudRetentionDays}</strong>
+                  <span>days in cloud storage</span>
+                </div>
+                <div>
+                  <strong>{settings.localRetentionDays}</strong>
+                  <span>days on this booth</span>
+                </div>
+              </div>
+              <p>
+                <LockKey aria-hidden="true" weight="bold" /> Retention periods cannot be changed
+                from the booth.
+              </p>
+            </article>
+          </TabsPanel>
+
+          <TabsPanel className="settings-tabs__panel" value="network">
+            <Form className="settings-card settings-form" noValidate onSubmit={saveSettings}>
+              <div className="settings-card__title">
+                <LinkSimple aria-hidden="true" weight="bold" />
+                <div>
+                  <h2>Network &amp; delivery</h2>
+                  <p>Configure local network access for kiosk operations.</p>
+                </div>
+              </div>
+              <Fieldset className="lan-fieldset">
+                <FieldsetLegend>Trusted network access</FieldsetLegend>
+                <label className="switch-row">
+                  <span>
+                    <strong>Allow LAN admin access</strong>
+                    <small>Off by default. Enable only on a trusted private network.</small>
+                  </span>
+                  <Switch checked={lanEnabled} onCheckedChange={setLanEnabled} />
+                </label>
+                <div className="two-field-grid">
+                  <Field name="lan-bind-host">
+                    <FieldLabel>Bind address</FieldLabel>
+                    <Input
+                      disabled={!lanEnabled}
+                      onChange={(event) => setLanBindHost(event.target.value)}
+                      type="text"
+                      value={lanBindHost}
+                    />
+                  </Field>
+                  <Field invalid={Boolean(localError?.includes('port'))} name="lan-port">
+                    <FieldLabel>Port</FieldLabel>
+                    <Input
+                      disabled={!lanEnabled}
+                      onChange={(event) => setLanPort(event.target.value)}
+                      type="number"
+                      value={lanPort}
+                    />
+                    <FieldError>{localError?.includes('port') ? localError : null}</FieldError>
+                  </Field>
+                </div>
+                <p className="certificate-state">
+                  <ShieldCheck aria-hidden="true" weight="bold" />
+                  {settings.lan.tlsConfigured
+                    ? 'TLS certificate configured'
+                    : 'TLS certificate required before LAN access'}
+                </p>
+                <Field name="certificate-passphrase">
+                  <FieldLabel>Certificate passphrase</FieldLabel>
+                  <div className="certificate-actions">
+                    <Input
+                      autoComplete="new-password"
+                      onChange={(event) => setCertificatePassphrase(event.target.value)}
+                      placeholder="Used once to import the certificate"
+                      type="password"
+                      value={certificatePassphrase}
+                    />
+                    <Button
+                      disabled={busy}
+                      icon={<FileLock aria-hidden="true" weight="bold" />}
+                      onClick={chooseCertificate}
+                      variant="secondary"
+                    >
+                      Choose certificate
+                    </Button>
+                  </div>
+                  <FieldDescription>
+                    Used once to import the protected certificate.
+                  </FieldDescription>
+                </Field>
+              </Fieldset>
+              <Fieldset className="lan-fieldset">
+                <FieldsetLegend>Ministry recruitment</FieldsetLegend>
+                <Field invalid={Boolean(localError?.includes('Ministry'))} name="google-forms-url">
+                  <FieldLabel>Join a ministry URL</FieldLabel>
+                  <Input
+                    onChange={(event) => setGoogleFormsUrl(event.target.value)}
+                    placeholder="https://volunteer-management.ccf.org.ph/recruitment/form"
+                    type="url"
+                    value={googleFormsUrl}
+                  />
+                  <FieldDescription>
+                    Destination URL for the &quot;Join a ministry&quot; link on guest download pages
+                    (must be HTTPS). Leave blank for default.
+                  </FieldDescription>
+                  {localError?.includes('Ministry') ? <FieldError>{localError}</FieldError> : null}
+                </Field>
+              </Fieldset>
               <Button
                 icon={<CheckCircle aria-hidden="true" weight="bold" />}
                 loading={busy}
                 type="submit"
               >
-                Save Display
+                Save settings
               </Button>
-            </div>
-          </Form>
-        </TabsPanel>
+            </Form>
+          </TabsPanel>
 
-        <TabsPanel className="settings-tabs__panel" value="google">
-          <Form className="settings-card settings-form" onSubmit={handleSaveGooglePhotos}>
-            <div className="settings-card__title">
-              <Images aria-hidden="true" weight="bold" />
-              <div>
-                <h2>Google Photos Shared Album Sync</h2>
-                <p>Live stream completed photo strips into an active Google Photos shared album.</p>
-              </div>
-            </div>
-
-            <Field className="form-toggle" name="google-photos-enabled">
-              <label className="switch-row">
-                <span><strong>Enable Google Photos live sync</strong><small>Send completed strips to the configured shared album.</small></span>
-                <Switch
-                  checked={googlePhotosEnabled}
-                  onCheckedChange={setGooglePhotosEnabled}
-                />
-              </label>
-            </Field>
-
-            <label>Google Account Authorization</label>
-            <div className="two-field-grid">
-              {googlePhotosEmail ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', padding: '0.5rem 0.75rem', color: '#4ade80' }}>
-                  <CheckCircle aria-hidden="true" weight="bold" />
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{googlePhotosEmail}</span>
+          <TabsPanel className="settings-tabs__panel" value="displays">
+            <Form className="settings-card settings-form" onSubmit={handleSaveDualDisplay}>
+              <div className="settings-card__title">
+                <Desktop aria-hidden="true" weight="bold" />
+                <div>
+                  <h2>Dual-Monitor Setup</h2>
+                  <p>
+                    Configure Screen 1 (Capture) and Screen 2 (QR Delivery) monitors (
+                    {displays.length} detected).
+                  </p>
                 </div>
-              ) : (
+              </div>
+              <Field name="dual-mode">
+                <FieldLabel>Dual display mode</FieldLabel>
+                <Select
+                  items={[
+                    { label: 'Auto (Enabled when 2 monitors connected)', value: 'auto' },
+                    { label: 'Force Enabled', value: 'enabled' },
+                    { label: 'Disabled (Single Monitor Only)', value: 'disabled' },
+                  ]}
+                  value={dualMode}
+                  onValueChange={(value) => value !== null && setDualMode(value)}
+                >
+                  <SelectTrigger aria-label="Dual display mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {(['auto', 'enabled', 'disabled'] as const).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value === 'auto'
+                          ? 'Auto (Enabled when 2 monitors connected)'
+                          : value === 'enabled'
+                            ? 'Force Enabled'
+                            : 'Disabled (Single Monitor Only)'}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </Field>
+              <Field name="qr-timeout">
+                <FieldLabel>QR auto-dismiss duration</FieldLabel>
+                <Select
+                  items={[30, 45, 60, 90].map((value) => ({ label: `${value} seconds`, value }))}
+                  value={qrDismissSeconds}
+                  onValueChange={(value) => value !== null && setQrDismissSeconds(value)}
+                >
+                  <SelectTrigger aria-label="QR auto-dismiss duration">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {[30, 45, 60, 90].map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value} seconds{value === 45 ? ' (Default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </Field>
+              <div className="two-field-grid">
                 <Button
-                  icon={<Cloud aria-hidden="true" weight="bold" />}
-                  onClick={handleConnectGoogleOAuth}
+                  icon={<ArrowsLeftRight aria-hidden="true" weight="bold" />}
+                  loading={busy}
+                  onClick={handleSwap}
                   type="button"
                   variant="secondary"
                 >
-                  Authorize Google Account
+                  Swap Displays
                 </Button>
-              )}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Button
+                  icon={<CheckCircle aria-hidden="true" weight="bold" />}
+                  loading={busy}
+                  type="submit"
+                >
+                  Save Display
+                </Button>
+              </div>
+            </Form>
+          </TabsPanel>
+
+          <TabsPanel className="settings-tabs__panel" value="google">
+            <Form className="settings-card settings-form" onSubmit={handleSaveGooglePhotos}>
+              <div className="settings-card__title">
+                <Images aria-hidden="true" weight="bold" />
+                <div>
+                  <h2>Google Photos Shared Album Sync</h2>
+                  <p>
+                    Live stream completed photo strips into an active Google Photos shared album.
+                  </p>
+                </div>
+              </div>
+
+              <Field className="form-toggle" name="google-photos-enabled">
+                <label className="switch-row">
+                  <span>
+                    <strong>Enable Google Photos live sync</strong>
+                    <small>Send completed strips to the configured shared album.</small>
+                  </span>
+                  <Switch checked={googlePhotosEnabled} onCheckedChange={setGooglePhotosEnabled} />
+                </label>
+              </Field>
+
+              <label>Google Account Authorization</label>
+              <div className="two-field-grid">
                 {googlePhotosEmail ? (
-                  <>
-                    <Button
-                      icon={<Trash aria-hidden="true" weight="bold" />}
-                      onClick={handleDisconnectGoogle}
-                      type="button"
-                      variant="secondary"
-                    >
-                      Disconnect
-                    </Button>
-                    {!hasRefreshToken ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: 'rgba(34, 197, 94, 0.1)',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      borderRadius: '6px',
+                      padding: '0.5rem 0.75rem',
+                      color: '#4ade80',
+                    }}
+                  >
+                    <CheckCircle aria-hidden="true" weight="bold" />
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+                      {googlePhotosEmail}
+                    </span>
+                  </div>
+                ) : (
+                  <Button
+                    icon={<Cloud aria-hidden="true" weight="bold" />}
+                    onClick={handleConnectGoogleOAuth}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Authorize Google Account
+                  </Button>
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {googlePhotosEmail ? (
+                    <>
                       <Button
-                        icon={<Cloud aria-hidden="true" weight="bold" />}
-                        onClick={handleConnectGoogleOAuth}
+                        icon={<Trash aria-hidden="true" weight="bold" />}
+                        onClick={handleDisconnectGoogle}
                         type="button"
+                        variant="secondary"
                       >
-                        Re-authorize
+                        Disconnect
                       </Button>
-                    ) : null}
-                  </>
-                ) : null}
-                <Button
-                  icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
-                  onClick={fetchGoogleStatus}
-                  type="button"
-                  variant="secondary"
-                >
-                  Check Auth Status
-                </Button>
+                      {!hasRefreshToken ? (
+                        <Button
+                          icon={<Cloud aria-hidden="true" weight="bold" />}
+                          onClick={handleConnectGoogleOAuth}
+                          type="button"
+                        >
+                          Re-authorize
+                        </Button>
+                      ) : null}
+                    </>
+                  ) : null}
+                  <Button
+                    icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                    onClick={fetchGoogleStatus}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Check Auth Status
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            {!hasCredentials ? (
-              <Alert variant="error" style={{ marginTop: '0.5rem' }}>
-                Google OAuth secrets are missing in Supabase Edge Functions. Please set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> in Supabase Secrets.
+              {!hasCredentials ? (
+                <Alert variant="error" style={{ marginTop: '0.5rem' }}>
+                  Google OAuth secrets are missing in Supabase Edge Functions. Please set{' '}
+                  <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> in Supabase
+                  Secrets.
+                </Alert>
+              ) : null}
+
+              {googlePhotosEmail && !hasRefreshToken ? (
+                <Alert variant="error" style={{ marginTop: '0.5rem' }}>
+                  Offline background sync permissions are missing. Please click{' '}
+                  <strong>Re-authorize</strong> and make sure to grant all Photos permissions.
+                </Alert>
+              ) : null}
+
+              <Field name="create-new-album">
+                <FieldLabel>Create new shared event album (Recommended)</FieldLabel>
+                <div className="two-field-grid">
+                  <Input
+                    type="text"
+                    placeholder="e.g. Celebration 2026"
+                    value={newAlbumTitle}
+                    onChange={(e) => setNewAlbumTitle(e.target.value)}
+                  />
+                  <Button
+                    icon={<Images aria-hidden="true" weight="bold" />}
+                    onClick={handleCreateAlbum}
+                    type="button"
+                  >
+                    Create &amp; Select
+                  </Button>
+                </div>
+                <FieldDescription>
+                  Creates a dedicated shared album on Google Photos and sets it as the live sync
+                  target.
+                </FieldDescription>
+              </Field>
+
+              <Alert variant="info" style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>
+                <strong>Google Photos Integration Policy:</strong> Google Photos API requires the
+                shared album to be created through the Photobooth so that captured photos can be
+                automatically streamed into it during the event.
               </Alert>
-            ) : null}
 
-            {googlePhotosEmail && !hasRefreshToken ? (
-              <Alert variant="error" style={{ marginTop: '0.5rem' }}>
-                Offline background sync permissions are missing. Please click <strong>Re-authorize</strong> and make sure to grant all Photos permissions.
-              </Alert>
-            ) : null}
-
-            <Field name="create-new-album">
-              <FieldLabel>Create new shared event album (Recommended)</FieldLabel>
-              <div className="two-field-grid">
-                <Input
-                  type="text"
-                  placeholder="e.g. Ministry Fair 2026"
-                  value={newAlbumTitle}
-                  onChange={(e) => setNewAlbumTitle(e.target.value)}
-                />
-                <Button
-                  icon={<Images aria-hidden="true" weight="bold" />}
-                  onClick={handleCreateAlbum}
-                  type="button"
-                >
-                  Create &amp; Select
-                </Button>
-              </div>
-              <FieldDescription>
-                Creates a dedicated shared album on Google Photos and sets it as the live sync target.
-              </FieldDescription>
-            </Field>
-
-            <Alert variant="info" style={{ marginTop: '0.25rem', fontSize: '0.85rem' }}>
-              <strong>Google Photos Integration Policy:</strong> Google Photos API requires the shared album to be created through the Photobooth so that captured photos can be automatically streamed into it during the event.
-            </Alert>
-
-            <Field name="google-album-url">
-              <FieldLabel>Or link existing photobooth-created shared album URL / ID</FieldLabel>
-              <div className="two-field-grid">
-                <Input
-                  type="text"
-                  placeholder="https://photos.app.goo.gl/..."
-                  value={googlePhotosShareUrl}
-                  onChange={(e) => setGooglePhotosShareUrl(e.target.value)}
-                />
-                <Button
-                  icon={<LinkSimple aria-hidden="true" weight="bold" />}
-                  onClick={handleResolveAlbum}
-                  type="button"
-                  variant="secondary"
-                >
-                  Resolve Link
-                </Button>
-              </div>
-            </Field>
-
-            {availableAlbums.length > 0 ? (
-              <Field name="select-existing-album">
-                <FieldLabel>Pick from your Google Photos albums</FieldLabel>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '140px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '6px' }}>
-                  {availableAlbums.map((alb) => (
-                    <button
-                      key={alb.id}
-                      type="button"
-                      onClick={() => {
-                        setGooglePhotosAlbumId(alb.id);
-                        setGooglePhotosAlbumTitle(alb.title);
-                        if (alb.shareUrl) setGooglePhotosShareUrl(alb.shareUrl);
-                        setGoogleFeedback(`Selected album: ${alb.title}`);
-                      }}
-                      style={{
-                        textAlign: 'left',
-                        padding: '0.4rem 0.6rem',
-                        background: googlePhotosAlbumId === alb.id ? 'rgba(163, 94, 71, 0.25)' : 'transparent',
-                        border: googlePhotosAlbumId === alb.id ? '1px solid #A35E47' : '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '4px',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      <strong>{alb.title}</strong> {alb.shareUrl ? <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({alb.shareUrl})</span> : null}
-                    </button>
-                  ))}
+              <Field name="google-album-url">
+                <FieldLabel>Or link existing photobooth-created shared album URL / ID</FieldLabel>
+                <div className="two-field-grid">
+                  <Input
+                    type="text"
+                    placeholder="https://photos.app.goo.gl/..."
+                    value={googlePhotosShareUrl}
+                    onChange={(e) => setGooglePhotosShareUrl(e.target.value)}
+                  />
+                  <Button
+                    icon={<LinkSimple aria-hidden="true" weight="bold" />}
+                    onClick={handleResolveAlbum}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Resolve Link
+                  </Button>
                 </div>
               </Field>
-            ) : (
-              <div style={{ marginTop: '0.25rem' }}>
-                <Button
-                  icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
-                  onClick={handleLoadAlbums}
-                  type="button"
-                  variant="secondary"
+
+              {availableAlbums.length > 0 ? (
+                <Field name="select-existing-album">
+                  <FieldLabel>Pick from your Google Photos albums</FieldLabel>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      maxHeight: '140px',
+                      overflowY: 'auto',
+                      background: 'rgba(0,0,0,0.2)',
+                      padding: '0.5rem',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    {availableAlbums.map((alb) => (
+                      <button
+                        key={alb.id}
+                        type="button"
+                        onClick={() => {
+                          setGooglePhotosAlbumId(alb.id);
+                          setGooglePhotosAlbumTitle(alb.title);
+                          if (alb.shareUrl) setGooglePhotosShareUrl(alb.shareUrl);
+                          setGoogleFeedback(`Selected album: ${alb.title}`);
+                        }}
+                        style={{
+                          textAlign: 'left',
+                          padding: '0.4rem 0.6rem',
+                          background:
+                            googlePhotosAlbumId === alb.id
+                              ? 'rgba(163, 94, 71, 0.25)'
+                              : 'transparent',
+                          border:
+                            googlePhotosAlbumId === alb.id
+                              ? '1px solid #A35E47'
+                              : '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        <strong>{alb.title}</strong>{' '}
+                        {alb.shareUrl ? (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                            ({alb.shareUrl})
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              ) : (
+                <div style={{ marginTop: '0.25rem' }}>
+                  <Button
+                    icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                    onClick={handleLoadAlbums}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Browse My Google Albums
+                  </Button>
+                </div>
+              )}
+
+              {googlePhotosAlbumTitle ? (
+                <div className="info-banner" style={{ marginTop: '0.75rem' }}>
+                  <CheckCircle aria-hidden="true" weight="bold" />
+                  <span>
+                    Active Target Album: <strong>{googlePhotosAlbumTitle}</strong>
+                  </span>
+                </div>
+              ) : null}
+
+              <div
+                className="operator-share-hub"
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '0.5rem',
+                  }}
                 >
-                  Browse My Google Albums
-                </Button>
+                  <span
+                    style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}
+                  >
+                    Sync operations and verification
+                  </span>
+                </div>
+                <div className="two-field-grid">
+                  {googlePhotosShareUrl ? (
+                    <>
+                      <Button
+                        icon={<Copy aria-hidden="true" weight="bold" />}
+                        onClick={handleCopyAlbumLink}
+                        type="button"
+                        variant="secondary"
+                      >
+                        {copiedLink ? 'Copied to Clipboard!' : 'Copy Guest Album Link'}
+                      </Button>
+                      <Button
+                        icon={<ArrowSquareOut aria-hidden="true" weight="bold" />}
+                        onClick={handleOpenAlbumInBrowser}
+                        type="button"
+                        variant="secondary"
+                      >
+                        Open in Browser
+                      </Button>
+                    </>
+                  ) : null}
+                  <Button
+                    icon={<PaperPlaneTilt aria-hidden="true" weight="bold" />}
+                    onClick={handleTestGoogleUpload}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Send Test Photo
+                  </Button>
+                  <Button
+                    icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                    onClick={handleSyncNow}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Sync Pending Now
+                  </Button>
+                </div>
               </div>
-            )}
 
-            {googlePhotosAlbumTitle ? (
-              <div className="info-banner" style={{ marginTop: '0.75rem' }}>
-                <CheckCircle aria-hidden="true" weight="bold" />
-                <span>Active Target Album: <strong>{googlePhotosAlbumTitle}</strong></span>
+              <div className="retention-values" style={{ marginTop: '1rem' }}>
+                <div>
+                  <strong>{googleStats.syncedCount}</strong>
+                  <span>Synced Strips</span>
+                </div>
+                <div>
+                  <strong>{googleStats.pendingCount}</strong>
+                  <span>Pending</span>
+                </div>
+                <div>
+                  <strong>{googleStats.failedCount}</strong>
+                  <span>Failed</span>
+                </div>
               </div>
-            ) : null}
 
-            <div className="operator-share-hub" style={{ marginTop: '1rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                  Sync Operations &amp; Verification
-                </span>
-              </div>
-              <div className="two-field-grid">
-                {googlePhotosShareUrl ? (
-                  <>
-                    <Button
-                      icon={<Copy aria-hidden="true" weight="bold" />}
-                      onClick={handleCopyAlbumLink}
-                      type="button"
-                      variant="secondary"
-                    >
-                      {copiedLink ? 'Copied to Clipboard!' : 'Copy Guest Album Link'}
-                    </Button>
-                    <Button
-                      icon={<ArrowSquareOut aria-hidden="true" weight="bold" />}
-                      onClick={handleOpenAlbumInBrowser}
-                      type="button"
-                      variant="secondary"
-                    >
-                      Open in Browser
-                    </Button>
-                  </>
-                ) : null}
-                <Button
-                  icon={<PaperPlaneTilt aria-hidden="true" weight="bold" />}
-                  onClick={handleTestGoogleUpload}
-                  type="button"
-                  variant="secondary"
+              {googleFeedback ? (
+                <p
+                  style={{
+                    fontSize: '0.9rem',
+                    color: 'var(--accent-color, #70b8ff)',
+                    margin: '0.5rem 0',
+                  }}
                 >
-                  Send Test Photo
-                </Button>
-                <Button
-                  icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
-                  onClick={handleSyncNow}
-                  type="button"
-                  variant="secondary"
-                >
-                  Sync Pending Now
-                </Button>
-              </div>
-            </div>
+                  {googleFeedback}
+                </p>
+              ) : null}
 
-            <div className="retention-values" style={{ marginTop: '1rem' }}>
-              <div>
-                <strong>{googleStats.syncedCount}</strong>
-                <span>Synced Strips</span>
-              </div>
-              <div>
-                <strong>{googleStats.pendingCount}</strong>
-                <span>Pending</span>
-              </div>
-              <div>
-                <strong>{googleStats.failedCount}</strong>
-                <span>Failed</span>
-              </div>
-            </div>
+              <Button
+                icon={<CheckCircle aria-hidden="true" weight="bold" />}
+                loading={busy}
+                type="submit"
+              >
+                Save Google Photos Config
+              </Button>
+            </Form>
+          </TabsPanel>
 
-            {googleFeedback ? (
-              <p style={{ fontSize: '0.9rem', color: 'var(--accent-color, #70b8ff)', margin: '0.5rem 0' }}>
-                {googleFeedback}
-              </p>
-            ) : null}
-
-            <Button
-              icon={<CheckCircle aria-hidden="true" weight="bold" />}
-              loading={busy}
-              type="submit"
-            >
-              Save Google Photos Config
-            </Button>
-          </Form>
-        </TabsPanel>
-
-        <TabsPanel className="settings-tabs__panel" value="queue">
-        <section className="settings-section" aria-labelledby="queue-title">
-          <div className="settings-section__heading settings-section__heading--inline">
-            <div>
-              <h2 id="queue-title">UPLOAD QUEUE &amp; RETRY BUFFER</h2>
-              <p>
-                {failedJobs.length === 0
-                  ? 'No failed uploads need attention.'
-                  : `${failedJobs.length} failed upload${failedJobs.length === 1 ? '' : 's'} need attention.`}
-              </p>
-            </div>
-            <span className="telemetry-counter">{jobs.length} RECENT JOBS</span>
-          </div>
-          <div className="upload-list">
-            {jobs.length === 0 ? (
-              <div className="empty-queue">
-                <Cloud aria-hidden="true" weight="bold" />
-                <strong>QUEUE IS CLEAR</strong>
-                <span>New completed collages will appear here while they upload.</span>
+          <TabsPanel className="settings-tabs__panel" value="queue">
+            <section className="settings-section" aria-labelledby="queue-title">
+              <div className="settings-section__heading settings-section__heading--inline">
+                <div>
+                  <h2 id="queue-title">Upload queue</h2>
+                  <p>
+                    {failedJobs.length === 0
+                      ? 'No failed uploads need attention.'
+                      : `${failedJobs.length} failed upload${failedJobs.length === 1 ? '' : 's'} need attention.`}
+                  </p>
+                </div>
+                <span className="telemetry-counter">{jobs.length} recent jobs</span>
               </div>
-            ) : (
-              jobs.map((job) => (
-                <article className="upload-job" key={job.id}>
-                  <div className="upload-job__state">
+              <div className="upload-list">
+                {jobs.length === 0 ? (
+                  <div className="empty-queue">
                     <Cloud aria-hidden="true" weight="bold" />
-                    <div>
-                      <strong>{jobLabel(job).toUpperCase()}</strong>
-                      <span>Attempt {job.attemptCount}</span>
-                    </div>
+                    <strong>The queue is clear</strong>
+                    <span>New completed collages will appear here while they upload.</span>
                   </div>
-                  <div className="upload-job__timing">
-                    <span>Updated {formatTimestamp(job.updatedAt)}</span>
-                    {job.nextAttemptAt ? (
-                      <small>Next try {formatTimestamp(job.nextAttemptAt)}</small>
-                    ) : null}
+                ) : (
+                  jobs.map((job) => (
+                    <article className="upload-job" key={job.id}>
+                      <div className="upload-job__state">
+                        <Cloud aria-hidden="true" weight="bold" />
+                        <div>
+                          <strong>{jobLabel(job)}</strong>
+                          <span>Attempt {job.attemptCount}</span>
+                        </div>
+                      </div>
+                      <div className="upload-job__timing">
+                        <span>Updated {formatTimestamp(job.updatedAt)}</span>
+                        {job.nextAttemptAt ? (
+                          <small>Next try {formatTimestamp(job.nextAttemptAt)}</small>
+                        ) : null}
+                      </div>
+                      {job.state === 'failed' ? (
+                        <Button
+                          icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                          loading={busy}
+                          onClick={() => onRetryJob?.(job.id)}
+                          variant="secondary"
+                        >
+                          Retry upload
+                        </Button>
+                      ) : (
+                        <Badge className={`job-state job-state--${job.state}`}>
+                          {jobLabel(job)}
+                        </Badge>
+                      )}
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          </TabsPanel>
+
+          <TabsPanel className="settings-tabs__panel" value="security">
+            <section
+              className="settings-section settings-section--split"
+              aria-label="Secure booth access"
+            >
+              <Form className="settings-card settings-form" noValidate onSubmit={changePasscode}>
+                <div className="settings-card__title">
+                  <Key aria-hidden="true" weight="bold" />
+                  <div>
+                    <h2>Change passcode</h2>
+                    <p>Use at least 8 characters for the shared operator passcode.</p>
                   </div>
-                  {job.state === 'failed' ? (
-                    <Button
-                      icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
-                      loading={busy}
-                      onClick={() => onRetryJob?.(job.id)}
-                      variant="secondary"
-                    >
-                      Retry upload
-                    </Button>
-                  ) : (
-                    <Badge className={`job-state job-state--${job.state}`}>{jobLabel(job)}</Badge>
-                  )}
-                </article>
-              ))
-            )}
-          </div>
-        </section>
-        </TabsPanel>
+                </div>
+                <Field name="current-passcode">
+                  <FieldLabel>Current passcode</FieldLabel>
+                  <Input
+                    autoComplete="current-password"
+                    maxLength={64}
+                    minLength={8}
+                    onChange={(event) => setCurrentPasscode(event.target.value)}
+                    type="password"
+                    value={currentPasscode}
+                  />
+                </Field>
+                <div className="two-field-grid">
+                  <Field name="new-passcode">
+                    <FieldLabel>New passcode</FieldLabel>
+                    <Input
+                      autoComplete="new-password"
+                      maxLength={64}
+                      minLength={8}
+                      onChange={(event) => setNewPasscode(event.target.value)}
+                      type="password"
+                      value={newPasscode}
+                    />
+                  </Field>
+                  <Field name="confirm-passcode">
+                    <FieldLabel>Confirm passcode</FieldLabel>
+                    <Input
+                      autoComplete="new-password"
+                      maxLength={64}
+                      minLength={8}
+                      onChange={(event) => setConfirmPasscode(event.target.value)}
+                      type="password"
+                      value={confirmPasscode}
+                    />
+                  </Field>
+                </div>
+                <Button
+                  icon={<LockKey aria-hidden="true" weight="bold" />}
+                  loading={busy}
+                  type="submit"
+                >
+                  Change passcode
+                </Button>
+              </Form>
 
-        <TabsPanel className="settings-tabs__panel" value="security">
-        <section
-          className="settings-section settings-section--split"
-          aria-label="Secure booth access"
-        >
-          <Form className="settings-card settings-form" noValidate onSubmit={changePasscode}>
-            <div className="settings-card__title">
-              <Key aria-hidden="true" weight="bold" />
-              <div>
-                <h2>Change passcode</h2>
-                <p>Use at least 8 characters for the shared operator passcode.</p>
-              </div>
-            </div>
-            <Field name="current-passcode"><FieldLabel>Current passcode</FieldLabel><Input
-              autoComplete="current-password"
-              maxLength={64}
-              minLength={8}
-              onChange={(event) => setCurrentPasscode(event.target.value)}
-              type="password"
-              value={currentPasscode}
-            /></Field>
-            <div className="two-field-grid">
-              <Field name="new-passcode"><FieldLabel>New passcode</FieldLabel><Input
-                  autoComplete="new-password"
-                  maxLength={64}
-                  minLength={8}
-                  onChange={(event) => setNewPasscode(event.target.value)}
-                  type="password"
-                  value={newPasscode}
-                /></Field>
-              <Field name="confirm-passcode"><FieldLabel>Confirm passcode</FieldLabel><Input
-                  autoComplete="new-password"
-                  maxLength={64}
-                  minLength={8}
-                  onChange={(event) => setConfirmPasscode(event.target.value)}
-                  type="password"
-                  value={confirmPasscode}
-                /></Field>
-            </div>
-            <Button
-              icon={<LockKey aria-hidden="true" weight="bold" />}
-              loading={busy}
-              type="submit"
-            >
-              Change passcode
-            </Button>
-          </Form>
-
-          <Form className="settings-card settings-form" noValidate onSubmit={connectCloud}>
-            <div className="settings-card__title">
-              <WifiHigh aria-hidden="true" weight="bold" />
-              <div>
-                <h2>Cloud connection</h2>
-                <p>Connect the dedicated booth account. Credentials are never displayed again.</p>
-              </div>
-            </div>
-            <Field name="supabase-url"><FieldLabel>Supabase project URL</FieldLabel><Input
-              onChange={(event) => setSupabaseUrl(event.target.value)}
-              placeholder="https://<project-ref>.supabase.co"
-              type="url"
-              value={supabaseUrl}
-            /></Field>
-            <Field name="supabase-key"><FieldLabel>Supabase publishable / anon key</FieldLabel><Input
-              onChange={(event) => setSupabasePublishableKey(event.target.value)}
-              placeholder="sb_publishable_... or anon key"
-              type="text"
-              value={supabasePublishableKey}
-            /></Field>
-            <Field name="booth-email"><FieldLabel>Booth account email</FieldLabel><Input
-              autoComplete="username"
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="booth@example.com"
-              type="email"
-              value={email}
-            /></Field>
-            <Field name="booth-cloud-password"><FieldLabel>Booth account password</FieldLabel><Input
-              autoComplete="current-password"
-              onChange={(event) => setCloudPassword(event.target.value)}
-              type="password"
-              value={cloudPassword}
-            /></Field>
-            <Button
-              icon={<ShieldCheck aria-hidden="true" weight="bold" />}
-              loading={busy}
-              type="submit"
-            >
-              Connect cloud
-            </Button>
-          </Form>
-        </section>
-        </TabsPanel>
+              <Form className="settings-card settings-form" noValidate onSubmit={connectCloud}>
+                <div className="settings-card__title">
+                  <WifiHigh aria-hidden="true" weight="bold" />
+                  <div>
+                    <h2>Cloud connection</h2>
+                    <p>
+                      Connect the dedicated booth account. Credentials are never displayed again.
+                    </p>
+                  </div>
+                </div>
+                <Field name="supabase-url">
+                  <FieldLabel>Supabase project URL</FieldLabel>
+                  <Input
+                    onChange={(event) => setSupabaseUrl(event.target.value)}
+                    placeholder="https://<project-ref>.supabase.co"
+                    type="url"
+                    value={supabaseUrl}
+                  />
+                </Field>
+                <Field name="supabase-key">
+                  <FieldLabel>Supabase publishable / anon key</FieldLabel>
+                  <Input
+                    onChange={(event) => setSupabasePublishableKey(event.target.value)}
+                    placeholder="sb_publishable_... or anon key"
+                    type="text"
+                    value={supabasePublishableKey}
+                  />
+                </Field>
+                <Field name="booth-email">
+                  <FieldLabel>Booth account email</FieldLabel>
+                  <Input
+                    autoComplete="username"
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="booth@example.com"
+                    type="email"
+                    value={email}
+                  />
+                </Field>
+                <Field name="booth-cloud-password">
+                  <FieldLabel>Booth account password</FieldLabel>
+                  <Input
+                    autoComplete="current-password"
+                    onChange={(event) => setCloudPassword(event.target.value)}
+                    type="password"
+                    value={cloudPassword}
+                  />
+                </Field>
+                <Button
+                  icon={<ShieldCheck aria-hidden="true" weight="bold" />}
+                  loading={busy}
+                  type="submit"
+                >
+                  Connect cloud
+                </Button>
+              </Form>
+            </section>
+          </TabsPanel>
         </Tabs>
       </div>
     </div>

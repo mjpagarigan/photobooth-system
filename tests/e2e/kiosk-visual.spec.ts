@@ -20,6 +20,18 @@ const VIEWPORTS = [
   { label: '1280x720', width: 1280, height: 720 },
 ] as const;
 
+const SECONDARY_STATES = [
+  'admin-frame-error',
+  'admin-gallery',
+  'admin-gallery-empty',
+  'admin-settings-degraded',
+  'admin-settings-error',
+  'operator-login',
+  'operator-bootstrap',
+  'operator-restart',
+  'camera-setup',
+] as const;
+
 for (const viewport of VIEWPORTS) {
   for (const state of STATES) {
     test(`${state} fits and remains accessible at ${viewport.label}`, async ({ page }) => {
@@ -143,6 +155,175 @@ for (const viewport of VIEWPORTS) {
     });
   });
 }
+
+for (const state of SECONDARY_STATES) {
+  test(`${state} remains accessible at 1366x768`, async ({ page }) => {
+    await page.setViewportSize({ width: 1_366, height: 768 });
+    await page.goto(`/?visual=${state}`);
+    await expect(page.locator('main, .admin-shell, [role="dialog"]').first()).toBeVisible();
+    await waitForVisualAssets(page);
+    await expectNoPageOverflow(page);
+
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    const seriousOrCritical = accessibility.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    );
+    expect(seriousOrCritical).toEqual([]);
+
+    await expect(page).toHaveScreenshot(`${state}-1366x768.png`, {
+      animations: 'disabled',
+      fullPage: false,
+    });
+  });
+}
+
+test('QR station active queue fits at 1920x1080', async ({ page }) => {
+  await page.setViewportSize({ width: 1_920, height: 1_080 });
+  await page.goto('/?view=qr-station&visual=qr-station-active');
+  await expect(page.getByTestId('qr-station-active')).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Please scan the QR Code beside to download the photo',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText(/Next photo replaces this in \d+s/)).toBeVisible();
+  await waitForVisualAssets(page);
+  await expectNoPageOverflow(page);
+
+  const qrSize = await page
+    .getByRole('img', { name: 'QR code for photo download' })
+    .evaluate((image) => image.getBoundingClientRect().width);
+  expect(qrSize).toBeGreaterThanOrEqual(180);
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    ),
+  ).toEqual([]);
+
+  await expect(page).toHaveScreenshot('qr-station-active-1920x1080.png', {
+    animations: 'disabled',
+    fullPage: false,
+    maxDiffPixelRatio: 0.02,
+  });
+});
+
+test('forced colors preserve visible focus and status', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await page.setViewportSize({ width: 1_366, height: 768 });
+  await page.goto('/?visual=admin-settings-degraded');
+  const firstNavigationItem = page.getByRole('button', { name: 'Frame editor' });
+  await firstNavigationItem.focus();
+  await expect(firstNavigationItem).toBeFocused();
+  const outline = await firstNavigationItem.evaluate(
+    (element) => getComputedStyle(element).outlineStyle,
+  );
+  expect(outline).not.toBe('none');
+  await expect(page.getByText('Degraded', { exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot('admin-settings-forced-colors-1366x768.png', {
+    animations: 'disabled',
+    fullPage: false,
+  });
+});
+
+test('operator settings preserve spacing, desktop upload columns, and tab scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1_366, height: 768 });
+  await page.goto('/?visual=admin-settings');
+
+  const overviewPanel = page.getByRole('tabpanel', { name: 'Overview' });
+  await expect(overviewPanel).toBeVisible();
+  expect(
+    await overviewPanel.evaluate((element) => Number.parseFloat(getComputedStyle(element).gap)),
+  ).toBeGreaterThanOrEqual(16);
+
+  await page.getByRole('tab', { name: 'Upload queue' }).click();
+  const uploadList = page.locator('.upload-list');
+  await expect(uploadList).toBeVisible();
+  const uploadLayout = await uploadList.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
+      gap: Number.parseFloat(style.gap),
+    };
+  });
+  expect(uploadLayout.columns).toBeGreaterThanOrEqual(2);
+  expect(uploadLayout.gap).toBeGreaterThanOrEqual(12);
+  await expect(page).toHaveScreenshot('admin-upload-queue-spaced-1366x768.png', {
+    animations: 'disabled',
+    fullPage: false,
+  });
+
+  for (const tabName of ['Google Photos', 'Security & Cloud'] as const) {
+    await page.getByRole('tab', { name: tabName }).click();
+    const panel = page.getByRole('tabpanel', { name: tabName });
+    await expect(panel).toBeVisible();
+    const scrollResult = await page.locator('.settings-scroll').evaluate((scrollOwner) => {
+      const style = getComputedStyle(scrollOwner);
+      const canScroll =
+        /(auto|scroll)/u.test(style.overflowY) &&
+        scrollOwner.scrollHeight > scrollOwner.clientHeight;
+      scrollOwner.scrollTop = Math.min(120, scrollOwner.scrollHeight - scrollOwner.clientHeight);
+      return { canScroll, scrollTop: scrollOwner.scrollTop };
+    });
+    expect(scrollResult.canScroll).toBe(true);
+    expect(scrollResult.scrollTop).toBeGreaterThan(0);
+  }
+
+  await expect(page).toHaveScreenshot('admin-security-scroll-1366x768.png', {
+    animations: 'disabled',
+    fullPage: false,
+  });
+});
+
+test('recent photos dialog stays within the kiosk viewport and owns its scroll', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1_366, height: 768 });
+  await page.goto('/?visual=recent-gallery');
+  await page.getByRole('button', { name: 'Recent Photos' }).click();
+  const dialog = page.getByTestId('recent-gallery');
+  await expect(dialog).toBeVisible();
+  const metrics = await dialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const grid = element.querySelector<HTMLElement>('.recent-gallery__grid');
+    return {
+      bottom: rect.bottom,
+      gridOverflowY: grid ? getComputedStyle(grid).overflowY : null,
+      height: rect.height,
+      right: rect.right,
+    };
+  });
+  expect(metrics.right).toBeLessThanOrEqual(1_350);
+  expect(metrics.bottom).toBeLessThanOrEqual(752);
+  expect(metrics.height).toBeLessThanOrEqual(736);
+  expect(metrics.gridOverflowY).toBe('auto');
+  await expect(page).toHaveScreenshot('recent-photos-bounded-1366x768.png', {
+    animations: 'disabled',
+    fullPage: false,
+  });
+});
+
+test('frame inspector groups preserve Fluent spacing', async ({ page }) => {
+  await page.setViewportSize({ width: 1_366, height: 768 });
+  await page.goto('/?visual=admin-frame');
+  const panel = page.locator('.slot-tabs [role="tabpanel"]');
+  const radioGroup = panel.getByRole('radiogroup', { name: 'Crop behavior' });
+  await expect(panel).toBeVisible();
+  await expect(radioGroup).toBeVisible();
+  expect(
+    await panel.evaluate((element) => Number.parseFloat(getComputedStyle(element).gap)),
+  ).toBeGreaterThanOrEqual(16);
+  expect(
+    await radioGroup.evaluate((element) => Number.parseFloat(getComputedStyle(element).gap)),
+  ).toBeGreaterThanOrEqual(8);
+  await expect(page).toHaveScreenshot('admin-frame-inspector-spaced-1366x768.png', {
+    animations: 'disabled',
+    fullPage: false,
+  });
+});
 
 test('reduced motion removes cosmetic rotation and shutter flash', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });

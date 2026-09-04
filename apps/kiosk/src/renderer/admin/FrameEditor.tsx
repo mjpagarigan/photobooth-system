@@ -1,13 +1,13 @@
 import {
-  ArrowCounterClockwiseIcon as ArrowCounterClockwise,
-  ArrowDownIcon as ArrowDown,
-  ArrowUpIcon as ArrowUp,
-  CropIcon as Crop,
-  FilePngIcon as FilePng,
-  FloppyDiskIcon as FloppyDisk,
-  FilmStripIcon as FilmStrip,
-  TrashIcon as Trash,
-} from '@phosphor-icons/react';
+  ArrowCounterClockwise,
+  ArrowDown,
+  ArrowUp,
+  Crop,
+  FilePng,
+  FilmStrip,
+  FloppyDisk,
+  Trash,
+} from '@grace-booth/ui';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   useLayoutEffect,
@@ -221,7 +221,7 @@ export function FrameEditor({
       <header className="admin-page-header">
         <div>
           <h1 data-screen-heading tabIndex={-1}>
-            FRAME LIBRARY
+            Frame library
           </h1>
           <p>
             Manage every collage frame available at review time and its three-photo slot geometry.
@@ -383,7 +383,7 @@ export function FrameEditor({
                         >
                           <span className="frame-slot__label">
                             <FilmStrip aria-hidden="true" weight="bold" />
-                            <span>SLOT_0{slot.slotIndex}</span>
+                            <span>Slot {slot.slotIndex}</span>
                           </span>
                         </div>
                       </Rnd>
@@ -422,7 +422,7 @@ export function FrameEditor({
                 </p>
               ) : null}
               <div className="slot-inspector__heading">
-                <span>SELECTED SLOT</span>
+                <span>Selected slot</span>
                 <h2>{selectedSlot?.name ?? 'Photo slot'}</h2>
               </div>
               <Tabs
@@ -478,7 +478,7 @@ export function FrameEditor({
                   </Fieldset>
                   <Fieldset className="slot-inspector__group">
                     <FieldsetLegend>
-                      <Crop aria-hidden="true" weight="bold" /> CROP BEHAVIOR
+                      <Crop aria-hidden="true" weight="bold" /> Crop behavior
                     </FieldsetLegend>
                     <RadioGroup
                       aria-label="Crop behavior"

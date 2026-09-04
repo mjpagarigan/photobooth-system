@@ -1,9 +1,4 @@
-import {
-  EyeIcon as Eye,
-  EyeSlashIcon as EyeSlash,
-  LockKeyIcon as LockKey,
-  XIcon as X,
-} from '@phosphor-icons/react';
+import { Eye, EyeSlash, LockKey, X } from '@grace-booth/ui';
 import { useRef, useState } from 'react';
 
 import {
@@ -18,7 +13,6 @@ import {
   DialogTitle,
   Field,
   FieldDescription,
-  FieldError,
   FieldLabel,
   Form,
   Input,
@@ -30,6 +24,7 @@ type PasscodeDialogProps = {
   error?: string | null;
   mode: 'login' | 'bootstrap' | 'restart';
   onCancel: () => void;
+  onClearError?: () => void;
   onSubmit: (passcode: string) => void;
 };
 
@@ -41,6 +36,7 @@ export function PasscodeDialog({
   error,
   mode,
   onCancel,
+  onClearError,
   onSubmit,
 }: PasscodeDialogProps) {
   const [passcode, setPasscode] = useState('');
@@ -125,7 +121,15 @@ export function PasscodeDialog({
         </DialogHeader>
         <Form className="contents" noValidate onSubmit={submit}>
           <DialogPanel className="passcode-dialog__form">
-            <Field invalid={Boolean(displayedError)} name="passcode">
+            {displayedError ? (
+              <div
+                className="form-error"
+                role="alert"
+              >
+                {displayedError}
+              </div>
+            ) : null}
+            <Field name="passcode">
               <FieldLabel>Passcode</FieldLabel>
               <div className="password-field">
                 <Input
@@ -135,7 +139,11 @@ export function PasscodeDialog({
                   id="operator-passcode"
                   maxLength={64}
                   minLength={MIN_PASSCODE_LENGTH}
-                  onChange={(event) => setPasscode(event.target.value)}
+                  onChange={(event) => {
+                    setPasscode(event.target.value);
+                    if (localError) setLocalError(null);
+                    onClearError?.();
+                  }}
                   required
                   type={showPasscode ? 'text' : 'password'}
                   value={passcode}
@@ -156,7 +164,6 @@ export function PasscodeDialog({
                 </Button>
               </div>
               <FieldDescription>Use at least {MIN_PASSCODE_LENGTH} characters.</FieldDescription>
-              {displayedError ? <FieldError match>{displayedError}</FieldError> : null}
             </Field>
             {isBootstrap ? (
               <Field name="confirmation">
@@ -166,7 +173,11 @@ export function PasscodeDialog({
                   id="operator-passcode-confirmation"
                   maxLength={64}
                   minLength={MIN_PASSCODE_LENGTH}
-                  onChange={(event) => setConfirmation(event.target.value)}
+                  onChange={(event) => {
+                    setConfirmation(event.target.value);
+                    if (localError) setLocalError(null);
+                    onClearError?.();
+                  }}
                   required
                   type={showPasscode ? 'text' : 'password'}
                   value={confirmation}
