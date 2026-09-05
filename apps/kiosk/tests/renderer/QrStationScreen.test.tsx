@@ -107,6 +107,10 @@ describe('QrStationScreen', () => {
     expect(screen.getByRole('button', { name: /recent photos/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /done/i })).toBeInTheDocument();
     expect(screen.getByAltText(/qr code for photo download/i)).toBeInTheDocument();
+    expect(document.querySelector('.photostrip--collage')).toHaveAttribute(
+      'data-media-fit',
+      'intrinsic',
+    );
     await waitFor(() => {
       expect(screen.getByText(/auto-clearing in 90s/i)).toBeInTheDocument();
     });

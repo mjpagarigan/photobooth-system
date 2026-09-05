@@ -124,6 +124,7 @@ export type StoredSession = {
   state: SessionState;
   captureRound: number;
   captureCount: number;
+  requiredShotCount: number;
   selectedOption: number;
   selectedFrameId: string | null;
   collageAssetId: string | null;
@@ -184,7 +185,7 @@ const SETTINGS_SELECT = `
 `;
 
 const SESSION_SELECT = `
-  SELECT id, state, capture_round, capture_count, selected_option, selected_frame_id,
+  SELECT id, state, capture_round, capture_count, required_shot_count, selected_option, selected_frame_id,
     collage_asset_id, cloud_photo_session_id, public_secret_ref, ready_at, expires_at,
     last_error_code, last_error_message, created_at, updated_at, completed_at,
     retention_anchor_at, cleanup_state, cleanup_started_at
@@ -585,14 +586,20 @@ export class LocalRepository {
     return frame;
   }
 
-  createSession(sessionId: string, now = Date.now()): StoredSession {
+  createSession(
+    sessionId: string,
+    now = Date.now(),
+    selectedFrameId: string | null = null,
+    requiredShotCount = 3,
+  ): StoredSession {
     this.database.raw
       .prepare(
         `INSERT INTO sessions
-          (id, state, capture_round, capture_count, retention_anchor_at, created_at, updated_at)
-        VALUES (?, 'countdown', 0, 0, ?, ?, ?)`,
+          (id, state, capture_round, capture_count, required_shot_count, selected_frame_id,
+            retention_anchor_at, created_at, updated_at)
+        VALUES (?, 'countdown', 0, 0, ?, ?, ?, ?, ?)`,
       )
-      .run(sessionId, now, now, now);
+      .run(sessionId, requiredShotCount, selectedFrameId, now, now, now);
     return this.requireSession(sessionId);
   }
 
@@ -702,27 +709,18 @@ export class LocalRepository {
       if (current.state !== 'capturing' || asset.retakeRound !== current.captureRound) {
         throw new AppError('state_conflict', 'The capture round changed unexpectedly.');
       }
-      const expectedState = reduceSessionState(
-        current.state,
-        current.captureCount < 2 ? 'capture_more' : 'capture_complete',
-      );
+      const requiredCount = current.requiredShotCount;
+      const isComplete = current.captureCount + 1 >= requiredCount;
+      const expectedState = reduceSessionState(current.state, isComplete ? 'capture_complete' : 'capture_more');
       this.insertAsset(asset);
       const result = this.database.raw
         .prepare(
-          `UPDATE sessions SET capture_count = capture_count + 1, state = 'countdown',
-            updated_at = ? WHERE id = ? AND state = 'capturing' AND capture_count < 2`,
+          `UPDATE sessions SET capture_count = capture_count + 1, state = ?,
+            updated_at = ? WHERE id = ? AND state = 'capturing' AND capture_count < ?`,
         )
-        .run(now, asset.sessionId);
-      if (result.changes === 0) {
-        const finalResult = this.database.raw
-          .prepare(
-            `UPDATE sessions SET capture_count = capture_count + 1, state = 'review',
-              updated_at = ? WHERE id = ? AND state = 'capturing' AND capture_count = 2`,
-          )
-          .run(now, asset.sessionId);
-        if (finalResult.changes !== 1) {
-          throw new AppError('state_conflict', 'The capture could not be recorded safely.');
-        }
+        .run(isComplete ? 'review' : 'countdown', now, asset.sessionId, requiredCount);
+      if (result.changes !== 1) {
+        throw new AppError('state_conflict', 'The capture could not be recorded safely.');
       }
       const saved = this.requireSession(asset.sessionId);
       if (saved.state !== expectedState)
@@ -739,7 +737,7 @@ export class LocalRepository {
       const result = this.database.raw
         .prepare(
           `UPDATE sessions SET state = 'countdown', capture_round = capture_round + 1,
-            capture_count = 0, selected_option = 1, selected_frame_id = NULL,
+            capture_count = 0, selected_option = 1,
             last_error_code = NULL, last_error_message = NULL, updated_at = ?
           WHERE id = ? AND state IN ('review', 'camera_error', 'interrupted')`,
         )
@@ -1365,13 +1363,14 @@ export class LocalRepository {
   private insertFrameSlots(frameId: string, slots: FrameLayout): void {
     const statement = this.database.raw.prepare(
       `INSERT INTO frame_slots
-        (frame_id, slot_index, name, x, y, width, height, crop_mode)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (frame_id, slot_index, z_index, name, x, y, width, height, crop_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const slot of slots) {
       statement.run(
         frameId,
         slot.slotIndex,
+        slot.zIndex,
         slot.name,
         slot.x,
         slot.y,
@@ -1417,7 +1416,7 @@ function loadFrameRows(database: BoothDatabase, suffix: string, params: unknown[
   const placeholders = rows.map(() => '?').join(',');
   const allSlots = database.raw
     .prepare(
-      `SELECT frame_id, slot_index, name, x, y, width, height, crop_mode
+      `SELECT frame_id, slot_index, z_index, name, x, y, width, height, crop_mode
       FROM frame_slots WHERE frame_id IN (${placeholders}) ORDER BY slot_index`,
     )
     .all(...rows.map((r) => String((r as Record<string, unknown>).id))) as Record<
@@ -1428,6 +1427,7 @@ function loadFrameRows(database: BoothDatabase, suffix: string, params: unknown[
     string,
     {
       slotIndex: number;
+      zIndex: number;
       name: string;
       x: number;
       y: number;
@@ -1445,6 +1445,7 @@ function loadFrameRows(database: BoothDatabase, suffix: string, params: unknown[
     }
     list.push({
       slotIndex: Number(slot.slot_index),
+      zIndex: Number(slot.z_index),
       name: String(slot.name),
       x: Number(slot.x),
       y: Number(slot.y),
@@ -1532,6 +1533,7 @@ function mapSession(row: Record<string, unknown>): StoredSession {
     state: SessionStateSchema.parse(row.state),
     captureRound: Number(row.capture_round),
     captureCount: Number(row.capture_count),
+    requiredShotCount: Math.max(1, Math.min(10, Number(row.required_shot_count ?? 3))),
     selectedOption: Number(row.selected_option ?? 1),
     selectedFrameId: nullableString(row.selected_frame_id),
     collageAssetId: nullableString(row.collage_asset_id),

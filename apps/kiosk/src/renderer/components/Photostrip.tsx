@@ -31,7 +31,7 @@ function slotStyle(slot: FrameSlot): CSSProperties {
 export function Photostrip(props: PhotostripProps) {
   if (props.variant === 'collage') {
     return (
-      <div className="photostrip photostrip--collage">
+      <div className="photostrip photostrip--collage" data-media-fit="intrinsic">
         <img
           className="photostrip__collage"
           src={props.collageUrl}
@@ -42,12 +42,17 @@ export function Photostrip(props: PhotostripProps) {
     );
   }
 
-  const slots = [...props.frame.slots].sort((left, right) => left.slotIndex - right.slotIndex);
+  const slots = [...props.frame.slots].sort((left, right) => left.zIndex - right.zIndex);
+  const aspect = props.frame.width / props.frame.height;
+  const previewStyle = {
+    '--frame-preview-aspect': aspect,
+    aspectRatio: `${props.frame.width} / ${props.frame.height}`,
+  } as CSSProperties;
 
   return (
     <div
       className="photostrip photostrip--preview"
-      style={{ aspectRatio: `${props.frame.width} / ${props.frame.height}` }}
+      style={previewStyle}
       role="group"
       aria-label={props.label}
     >

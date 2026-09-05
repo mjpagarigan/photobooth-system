@@ -7,6 +7,7 @@ type CaptureScreenProps = {
   phase: 'countdown' | 'capturing';
   secondsRemaining: number;
   shotNumber: number;
+  totalShots?: number;
   liveVideoRef?: (element: HTMLVideoElement | null) => void;
   liveStreamReady?: boolean;
 };
@@ -21,17 +22,18 @@ export function CaptureScreen({
   phase,
   secondsRemaining,
   shotNumber,
+  totalShots = 3,
   liveVideoRef,
   liveStreamReady = false,
 }: CaptureScreenProps) {
-  const safeShot = Math.max(1, Math.min(3, shotNumber));
-  const poseSuggestion = POSE_COPY[safeShot - 1];
+  const safeShot = Math.max(1, Math.min(totalShots, shotNumber));
+  const poseSuggestion = POSE_COPY[(safeShot - 1) % POSE_COPY.length];
   const countdownHint = secondsRemaining <= 3 ? 'Hold your pose' : 'Get ready';
 
   return (
     <main className="screen screen--capture" data-phase={phase} data-testid="capture-screen">
       <header className="capture-header">
-        <ProgressStepper activeStep={safeShot} />
+        <ProgressStepper activeStep={safeShot} total={totalShots} />
         <div className="camera-ready-badge" role="status">
           <CheckCircle aria-hidden="true" weight="bold" />
           <span>{liveVideoRef && !liveStreamReady ? 'Getting camera ready…' : 'Camera ready'}</span>

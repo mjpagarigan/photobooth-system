@@ -35,12 +35,13 @@ export type CropMode = z.infer<typeof CropModeSchema>;
 
 export const FrameSlotSchema = z
   .object({
-    slotIndex: z.number().int().min(1).max(3),
+    slotIndex: z.number().int().min(1).max(10),
+    zIndex: z.number().int().min(0).max(9).default(0),
     name: z.string().trim().min(1).max(40),
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
-    width: z.number().positive().max(1),
-    height: z.number().positive().max(1),
+    width: z.number().min(0.001).max(1),
+    height: z.number().min(0.001).max(1),
     cropMode: CropModeSchema,
   })
   .strict()
@@ -64,13 +65,19 @@ export type FrameSlot = z.infer<typeof FrameSlotSchema>;
 
 export const FrameLayoutSchema = z
   .array(FrameSlotSchema)
-  .length(3)
+  .min(1)
+  .max(10)
   .superRefine((slots, context) => {
     const indices = new Set(slots.map((slot) => slot.slotIndex));
-    if (indices.size !== 3 || ![1, 2, 3].every((index) => indices.has(index))) {
+    if (
+      indices.size !== slots.length ||
+      !Array.from({ length: slots.length }, (_, index) => index + 1).every((index) =>
+        indices.has(index),
+      )
+    ) {
       context.addIssue({
         code: 'custom',
-        message: 'Frame layout must contain slots 1 through 3 exactly once',
+        message: 'Frame layout must contain sequential slots starting at 1 exactly once',
       });
     }
   });
@@ -125,9 +132,19 @@ export const FrameSummarySchema = z
     mediaUrl: z.string().min(1),
     slots: FrameLayoutSchema,
     revision: z.number().int().nonnegative(),
+    active: z.boolean().optional(),
   })
   .strict();
 export type FrameSummary = z.infer<typeof FrameSummarySchema>;
+
+export const FrameImportCandidateSchema = z.object({
+  candidateId: OpaqueIdSchema,
+  suggestedName: z.string().trim().min(1).max(120),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  byteSize: z.number().int().positive(),
+}).strict();
+export type FrameImportCandidate = z.infer<typeof FrameImportCandidateSchema>;
 
 export const DualDisplayModeSchema = z.enum(['auto', 'enabled', 'disabled']);
 export type DualDisplayMode = z.infer<typeof DualDisplayModeSchema>;
@@ -258,7 +275,7 @@ export const BoothControlsSchema = z
 
 export const BoothMediaSchema = z
   .object({
-    captureUrls: z.array(z.string().min(1)).max(3),
+    captureUrls: z.array(z.string().min(1)).max(10),
     collageUrl: z.string().min(1).nullable(),
     frame: FrameSummarySchema.nullable().optional(),
     frames: z.array(FrameSummarySchema).optional(),
@@ -271,8 +288,9 @@ export const BoothSnapshotSchema = z
     screen: GuestScreenSchema,
     state: SessionStateSchema.nullable(),
     sessionId: OpaqueIdSchema.nullable(),
-    shotNumber: z.number().int().min(1).max(3).nullable(),
-    captureCount: z.number().int().min(0).max(3),
+    shotNumber: z.number().int().min(1).max(10).nullable(),
+    captureCount: z.number().int().min(0).max(10),
+    requiredShotCount: z.number().int().min(1).max(10).optional(),
     countdownEndsAt: UtcMillisSchema.nullable(),
     cameraPreviewEnabled: z.boolean(),
     media: BoothMediaSchema,

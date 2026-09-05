@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
 
 import {
   BOOTH_SNAPSHOT_EVENT,
+  FrameLayoutSchema,
   QR_STATION_EVENT,
   IpcContracts,
   type AdminSettings,
@@ -34,7 +36,7 @@ import type { UploadQueue } from '../cloud/upload-queue.js';
 import type { RecentGalleryService } from '../gallery/recent-gallery-service.js';
 import type { LocalRepository, StoredUploadJob } from '../database/repositories.js';
 import { AppError } from '../errors.js';
-import type { FrameService } from '../frame/frame-service.js';
+import { createStarterSlots, type FrameService } from '../frame/frame-service.js';
 import type { HealthService } from '../health-service.js';
 import { assertPrivateIpv4 } from '../server/network-boundary.js';
 import type { BoothWorkflow } from '../workflow/booth-workflow.js';
@@ -61,6 +63,7 @@ export type IpcDependencies = {
 
 export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   const channels: IpcChannel[] = [];
+  const pendingFrames = new Map<string, string>();
   const register = <C extends IpcChannel>(
     channel: C,
     handler: (event: IpcMainInvokeEvent, input: IpcRequest<C>) => unknown,
@@ -387,7 +390,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     requireAdmin(event);
     return dependencies.frameService.getFrameSummaries();
   });
-  register('admin:add-frame', async (event) => {
+  register('admin:choose-frame', async (event) => {
     requireAdmin(event);
     const owner = BrowserWindow.fromWebContents(event.sender);
     const dialogOptions: OpenDialogOptions = {
@@ -400,9 +403,23 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       : await dialog.showOpenDialog(dialogOptions);
     const selected = result.filePaths[0];
     if (result.canceled || !selected) return null;
+    const bytes = await readFile(selected);
+    const inspected = await dependencies.frameService.inspectFrame(bytes);
+    const candidateId = randomUUID();
+    pendingFrames.set(candidateId, selected);
+    return { candidateId, suggestedName: basename(selected, '.png'), ...inspected };
+  });
+  register('admin:add-frame', async (event, input) => {
+    requireAdmin(event);
+    const selected = pendingFrames.get(input.candidateId);
+    if (!selected) throw new AppError('frame_candidate_missing', 'Choose the PNG again.');
+    pendingFrames.delete(input.candidateId);
+    const bytes = await readFile(selected);
+    const inspected = await dependencies.frameService.inspectFrame(bytes);
     const frame = await dependencies.frameService.importFrame(
-      basename(selected, '.png'),
-      await readFile(selected),
+      input.name,
+      bytes,
+      createStarterSlots(input.shotCount, inspected.width, inspected.height),
     );
     return dependencies.frameService.toSummary(frame);
   });
@@ -431,7 +448,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       dependencies.frameService.updateLayout(
         input.frameId,
         input.name,
-        input.slots,
+        FrameLayoutSchema.parse(input.slots),
         input.expectedRevision,
       ),
     );
@@ -441,6 +458,10 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     return dependencies.frameService
       .deleteFrame(input.frameId)
       .map((frame) => dependencies.frameService.toSummary(frame));
+  });
+  register('admin:activate-frame', (event, input) => {
+    requireAdmin(event);
+    return dependencies.frameService.toSummary(dependencies.frameService.activateFrame(input.frameId));
   });
   register('admin:move-frame', (event, input) => {
     requireAdmin(event);
@@ -523,6 +544,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     }
   });
   return () => {
+    pendingFrames.clear();
     unsubscribeSnapshot();
     unsubscribeQr();
     for (const channel of channels) ipcMain.removeHandler(channel);

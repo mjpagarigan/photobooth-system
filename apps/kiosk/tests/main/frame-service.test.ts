@@ -25,7 +25,7 @@ const PACKAGED_FRAMES = {
 };
 
 describe('frame import contract', () => {
-  it('rejects a decoded transparent frame outside the supported portrait aspect', async () => {
+  it('accepts a decoded transparent square frame', async () => {
     const store = createTestStore();
     const processor = fakeProcessor(1_000, 1_000);
     const service = new FrameService(
@@ -35,16 +35,16 @@ describe('frame import contract', () => {
       processor,
     );
     try {
-      await expect(
-        service.importFrame('square', Buffer.from('png'), DEFAULT_FRAME_SLOTS),
-      ).rejects.toThrow(/1:3 vertical photobooth strip/);
-      expect(store.repository.getActiveFrame()).toBeNull();
+      const frame = await service.importFrame('square', Buffer.from('png'), DEFAULT_FRAME_SLOTS);
+      expect(frame.width).toBe(1_000);
+      expect(frame.height).toBe(1_000);
+      expect(store.repository.getActiveFrame()?.id).toBe(frame.id);
     } finally {
       store.close();
     }
   });
 
-  it('rejects the previously supported 3:2 landscape aspect', async () => {
+  it('accepts a 3:2 landscape aspect', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -53,15 +53,14 @@ describe('frame import contract', () => {
       fakeProcessor(2_700, 1_800),
     );
     try {
-      await expect(
-        service.importFrame('landscape', Buffer.from('png'), DEFAULT_FRAME_SLOTS),
-      ).rejects.toThrow(/1:3 vertical photobooth strip/);
+      const frame = await service.importFrame('landscape', Buffer.from('png'), DEFAULT_FRAME_SLOTS);
+      expect(frame.width / frame.height).toBeCloseTo(1.5);
     } finally {
       store.close();
     }
   });
 
-  it('rejects near-1:3 frames instead of stretching them into production output', async () => {
+  it('preserves near-1:3 dimensions without stretching', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -70,15 +69,15 @@ describe('frame import contract', () => {
       fakeProcessor(1_200, 3_599),
     );
     try {
-      await expect(
-        service.importFrame('near aspect', Buffer.from('png'), DEFAULT_FRAME_SLOTS),
-      ).rejects.toThrow(/exact 1:3 vertical/);
+      const frame = await service.importFrame('near aspect', Buffer.from('png'), DEFAULT_FRAME_SLOTS);
+      expect(frame.width).toBe(1_200);
+      expect(frame.height).toBe(3_599);
     } finally {
       store.close();
     }
   });
 
-  it('validates exactly three slots before persisting an accepted strip frame', async () => {
+  it('accepts one through ten sequential slots', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -87,13 +86,13 @@ describe('frame import contract', () => {
       fakeProcessor(1_200, 3_600),
     );
     try {
-      await expect(
-        service.importFrame(
-          'bad slots',
-          Buffer.from('png'),
-          DEFAULT_FRAME_SLOTS.slice(0, 2) as never,
-        ),
-      ).rejects.toThrow();
+      const twoSlot = await service.importFrame(
+        'two slots',
+        Buffer.from('png'),
+        DEFAULT_FRAME_SLOTS.slice(0, 2),
+      );
+      expect(twoSlot.slots).toHaveLength(2);
+      await expect(service.importFrame('bad slots', Buffer.from('png'), [] as never)).rejects.toThrow();
       const frame = await service.importFrame(
         'valid frame',
         Buffer.from('png'),
@@ -174,7 +173,7 @@ describe('frame import contract', () => {
     }
   });
 
-  it('soft-archives referenced frames, deletes unreferenced frames, and guards the last active frame', async () => {
+  it('archives every removed frame and guards the last visible frame', async () => {
     const store = createTestStore();
     const service = new FrameService(
       store.repository,
@@ -201,10 +200,10 @@ describe('frame import contract', () => {
       expect(archivedFrame).not.toBeNull();
       expect(archivedFrame?.archived).toBe(true);
 
-      // Deleting an unreferenced frame deletes the row and file
+      // Unreferenced frames are also archived so removal is recoverable.
       const remaining = service.deleteFrame(disposable.id);
       expect(remaining.map((frame) => frame.id)).toEqual([extra.id]);
-      expect(store.repository.getFrame(disposable.id)).toBeNull();
+      expect(store.repository.getFrame(disposable.id)?.archived).toBe(true);
 
       // Attempting to delete the last active frame must be rejected
       expect(() => service.deleteFrame(extra.id)).toThrow(/Cannot delete the only remaining active frame/i);

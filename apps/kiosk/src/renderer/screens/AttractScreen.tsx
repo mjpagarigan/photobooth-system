@@ -12,6 +12,7 @@ type AttractScreenProps = {
   onOpenCameras?: () => void;
   onOpenRecent?: () => void;
   onStart: () => void;
+  shotCount?: number;
 };
 
 export function AttractScreen({
@@ -22,6 +23,7 @@ export function AttractScreen({
   onOpenCameras,
   onOpenRecent,
   onStart,
+  shotCount = 3,
 }: AttractScreenProps) {
   const startButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -89,12 +91,12 @@ export function AttractScreen({
         <h1 id="attract-title">M.A.T. Photobooth</h1>
         <p className="attract-card__subtitle">Capture your moment</p>
         <p className="attract-card__lead">
-          Take three photos, receive your finished collage, and scan to download instantly.
+          Take {shotCount} {shotCount === 1 ? 'photo' : 'photos'}, receive your finished collage, and scan to download instantly.
         </p>
 
         <p className="attract-status" role="status">
           <CheckCircle aria-hidden="true" weight="bold" />
-          <span>3 photos · custom collage · instant private download</span>
+          <span>{shotCount} {shotCount === 1 ? 'photo' : 'photos'} · custom collage · instant private download</span>
         </p>
 
         <Button

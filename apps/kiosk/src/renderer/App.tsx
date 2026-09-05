@@ -7,6 +7,7 @@ import type {
   BoothSnapshot,
   CameraResolution,
   FrameLayout,
+  FrameImportCandidate,
   GalleryItem,
   GraceBoothBridge,
   RpcResult,
@@ -19,6 +20,7 @@ import { AdminShell } from './admin/AdminShell';
 import { FrameEditor } from './admin/FrameEditor';
 import { Button } from './components/Button';
 import { CameraSetupModal } from './components/CameraSetupModal';
+import { FrameImportDialog } from './components/FrameImportDialog';
 import { PasscodeDialog } from './components/PasscodeDialog';
 import { RecentGallery } from './components/RecentGallery';
 import { useCameraStream } from './hooks/useCameraStream';
@@ -117,6 +119,7 @@ export function App() {
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminStatus, setAdminStatus] = useState<string | null>(null);
+  const [frameImportCandidate, setFrameImportCandidate] = useState<FrameImportCandidate | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -639,9 +642,33 @@ export function App() {
     setAdminError(null);
     setAdminStatus(null);
     try {
-      const result = await bridge.admin.addFrame();
+      const selection = await bridge.admin.chooseFrame();
+      if (!selection.ok) {
+        setAdminError(adminErrorMessage(selection));
+        return;
+      }
+      if (!selection.data) return;
+      setFrameImportCandidate(selection.data);
+    } finally {
+      setAdminBusy(false);
+    }
+  }, [visualSeed]);
+
+  const confirmAddFrame = useCallback(async (name: string, shotCount: number) => {
+    if (!frameImportCandidate || visualSeed) return;
+    const bridge = getBridge();
+    if (!bridge) return;
+    setAdminBusy(true);
+    setAdminError(null);
+    try {
+      const result = await bridge.admin.addFrame({
+        candidateId: frameImportCandidate.candidateId,
+        name,
+        shotCount,
+      });
       if (result.ok) {
         if (result.data) {
+          setFrameImportCandidate(null);
           await refreshAdminData();
           setAdminStatus('Transparent frame added to the library. Review the slots, then save.');
         }
@@ -651,7 +678,7 @@ export function App() {
     } finally {
       setAdminBusy(false);
     }
-  }, [refreshAdminData, visualSeed]);
+  }, [frameImportCandidate, refreshAdminData, visualSeed]);
 
   const deleteFrame = useCallback(
     async (frameId: string) => {
@@ -673,6 +700,27 @@ export function App() {
         } else {
           setAdminError(adminErrorMessage(result));
         }
+      } finally {
+        setAdminBusy(false);
+      }
+    },
+    [refreshAdminData, visualSeed],
+  );
+
+  const activateFrame = useCallback(
+    async (frameId: string) => {
+      if (visualSeed) return;
+      const bridge = getBridge();
+      if (!bridge) return;
+      setAdminBusy(true);
+      setAdminError(null);
+      setAdminStatus(null);
+      try {
+        const result = await bridge.admin.activateFrame(frameId);
+        if (result.ok) {
+          await refreshAdminData();
+          setAdminStatus('Frame will be used for new sessions.');
+        } else setAdminError(adminErrorMessage(result));
       } finally {
         setAdminBusy(false);
       }
@@ -963,6 +1011,7 @@ export function App() {
           onOpenCameras={() => setCameraSetupOpen(true)}
           onOpenRecent={() => void openRecentGallery()}
           onStart={startGuestSession}
+          shotCount={snapshot.requiredShotCount ?? 3}
         />
       );
     }
@@ -972,7 +1021,8 @@ export function App() {
         <CaptureScreen
           phase={snapshot.screen}
           secondsRemaining={countdownSeconds}
-          shotNumber={snapshot.shotNumber ?? Math.min(3, snapshot.captureCount + 1)}
+          shotNumber={snapshot.shotNumber ?? Math.min(snapshot.requiredShotCount ?? 3, snapshot.captureCount + 1)}
+          totalShots={snapshot.requiredShotCount ?? 3}
           {...(liveCameraEnabled
             ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
             : {})}
@@ -1077,6 +1127,7 @@ export function App() {
                   error={adminError}
                   frames={adminSettings.frames ?? [adminSettings.activeFrame]}
                   onAddFrame={() => void addFrame()}
+                  onActivateFrame={(frameId) => void activateFrame(frameId)}
                   onDeleteFrame={(frameId) => void deleteFrame(frameId)}
                   onMoveFrame={(frameId, direction) => void moveFrame(frameId, direction)}
                   onSave={(frameId, name, slots, expectedRevision) =>
@@ -1146,6 +1197,14 @@ export function App() {
                 void refreshAdminData();
               }}
             />
+            {frameImportCandidate ? (
+              <FrameImportDialog
+                busy={adminBusy}
+                candidate={frameImportCandidate}
+                onCancel={() => setFrameImportCandidate(null)}
+                onConfirm={(name, shotCount) => void confirmAddFrame(name, shotCount)}
+              />
+            ) : null}
           </>
         </AnchoredToastProvider>
       </ToastProvider>

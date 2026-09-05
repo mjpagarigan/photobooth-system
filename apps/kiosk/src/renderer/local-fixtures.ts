@@ -18,6 +18,7 @@ export const LOCAL_FIXTURES = {
 export const DEFAULT_FRAME_LAYOUT = [
   {
     slotIndex: 1,
+    zIndex: 0,
     name: 'Photo 1',
     x: 0.25,
     y: 0.295556,
@@ -27,6 +28,7 @@ export const DEFAULT_FRAME_LAYOUT = [
   },
   {
     slotIndex: 2,
+    zIndex: 1,
     name: 'Photo 2',
     x: 0.138333,
     y: 0.491667,
@@ -36,6 +38,7 @@ export const DEFAULT_FRAME_LAYOUT = [
   },
   {
     slotIndex: 3,
+    zIndex: 2,
     name: 'Photo 3',
     x: 0.271667,
     y: 0.742778,
@@ -48,6 +51,7 @@ export const DEFAULT_FRAME_LAYOUT = [
 export const ANNIVERSARY_FRAME_LAYOUT = [
   {
     slotIndex: 1,
+    zIndex: 0,
     name: 'Photo 1',
     x: 0.068333,
     y: 0.28,
@@ -57,6 +61,7 @@ export const ANNIVERSARY_FRAME_LAYOUT = [
   },
   {
     slotIndex: 2,
+    zIndex: 1,
     name: 'Photo 2',
     x: 0.065,
     y: 0.487778,
@@ -66,6 +71,7 @@ export const ANNIVERSARY_FRAME_LAYOUT = [
   },
   {
     slotIndex: 3,
+    zIndex: 2,
     name: 'Photo 3',
     x: 0.068333,
     y: 0.696667,

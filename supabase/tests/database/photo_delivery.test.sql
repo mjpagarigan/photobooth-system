@@ -296,12 +296,12 @@ select throws_ok(
       1000000,
       decode(repeat('bb', 32), 'hex'),
       1200,
-      6001
+      12001
     )
   $$,
   '23514',
   'new row for relation "photo_sessions" violates check constraint "photo_sessions_image_dimensions"',
-  'dimensions above 6000 pixels remain rejected'
+  'dimensions above 12000 pixels remain rejected'
 );
 
 select is(

@@ -8,10 +8,9 @@ import { FrameLayoutSchema } from '@grace-booth/shared';
 import type { LocalRepository, StoredFrame } from '../database/repositories.js';
 import { AppError } from '../errors.js';
 import type { ImageProcessor } from '../image/image-worker-client.js';
-import { hasExactProductionStripAspect } from '../image/strip-export-config.js';
 import type { PhotoVault } from '../storage/photo-vault.js';
 
-/** 1:3 Vertical photobooth strip aspect of the CCF Alabang Ministry Fair frame (1200 x 3600 pixels). */
+/** Legacy packaged-frame aspect retained only for shipped-frame migration detection. */
 export const SUPPORTED_FRAME_ASPECT = 1 / 3;
 export const KNOWN_SHIPPED_LEGACY_HASHES = new Set([
   'a0a3dfacd86a4a458e1cf510b4a19a395cdafc1c2373863adac083b79603a2eb',
@@ -203,6 +202,26 @@ export const MAT_FRAME_NAME = 'M.A.T. 42nd Anniversary';
 export const ANNIVERSARY_FRAME_NAME = 'CCF Alabang 42nd Anniversary';
 export const DEFAULT_FRAME_NAME = MAT_FRAME_NAME;
 
+export function createStarterSlots(count: number, width: number, height: number): FrameLayout {
+  const safeCount = Math.max(1, Math.min(10, Math.trunc(count)));
+  const inset = 0.04;
+  const gutter = 0.025;
+  const columns = Math.min(safeCount, Math.max(1, Math.ceil(Math.sqrt(safeCount * (width / height)))));
+  const rows = Math.ceil(safeCount / columns);
+  const slotWidth = (1 - inset * 2 - gutter * (columns - 1)) / columns;
+  const slotHeight = (1 - inset * 2 - gutter * (rows - 1)) / rows;
+  return FrameLayoutSchema.parse(Array.from({ length: safeCount }, (_, index) => ({
+    slotIndex: index + 1,
+    zIndex: index,
+    name: `Photo ${index + 1}`,
+    x: inset + (index % columns) * (slotWidth + gutter),
+    y: inset + Math.floor(index / columns) * (slotHeight + gutter),
+    width: slotWidth,
+    height: slotHeight,
+    cropMode: 'crop-to-fill',
+  })));
+}
+
 type PackagedFramePaths = {
   option1: string;
   option2: string;
@@ -344,6 +363,11 @@ export class FrameService {
     return this.importLibraryFrame(name, bytes, slots);
   }
 
+  async inspectFrame(bytes: Uint8Array): Promise<{ width: number; height: number; byteSize: number }> {
+    const normalized = await this.imageProcessor.normalizeFramePng(bytes);
+    return { width: normalized.width, height: normalized.height, byteSize: normalized.bytes.byteLength };
+  }
+
   listFrames(): StoredFrame[] {
     return this.repository.listFrames();
   }
@@ -379,11 +403,7 @@ export class FrameService {
     return this.repository.listFrames();
   }
 
-  /**
-   * Deletes or archives a library entry. Referenced frames are soft-archived to preserve historical
-   * collage integrity, while unreferenced frames are deleted along with their vault PNG asset.
-   * Guarantees at least one active frame remains in the library.
-   */
+  /** Archives a library entry while preserving history and at least one visible active frame. */
   deleteFrame(frameId: string): StoredFrame[] {
     const frame = this.repository.getFrame(frameId);
     if (!frame || frame.archived) {
@@ -396,20 +416,20 @@ export class FrameService {
         'Cannot delete the only remaining active frame in the library.',
       );
     }
-    const usage = this.repository.countSessionsReferencingFrame(frameId);
-    const replacement = activeFrames.find((candidate) => candidate.id !== frameId);
+    const index = activeFrames.findIndex((candidate) => candidate.id === frameId);
+    const replacement = activeFrames[index + 1] ?? activeFrames[index - 1] ?? null;
     this.repository.repointFramePointer(frameId, replacement?.id ?? null);
-    if (usage > 0) {
-      this.repository.archiveFrame(frameId);
-    } else {
-      this.repository.deleteFrameRow(frameId);
-      try {
-        this.vault.delete(frame.encryptedPath);
-      } catch {
-        // The library row removal is authoritative; a missing PNG is not a deletion failure.
-      }
-    }
+    this.repository.archiveFrame(frameId);
     return this.repository.listFrames();
+  }
+
+  activateFrame(frameId: string): StoredFrame {
+    const frame = this.repository.getFrame(frameId);
+    if (!frame || frame.archived) {
+      throw new AppError('frame_missing', 'The selected frame no longer exists.');
+    }
+    this.repository.setCollageFrameId(1, frameId);
+    return frame;
   }
 
   getFrameOptions(): [StoredFrame | null, StoredFrame | null] {
@@ -418,6 +438,9 @@ export class FrameService {
   }
 
   toSummary(frame: StoredFrame): FrameSummary {
+    const slots = new Set(frame.slots.map((slot) => slot.zIndex)).size > 1
+      ? frame.slots
+      : frame.slots.map((slot) => ({ ...slot, zIndex: slot.slotIndex - 1 }));
     return {
       id: frame.id,
       name: frame.name,
@@ -425,8 +448,9 @@ export class FrameService {
       height: frame.height,
       byteSize: frame.byteSize,
       mediaUrl: `grace-booth-media://asset/${frame.id}`,
-      slots: frame.slots,
+      slots,
       revision: frame.revision,
+      active: this.repository.getSettings().activeFrameId === frame.id,
     };
   }
 
@@ -451,12 +475,6 @@ export class FrameService {
   ): Promise<StoredFrame> {
     const validatedSlots = FrameLayoutSchema.parse(slots);
     const normalized = await this.imageProcessor.normalizeFramePng(bytes);
-    if (!hasExactProductionStripAspect(normalized.width, normalized.height)) {
-      throw new AppError(
-        'frame_aspect',
-        'The frame must use an exact 1:3 vertical photobooth strip aspect.',
-      );
-    }
     const stored = this.vault.write('frames', normalized.bytes);
     const now = Date.now();
     const frame: Omit<StoredFrame, 'slots'> = {
@@ -493,12 +511,6 @@ export class FrameService {
     normalized: { bytes: Uint8Array; width: number; height: number },
     slots?: FrameLayout,
   ): StoredFrame {
-    if (!hasExactProductionStripAspect(normalized.width, normalized.height)) {
-      throw new AppError(
-        'frame_aspect',
-        'The frame must use an exact 1:3 vertical photobooth strip aspect.',
-      );
-    }
     const stored = this.vault.write('frames', normalized.bytes);
     try {
       const updated = this.repository.updateFrameArtwork(
@@ -534,12 +546,6 @@ export class FrameService {
       throw new AppError('frame_missing', 'The selected frame no longer exists.');
     }
     const normalized = await this.imageProcessor.normalizeFramePng(bytes);
-    if (!hasExactProductionStripAspect(normalized.width, normalized.height)) {
-      throw new AppError(
-        'frame_aspect',
-        'The frame must use an exact 1:3 vertical photobooth strip aspect.',
-      );
-    }
     const stored = this.vault.write('frames', normalized.bytes);
     try {
       const updated = this.repository.updateFrameArtwork(existing.id, {

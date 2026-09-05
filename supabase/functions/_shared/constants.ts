@@ -1,5 +1,4 @@
-export const MIN_LONG_EDGE_PIXELS = 2400;
-export const MAX_EDGE_PIXELS = 6000;
+export const MAX_EDGE_PIXELS = 12000;
 export const PUBLIC_TOKEN_BYTES = 32;
 export const PUBLIC_TOKEN_LENGTH = 43;
 export const SIGNED_UPLOAD_VALID_FOR_SECONDS = 7200 as const;

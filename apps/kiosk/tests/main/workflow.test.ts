@@ -625,9 +625,9 @@ describe('dual display handoff', () => {
         updatedAt: 1000,
       },
       [
-        { slotIndex: 1, name: 'Photo 1', x: 0.1, y: 0.1, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
-        { slotIndex: 2, name: 'Photo 2', x: 0.1, y: 0.4, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
-        { slotIndex: 3, name: 'Photo 3', x: 0.1, y: 0.7, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+        { slotIndex: 1, zIndex: 0, name: 'Photo 1', x: 0.1, y: 0.1, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+        { slotIndex: 2, zIndex: 1, name: 'Photo 2', x: 0.1, y: 0.4, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+        { slotIndex: 3, zIndex: 2, name: 'Photo 3', x: 0.1, y: 0.7, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
       ],
     );
 

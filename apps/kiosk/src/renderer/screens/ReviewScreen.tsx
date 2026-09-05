@@ -219,7 +219,7 @@ export function ReviewScreen({
             >
               {options.map((option, index) => (
                 <div
-                  className={`review-option-card ${selectedId === option.id ? 'is-selected' : ''}`}
+                  className={`review-option-card ${option.width >= option.height ? 'is-landscape' : 'is-portrait'} ${selectedId === option.id ? 'is-selected' : ''}`}
                   role="radio"
                   aria-checked={selectedId === option.id}
                   tabIndex={selectedId === option.id ? 0 : -1}
@@ -270,14 +270,16 @@ export function ReviewScreen({
           <div className="review-decision-card">
             <div className="capture-complete-badge">
               <CheckCircle aria-hidden="true" weight="bold" />
-              <span>All 3 photos captured</span>
+              <span>
+                All {captureUrls.length} {captureUrls.length === 1 ? 'photo' : 'photos'} captured
+              </span>
             </div>
             <h1 id="review-title" data-screen-heading ref={headingRef} tabIndex={-1}>
               Choose your collage
             </h1>
             <p className="review-copy">
-              Check your three-photo strip. Retake if you want another try, or continue to finish
-              your collage.
+              Check your {captureUrls.length}-photo collage. Retake if you want another try, or
+              continue to finish your collage.
             </p>
             <div className="review-actions">
               <Button
@@ -331,7 +333,7 @@ export function ReviewScreen({
                   <button
                     type="button"
                     key={option.id}
-                    className={`layouts-picker-tile ${isSelected ? 'is-selected' : ''}`}
+                    className={`layouts-picker-tile ${option.width >= option.height ? 'is-landscape' : 'is-portrait'} ${isSelected ? 'is-selected' : ''}`}
                     onClick={() => {
                       setSelectedRawId(option.id);
                       setLayoutsModalOpen(false);

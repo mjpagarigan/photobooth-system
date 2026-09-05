@@ -61,6 +61,7 @@ export const frameSlots = sqliteTable(
       .notNull()
       .references(() => frames.id, { onDelete: 'cascade' }),
     slotIndex: integer('slot_index').notNull(),
+    zIndex: integer('z_index').notNull().default(0),
     name: text('name').notNull(),
     x: real('x').notNull(),
     y: real('y').notNull(),
@@ -91,6 +92,7 @@ export const sessions = sqliteTable('sessions', {
   }).notNull(),
   captureRound: integer('capture_round').notNull(),
   captureCount: integer('capture_count').notNull(),
+  requiredShotCount: integer('required_shot_count').notNull().default(3),
   selectedOption: integer('selected_option').notNull().default(1),
   selectedFrameId: text('selected_frame_id'),
   collageAssetId: text('collage_asset_id'),

@@ -47,7 +47,19 @@ Deno.test('create upload schema accepts a constrained finished JPEG and standard
   assertEquals(largeStrip.action, 'create');
 });
 
-Deno.test('create upload schema rejects undersized output and unknown keys', () => {
+Deno.test('create upload schema supports arbitrary geometry up to 12000px and rejects unknown keys', () => {
+  const arbitrary = parseWithSchema(CreateOrResumeUploadSchema, {
+    action: 'create',
+    clientSessionId: uuid,
+    contentType: 'image/jpeg',
+    byteSize: 10,
+    sha256: 'a'.repeat(64),
+    width: 12000,
+    height: 300,
+    googleFormsUrl: null,
+  });
+  assertEquals(arbitrary.action, 'create');
+  assertThrows(() => CreateOrResumeUploadSchema.parse({ ...arbitrary, width: 12001 }));
   assertThrows(() =>
     parseWithSchema(CreateOrResumeUploadSchema, {
       action: 'create',

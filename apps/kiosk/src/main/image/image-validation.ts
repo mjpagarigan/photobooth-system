@@ -1,10 +1,7 @@
 import sharp, { type Metadata } from 'sharp';
 
 import { AppError } from '../errors.js';
-import {
-  hasExactProductionStripAspect,
-  PRODUCTION_STRIP_EXPORT,
-} from './strip-export-config.js';
+import { PRODUCTION_STRIP_EXPORT } from './strip-export-config.js';
 
 export const CANONICAL_FRAME_WIDTH = PRODUCTION_STRIP_EXPORT.width;
 export const CANONICAL_FRAME_HEIGHT = PRODUCTION_STRIP_EXPORT.height;
@@ -13,9 +10,9 @@ export const CANONICAL_FRAME_ASPECT = PRODUCTION_STRIP_EXPORT.aspectRatio;
 const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 export const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
-export const MAX_FRAME_BYTES = 5 * 1024 * 1024;
+export const MAX_FRAME_BYTES = 50 * 1024 * 1024;
 export const MAX_SOURCE_PIXELS = 80_000_000;
-export const MAX_FRAME_PIXELS = 25_000_000;
+export const MAX_FRAME_PIXELS = 80_000_000;
 export const MAX_EDGE = 12_000;
 
 export type ValidatedImageDimensions = { width: number; height: number };
@@ -84,23 +81,13 @@ export async function normalizeFramePng(bytes: Uint8Array): Promise<NormalizedFr
   if (metadata.format !== 'png' || !metadata.hasAlpha) {
     throw new AppError('frame_invalid', 'Choose a transparent PNG within the size limit.');
   }
-  if (!hasExactProductionStripAspect(metadata.width, metadata.height)) {
-    throw new AppError(
-      'frame_aspect',
-      'The frame must use an exact 1:3 vertical photobooth strip aspect.',
-    );
-  }
   const stats = await sharp(bytes, { limitInputPixels: MAX_FRAME_PIXELS }).stats();
   if ((stats.channels.at(-1)?.min ?? 255) >= 255) {
     throw new AppError('frame_opaque', 'The frame PNG must contain transparent pixels.');
   }
-  let pipeline = sharp(bytes, { limitInputPixels: MAX_FRAME_PIXELS }).rotate().ensureAlpha();
-  if (metadata.width !== CANONICAL_FRAME_WIDTH || metadata.height !== CANONICAL_FRAME_HEIGHT) {
-    pipeline = pipeline.resize(CANONICAL_FRAME_WIDTH, CANONICAL_FRAME_HEIGHT, {
-      fit: 'fill',
-    });
-  }
-  const normalized = await pipeline
+  const normalized = await sharp(bytes, { limitInputPixels: MAX_FRAME_PIXELS })
+    .rotate()
+    .ensureAlpha()
     .png({ compressionLevel: 9, adaptiveFiltering: false })
     .toBuffer();
   const corrected = await sharp(normalized, { limitInputPixels: MAX_FRAME_PIXELS }).metadata();

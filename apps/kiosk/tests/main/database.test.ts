@@ -98,6 +98,7 @@ describe('checked-in local migration', () => {
 
     const retaken = store.repository.startRetakeRound(sessionId, 2_000);
     expect(retaken.selectedOption).toBe(1);
-    expect(retaken.selectedFrameId).toBeNull();
+    expect(retaken.selectedFrameId).toBe(frame2Id);
+    expect(retaken.requiredShotCount).toBe(3);
   });
 });

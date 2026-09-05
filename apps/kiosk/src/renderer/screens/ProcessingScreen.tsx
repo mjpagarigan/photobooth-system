@@ -50,7 +50,7 @@ function copyForState(
 
   return {
     headline: 'Creating your collage',
-    status: message ?? 'Combining your three photos into one finished image.',
+    status: message ?? 'Combining your photos into one finished image.',
     activeStep: 1,
   };
 }

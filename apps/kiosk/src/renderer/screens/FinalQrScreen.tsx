@@ -53,17 +53,9 @@ export function FinalQrScreen({
       )}
       <div className="final-composition">
         <section className="final-result" aria-label="Your finished photo" ref={resultRef}>
-          <Photostrip
-            collageUrl={collageUrl}
-            label="Your finished three-photo strip"
-            variant="collage"
-          />
+          <Photostrip collageUrl={collageUrl} label="Your finished photo" variant="collage" />
         </section>
-        <QrPanel
-          busy={busy}
-          onDone={onDone}
-          qrImageUrl={qrImageUrl}
-        />
+        <QrPanel busy={busy} onDone={onDone} qrImageUrl={qrImageUrl} />
       </div>
     </main>
   );

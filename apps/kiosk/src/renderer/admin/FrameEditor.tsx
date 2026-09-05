@@ -47,6 +47,7 @@ import {
 
 import { Button } from '../components/Button';
 import { LOCAL_FIXTURES, mockPhotoFor } from '../local-fixtures';
+import { fitFrameWithin } from './frame-editor-layout';
 
 type FrameEditorProps = {
   busy?: boolean | undefined;
@@ -55,6 +56,7 @@ type FrameEditorProps = {
   onAddFrame: () => void;
   onDeleteFrame: (frameId: string) => void;
   onMoveFrame: (frameId: string, direction: 'up' | 'down') => void;
+  onActivateFrame?: (frameId: string) => void;
   onSave: (frameId: string, name: string, slots: FrameLayout, expectedRevision: number) => void;
   status?: string | null | undefined;
 };
@@ -70,8 +72,8 @@ type SlotDraft = {
 };
 
 function constrainSlot(slot: FrameSlot): FrameSlot {
-  const width = Math.max(0.05, Math.min(1, slot.width));
-  const height = Math.max(0.05, Math.min(1, slot.height));
+  const width = Math.max(0.001, Math.min(1, slot.width));
+  const height = Math.max(0.001, Math.min(1, slot.height));
   const x = Math.max(0, Math.min(1 - width, slot.x));
   const y = Math.max(0, Math.min(1 - height, slot.y));
   return { ...slot, x, y, width, height };
@@ -93,6 +95,7 @@ export function FrameEditor({
   onAddFrame,
   onDeleteFrame,
   onMoveFrame,
+  onActivateFrame = () => undefined,
   onSave,
   status,
 }: FrameEditorProps) {
@@ -101,6 +104,7 @@ export function FrameEditor({
   const deleteOpenerRef = useRef<HTMLElement | null>(null);
   // Name edits are scoped to the frame they started on so switching frames never leaks a draft.
   const [nameDraft, setNameDraft] = useState<{ frameId: string; value: string } | null>(null);
+  const [layerStatus, setLayerStatus] = useState<string | null>(null);
 
   const selectedFrame = useMemo(
     () => frames.find((frame) => frame.id === selectedId) ?? frames[0] ?? null,
@@ -110,9 +114,10 @@ export function FrameEditor({
   const selectFrame = (frameId: string) => {
     setSelectedId(frameId);
     setDeleteTargetId(null);
+    setLayerStatus(null);
   };
 
-  const stageRef = useRef<HTMLDivElement>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 540, height: 720 });
   const [draft, setDraft] = useState<SlotDraft | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(1);
@@ -128,7 +133,7 @@ export function FrameEditor({
       : (selectedFrame?.name ?? '');
 
   useLayoutEffect(() => {
-    const element = stageRef.current;
+    const element = stageContainerRef.current;
     if (!element) {
       return;
     }
@@ -136,7 +141,14 @@ export function FrameEditor({
     const update = () => {
       const rect = element.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        setStageSize({ width: rect.width, height: rect.height });
+        setStageSize(
+          fitFrameWithin(
+            rect.width,
+            rect.height,
+            selectedFrame?.width ?? 1,
+            selectedFrame?.height ?? 1,
+          ),
+        );
       }
     };
 
@@ -176,6 +188,61 @@ export function FrameEditor({
     if (selectedSlot) {
       updateSlot(selectedSlot.slotIndex, { cropMode });
     }
+  };
+
+  const changeSlotCount = (nextCount: number) => {
+    if (!selectedFrame || nextCount === currentSlots.length || nextCount < 1 || nextCount > 10) return;
+    if (
+      nextCount < currentSlots.length &&
+      !window.confirm(
+        `Reduce this frame to ${nextCount} shots? Slots ${nextCount + 1}–${currentSlots.length} will be removed when you save.`,
+      )
+    ) return;
+    const generated = starterSlots(nextCount, selectedFrame.width, selectedFrame.height);
+    const next = nextCount > currentSlots.length
+      ? [...currentSlots, ...generated.slice(currentSlots.length)]
+      : currentSlots.filter((slot) => slot.slotIndex <= nextCount);
+    setDraft({ frameKey, slots: next });
+    setSelectedIndex(Math.min(selectedIndex, nextCount));
+  };
+
+  const bringForward = () => {
+    if (!selectedSlot) return;
+    const ordered = [...currentSlots].sort((a, b) => a.zIndex - b.zIndex);
+    const index = ordered.findIndex((slot) => slot.slotIndex === selectedSlot.slotIndex);
+    const above = ordered[index + 1];
+    if (!above) {
+      setLayerStatus(`${selectedSlot.name} is already at the front.`);
+      return;
+    }
+    const next = currentSlots.map((slot) =>
+      slot.slotIndex === selectedSlot.slotIndex
+        ? { ...slot, zIndex: above.zIndex }
+        : slot.slotIndex === above.slotIndex
+          ? { ...slot, zIndex: selectedSlot.zIndex }
+          : slot,
+    );
+    setDraft({ frameKey, slots: next });
+    setLayerStatus(`${selectedSlot.name} moved forward.`);
+  };
+
+  const sendToBack = () => {
+    if (!selectedSlot) return;
+    if (selectedSlot.zIndex === 0) {
+      setLayerStatus(`${selectedSlot.name} is already at the back.`);
+      return;
+    }
+    const next = currentSlots.map((slot) => ({
+      ...slot,
+      zIndex:
+        slot.slotIndex === selectedSlot.slotIndex
+          ? 0
+          : slot.zIndex < selectedSlot.zIndex
+            ? slot.zIndex + 1
+            : slot.zIndex,
+    }));
+    setDraft({ frameKey, slots: next });
+    setLayerStatus(`${selectedSlot.name} was sent to the back.`);
   };
 
   const resetSelected = () => {
@@ -281,6 +348,7 @@ export function FrameEditor({
                 <span className="frame-library__meta">
                   {item.slots.length} slots · rev {item.revision}
                 </span>
+                {item.active ? <span className="status-badge status-badge--success">Active</span> : null}
               </button>
               <span className="frame-library__controls">
                 <CossButton
@@ -323,19 +391,20 @@ export function FrameEditor({
             </div>
           ))}
           <p className="frame-library__hint">
-            Add transparent PNG strips (1:3). Frames used by saved sessions cannot be deleted.
+            Add transparent PNG frames in any aspect ratio. Archived frames disappear from new sessions.
           </p>
         </aside>
 
         {selectedFrame ? (
           <>
             <section className="frame-stage-wrapper" aria-label="Visual frame layout preview">
-              <div className="frame-stage-card">
+              <div className="frame-stage-card" ref={stageContainerRef}>
                 <div
                   className="frame-stage"
-                  ref={stageRef}
                   style={{
                     aspectRatio: `${selectedFrame.width} / ${selectedFrame.height}`,
+                    width: `${stageSize.width}px`,
+                    height: `${stageSize.height}px`,
                   }}
                 >
                   {currentSlots.map((slot) => {
@@ -345,8 +414,8 @@ export function FrameEditor({
                         bounds="parent"
                         className={`frame-slot${selected ? ' is-selected' : ''}`}
                         key={slot.slotIndex}
-                        minHeight={40}
-                        minWidth={40}
+                        minWidth={Math.max(1, stageSize.width * 0.001)}
+                        minHeight={Math.max(1, stageSize.height * 0.001)}
                         onDragStart={() => setSelectedIndex(slot.slotIndex)}
                         onDragStop={(_, position) =>
                           updateSlot(slot.slotIndex, {
@@ -371,6 +440,7 @@ export function FrameEditor({
                           width: slot.width * stageSize.width,
                           height: slot.height * stageSize.height,
                         }}
+                        style={{ zIndex: slot.zIndex }}
                       >
                         <div
                           aria-label={`${slot.name} preview`}
@@ -411,6 +481,25 @@ export function FrameEditor({
                 />
                 <FieldDescription>Shown to operators and guests during review.</FieldDescription>
               </Field>
+              <Field className="slot-inspector__group" name="shot-count">
+                <FieldLabel>Shots / slots</FieldLabel>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={currentSlots.length}
+                  onChange={(event) => changeSlotCount(Number(event.target.value))}
+                />
+                <FieldDescription>Controls how many photos future sessions capture.</FieldDescription>
+              </Field>
+              <CossButton
+                disabled={busy || selectedFrame.active}
+                onClick={() => onActivateFrame(selectedFrame.id)}
+                type="button"
+                variant="secondary"
+              >
+                {selectedFrame.active ? 'Active for new sessions' : 'Use for new sessions'}
+              </CossButton>
               {status ? (
                 <p className="form-success" role="status">
                   {status}
@@ -444,6 +533,23 @@ export function FrameEditor({
                 </TabsList>
                 {selectedSlot ? (
                   <TabsPanel value={String(selectedIndex)}>
+                  <Fieldset className="slot-inspector__group slot-layer-fieldset">
+                    <FieldsetLegend>Layer order</FieldsetLegend>
+                    <p className="field-description">
+                      Layer {selectedSlot.zIndex + 1} of {currentSlots.length}. Frame artwork always stays on top.
+                    </p>
+                    <div className="slot-layer-actions">
+                      <CossButton type="button" variant="secondary" onClick={bringForward}>
+                        Bring forward
+                      </CossButton>
+                      <CossButton type="button" variant="secondary" onClick={sendToBack}>
+                        Send to back
+                      </CossButton>
+                    </div>
+                    {layerStatus ? (
+                      <p className="field-description" role="status">{layerStatus}</p>
+                    ) : null}
+                  </Fieldset>
                   <Fieldset className="slot-inspector__group">
                     <FieldsetLegend>Position &amp; scale (%)</FieldsetLegend>
                     <div className="coordinate-grid">
@@ -563,4 +669,24 @@ export function FrameEditor({
       </AlertDialog>
     </div>
   );
+}
+
+function starterSlots(count: number, width: number, height: number): FrameLayout {
+  const inset = 0.04;
+  const gutter = 0.025;
+  const aspect = width / height;
+  const columns = Math.min(count, Math.max(1, Math.ceil(Math.sqrt(count * aspect))));
+  const rows = Math.ceil(count / columns);
+  const slotWidth = (1 - inset * 2 - gutter * (columns - 1)) / columns;
+  const slotHeight = (1 - inset * 2 - gutter * (rows - 1)) / rows;
+  return Array.from({ length: count }, (_, index) => ({
+    slotIndex: index + 1,
+    zIndex: index,
+    name: `Photo ${index + 1}`,
+    x: inset + (index % columns) * (slotWidth + gutter),
+    y: inset + Math.floor(index / columns) * (slotHeight + gutter),
+    width: slotWidth,
+    height: slotHeight,
+    cropMode: 'crop-to-fill' as const,
+  }));
 }

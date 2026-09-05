@@ -65,7 +65,8 @@ export async function runNativeSelfTest(workerUrl: URL): Promise<SelfTestResult>
         framePng: frame,
         slots: [
           {
-            slotIndex: 1,
+          slotIndex: 1,
+          zIndex: 0,
             name: '1',
             x: 0,
             y: 0,
@@ -74,7 +75,8 @@ export async function runNativeSelfTest(workerUrl: URL): Promise<SelfTestResult>
             cropMode: 'crop-to-fill',
           },
           {
-            slotIndex: 2,
+          slotIndex: 2,
+          zIndex: 1,
             name: '2',
             x: 0,
             y: 1 / 3,
@@ -83,7 +85,8 @@ export async function runNativeSelfTest(workerUrl: URL): Promise<SelfTestResult>
             cropMode: 'crop-to-fill',
           },
           {
-            slotIndex: 3,
+          slotIndex: 3,
+          zIndex: 2,
             name: '3',
             x: 0,
             y: 2 / 3,
@@ -95,7 +98,7 @@ export async function runNativeSelfTest(workerUrl: URL): Promise<SelfTestResult>
         frameAspectRatio: 1 / 3,
       });
       result.worker =
-        processed.width === 1_200 && processed.height === 3_600 && processed.byteSize > 0;
+        processed.width === 120 && processed.height === 360 && processed.byteSize > 0;
     } finally {
       await worker.close();
     }

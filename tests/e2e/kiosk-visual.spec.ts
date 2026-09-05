@@ -15,6 +15,44 @@ const STATES = [
   'admin-settings',
 ] as const;
 
+test('recent photos preserve mixed frame aspect ratios in tiles and details', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/?visual=recent-gallery');
+  await page.getByRole('button', { name: 'Recent Photos' }).click();
+  const preview = page.locator('.gallery-tile__preview').first();
+  await expect(preview).toBeVisible();
+  for (const [width, height] of [
+    [1600, 900],
+    [900, 1600],
+    [1000, 1000],
+  ]) {
+    const source = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="steelblue"/></svg>`)}`;
+    await preview.evaluate(async (element, src) => {
+      const image = element as HTMLImageElement;
+      image.src = src;
+      await image.decode();
+    }, source);
+    const bounds = await preview.boundingBox();
+    expect(bounds!.width / bounds!.height).toBeCloseTo(width! / height!, 2);
+    const container = await page.locator('.gallery-tile__preview-container').first().boundingBox();
+    expect(Math.abs(container!.height - bounds!.height)).toBeLessThanOrEqual(2);
+  }
+  await page.locator('.gallery-tile__open').first().click();
+  const detail = page.locator('.recent-detail-modal__image');
+  await expect(detail).toBeVisible();
+  await detail.evaluate(async (element) => {
+    const image = element as HTMLImageElement;
+    image.src =
+      'data:image/svg+xml,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="100%" height="100%" fill="steelblue"/></svg>',
+      );
+    await image.decode();
+  });
+  const bounds = await detail.boundingBox();
+  expect(bounds!.width / bounds!.height).toBeCloseTo(16 / 9, 2);
+});
+
 const VIEWPORTS = [
   { label: '1366x768', width: 1366, height: 768 },
   { label: '1280x720', width: 1280, height: 720 },

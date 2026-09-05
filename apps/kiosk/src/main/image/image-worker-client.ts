@@ -5,7 +5,42 @@ import type { FrameLayout } from '@grace-booth/shared';
 
 import { AppError } from '../errors.js';
 import type { ImagePipelineInput, ImagePipelineResult } from './image-pipeline.js';
-import { PRODUCTION_STRIP_EXPORT } from './strip-export-config.js';
+
+const MAX_OUTPUT_EDGE = 12_000;
+const MAX_OUTPUT_PIXELS = 80_000_000;
+
+type ProcessedWorkerResult = Pick<ImagePipelineResult, 'byteSize' | 'height' | 'width'> & {
+  bytes: Uint8Array;
+};
+
+export function validateProcessedWorkerResult(
+  result: ProcessedWorkerResult,
+  expectedAspectRatio?: number,
+): void {
+  const dimensionsAreSafe =
+    Number.isSafeInteger(result.width) &&
+    Number.isSafeInteger(result.height) &&
+    result.width > 0 &&
+    result.height > 0 &&
+    result.width <= MAX_OUTPUT_EDGE &&
+    result.height <= MAX_OUTPUT_EDGE &&
+    result.width * result.height <= MAX_OUTPUT_PIXELS;
+  const aspectMatches =
+    expectedAspectRatio === undefined ||
+    (Number.isFinite(expectedAspectRatio) &&
+      Math.abs(result.width / result.height - expectedAspectRatio) <= 0.000_001);
+  if (
+    !dimensionsAreSafe ||
+    !aspectMatches ||
+    result.byteSize !== result.bytes.byteLength ||
+    result.byteSize < 1
+  ) {
+    throw new AppError(
+      'image_worker_output',
+      'The image processor returned an invalid production photo.',
+    );
+  }
+}
 
 type WorkerResult =
   | ({ kind: 'process' } & Omit<ImagePipelineResult, 'bytes'> & { bytes: Uint8Array })
@@ -17,7 +52,7 @@ type WorkerRequestMessage =
   | {
       id: string;
       operation: 'process';
-      captures: [Uint8Array, Uint8Array, Uint8Array];
+      captures: Uint8Array[];
       framePng: Uint8Array;
       slots: FrameLayout;
       frameAspectRatio?: number;
@@ -75,16 +110,12 @@ export class WorkerImageProcessor implements ImageProcessor {
       );
     }
     const id = randomUUID();
-    const captures = input.captures.map((capture) => Uint8Array.from(capture)) as [
-      Uint8Array,
-      Uint8Array,
-      Uint8Array,
-    ];
+    const captures = input.captures.map((capture) => Uint8Array.from(capture));
     const framePng = Uint8Array.from(input.framePng);
     const message: {
       id: string;
       operation: 'process';
-      captures: [Uint8Array, Uint8Array, Uint8Array];
+      captures: Uint8Array[];
       framePng: Uint8Array;
       slots: FrameLayout;
       frameAspectRatio?: number;
@@ -96,24 +127,13 @@ export class WorkerImageProcessor implements ImageProcessor {
       slots: input.slots,
       ...(input.frameAspectRatio === undefined ? {} : { frameAspectRatio: input.frameAspectRatio }),
     };
-    return this.send(message, [
-      ...captures.map((capture) => capture.buffer as ArrayBuffer),
-      framePng.buffer,
-    ]).then((result) => {
-      if (result.kind !== 'process') throw new Error('Unexpected image-worker response');
-      if (
-        result.width !== PRODUCTION_STRIP_EXPORT.width ||
-        result.height !== PRODUCTION_STRIP_EXPORT.height ||
-        result.byteSize !== result.bytes.byteLength ||
-        result.byteSize < 1
-      ) {
-        throw new AppError(
-          'image_worker_output',
-          'The image processor returned an invalid production strip.',
-        );
-      }
-      return { ...result, bytes: Buffer.from(result.bytes) };
-    });
+    return this.send(message, [...captures.map((capture) => capture.buffer), framePng.buffer]).then(
+      (result) => {
+        if (result.kind !== 'process') throw new Error('Unexpected image-worker response');
+        validateProcessedWorkerResult(result, input.frameAspectRatio);
+        return { ...result, bytes: Buffer.from(result.bytes) };
+      },
+    );
   }
 
   validateSourceJpeg(bytes: Uint8Array): Promise<{ width: number; height: number }> {

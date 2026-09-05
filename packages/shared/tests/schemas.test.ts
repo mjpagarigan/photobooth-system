@@ -111,7 +111,21 @@ describe('shared boundary schemas', () => {
     ).toThrow();
 
     expect(IpcContracts['admin:list-frames'].request.parse({})).toEqual({});
-    expect(IpcContracts['admin:add-frame'].request.parse({})).toEqual({});
+    expect(IpcContracts['admin:choose-frame'].request.parse({})).toEqual({});
+    expect(
+      IpcContracts['admin:add-frame'].request.parse({
+        candidateId: frameId,
+        name: 'Landscape frame',
+        shotCount: 1,
+      }),
+    ).toMatchObject({ candidateId: frameId, shotCount: 1 });
+    expect(() =>
+      IpcContracts['admin:add-frame'].request.parse({
+        candidateId: frameId,
+        name: 'Too many',
+        shotCount: 11,
+      }),
+    ).toThrow();
     expect(IpcContracts['admin:replace-frame-image'].request.parse({ frameId })).toEqual({ frameId });
     expect(
       IpcContracts['admin:update-frame-layout'].request.parse({

@@ -10,7 +10,7 @@ import { createThumbnailJpeg, normalizeFramePng, validateSourceJpeg } from './im
 type ProcessRequest = {
   id: string;
   operation: 'process';
-  captures: [Uint8Array, Uint8Array, Uint8Array];
+  captures: Uint8Array[];
   framePng: Uint8Array;
   slots: FrameLayout;
   frameAspectRatio?: number;

@@ -11,6 +11,7 @@ import type { AdminHealth, AdminSettings, FrameLayout, GalleryItem } from '@grac
 import { AdminSettings as AdminSettingsScreen } from '../../src/renderer/admin/AdminSettings';
 import { AdminShell } from '../../src/renderer/admin/AdminShell';
 import { FrameEditor } from '../../src/renderer/admin/FrameEditor';
+import { fitFrameWithin } from '../../src/renderer/admin/frame-editor-layout';
 import { RecentGallery } from '../../src/renderer/components/RecentGallery';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
 import { ProcessingScreen } from '../../src/renderer/screens/ProcessingScreen';
@@ -182,6 +183,40 @@ describe('guest screen components', () => {
     expect(screen.queryByText(/retake photo 1/i)).not.toBeInTheDocument();
   });
 
+  it('preserves a landscape frame aspect in the review card and layouts picker', async () => {
+    const user = userEvent.setup();
+    const landscapeFrame = {
+      ...FRAME,
+      width: 1920,
+      height: 1080,
+      slots: [{ ...FRAME.slots[0]!, slotIndex: 1, x: 0.05, y: 0.05, width: 0.9, height: 0.9 }],
+    };
+
+    render(
+      <ReviewScreen
+        canAccept
+        canRetake={false}
+        captureUrls={['/a.jpg']}
+        frames={[landscapeFrame]}
+        onAccept={() => undefined}
+        onRetake={() => undefined}
+      />,
+    );
+
+    const cardPreview = screen.getByRole('group', { name: /preview in collage option 1/i });
+    expect(screen.getByTestId('collage-option-1')).toHaveClass('is-landscape');
+    expect(cardPreview).toHaveStyle({ aspectRatio: '1920 / 1080' });
+    expect(cardPreview.style.getPropertyValue('--frame-preview-aspect')).toBe('1.7777777777777777');
+
+    await user.click(screen.getByRole('button', { name: /all layouts/i }));
+    const pickerPreview = screen.getByRole('group', {
+      name: /preview in m\.a\.t\. 42nd anniversary/i,
+    });
+    expect(pickerPreview.style.getPropertyValue('--frame-preview-aspect')).toBe(
+      '1.7777777777777777',
+    );
+  });
+
   it('renders one preview per stored frame and supports keyboard-only walkthrough', async () => {
     const user = userEvent.setup();
     const onAccept = vi.fn();
@@ -221,7 +256,7 @@ describe('guest screen components', () => {
   it('distinguishes collage processing from upload backoff without claiming readiness', () => {
     const { rerender } = render(<ProcessingScreen state="processing" />);
     expect(screen.getByText('Creating your collage')).toBeVisible();
-    expect(screen.getByText('Combining your three photos into one finished image.')).toBeVisible();
+    expect(screen.getByText('Combining your photos into one finished image.')).toBeVisible();
     expect(screen.getByTestId('processing-animation')).toBeVisible();
     expect(screen.queryByText('Photo ready')).not.toBeInTheDocument();
 
@@ -251,6 +286,38 @@ describe('FrameEditor', () => {
     onMoveFrame: vi.fn(),
     status: null,
   };
+
+  it('contains a 16:9 frame inside the available viewer without cropping or stretching', () => {
+    expect(fitFrameWithin(1000, 700, 1920, 1080)).toEqual({ width: 1000, height: 562.5 });
+    expect(fitFrameWithin(1000, 700, 1080, 1920)).toEqual({ width: 393.75, height: 700 });
+  });
+
+  it('places layer controls above position and reports one-slot boundary actions', async () => {
+    const user = userEvent.setup();
+    const oneSlotFrame = { ...FRAME, width: 1920, height: 1080, slots: [FRAME.slots[0]!] };
+    render(<FrameEditor {...baseProps} frames={[oneSlotFrame]} onSave={() => undefined} />);
+
+    const bringForward = screen.getByRole('button', { name: 'Bring forward' });
+    const positionLegend = screen.getByText('Position & scale (%)');
+    expect(
+      bringForward.compareDocumentPosition(positionLegend) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(bringForward);
+    expect(screen.getByRole('status')).toHaveTextContent('Photo 1 is already at the front.');
+    await user.click(screen.getByRole('button', { name: 'Send to back' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Photo 1 is already at the back.');
+  });
+
+  it('persists changed layer order for overlapping slots', async () => {
+    const onSave =
+      vi.fn<(frameId: string, name: string, slots: FrameLayout, revision: number) => void>();
+    const user = userEvent.setup();
+    render(<FrameEditor {...baseProps} frames={[FRAME]} onSave={onSave} />);
+    await user.click(screen.getByRole('button', { name: 'Bring forward' }));
+    await user.click(screen.getByRole('button', { name: /save configuration/i }));
+    expect(onSave.mock.calls[0]?.[2].map((slot) => slot.zIndex)).toEqual([1, 0, 2]);
+  });
 
   it('saves edited slot geometry as normalized coordinates for the selected frame', async () => {
     const onSave =

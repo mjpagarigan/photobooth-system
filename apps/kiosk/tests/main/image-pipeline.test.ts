@@ -215,7 +215,7 @@ describe('deterministic Sharp collage pipeline', () => {
     ).rejects.toThrow(/transparent/i);
   });
 
-  it('enforces exactly three captures and an exact 1:3 decoded frame', async () => {
+  it('requires one capture per slot and preserves arbitrary frame geometry', async () => {
     const pipeline = new ImagePipeline(new CenterCropStrategy());
     await expect(
       pipeline.process({
@@ -223,16 +223,16 @@ describe('deterministic Sharp collage pipeline', () => {
         framePng: fixtureFrame,
         slots: DEFAULT_FRAME_SLOTS,
       }),
-    ).rejects.toThrow(/exactly three/i);
+    ).rejects.toThrow(/exactly 3/i);
 
     const nearAspect = await transparentPng(1_200, 3_599);
-    await expect(
-      pipeline.process({
-        captures: fixturePhotos,
-        framePng: nearAspect,
-        slots: DEFAULT_FRAME_SLOTS,
-      }),
-    ).rejects.toThrow(/exact 1:3/i);
+    const result = await pipeline.process({
+      captures: fixturePhotos,
+      framePng: nearAspect,
+      slots: DEFAULT_FRAME_SLOTS,
+    });
+    expect(result.width).toBe(1_200);
+    expect(result.height).toBe(3_599);
   });
 
   it('keeps the immutable production encoder contract without a fixed byte ceiling', () => {

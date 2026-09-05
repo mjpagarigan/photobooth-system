@@ -190,7 +190,7 @@ export function QrStationScreen(): React.ReactElement {
         <section className="final-result" aria-label="Your finished photo">
           <Photostrip
             collageUrl={stationState.collageUrl}
-            label="Your finished three-photo strip"
+            label="Your finished photo"
             variant="collage"
           />
         </section>

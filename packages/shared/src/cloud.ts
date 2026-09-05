@@ -11,8 +11,8 @@ export const CreateUploadRequestSchema = z
     contentType: z.literal('image/jpeg'),
     byteSize: z.number().int().positive(),
     sha256: Sha256HexSchema,
-    width: z.number().int().min(1).max(6_000),
-    height: z.number().int().min(1).max(6_000),
+    width: z.number().int().min(1).max(12_000),
+    height: z.number().int().min(1).max(12_000),
     googleFormsUrl: OptionalGoogleFormsUrlSchema,
     /** ISO-8601 capture instant used to derive the human-readable cloud object name. */
     capturedAt: z.iso.datetime({ offset: true }).optional(),
@@ -105,8 +105,8 @@ export const PhotoRepairMetadataSchema = z
   .object({
     byteSize: z.number().int().positive(),
     sha256: Sha256HexSchema,
-    width: z.number().int().min(1).max(6_000),
-    height: z.number().int().min(1).max(6_000),
+    width: z.number().int().min(1).max(12_000),
+    height: z.number().int().min(1).max(12_000),
   })
   .strict();
 export type PhotoRepairMetadata = z.infer<typeof PhotoRepairMetadataSchema>;

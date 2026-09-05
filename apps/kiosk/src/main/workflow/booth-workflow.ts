@@ -17,11 +17,9 @@ import type { LocalRepository, NewAsset, StoredSession } from '../database/repos
 import { AppError, toSafeError } from '../errors.js';
 import type { FrameService } from '../frame/frame-service.js';
 import type { ImageProcessor } from '../image/image-worker-client.js';
-import { PRODUCTION_STRIP_EXPORT } from '../image/strip-export-config.js';
 import type { PhotoVault } from '../storage/photo-vault.js';
 import { reduceSessionState, type SessionEvent } from './session-state-machine.js';
 
-const PHOTO_COUNT = 3;
 const MAX_CAPTURE_BYTES = 50 * 1024 * 1024;
 const CANCELLABLE_STATES: readonly SessionState[] = ['countdown', 'capturing', 'review'];
 
@@ -46,11 +44,11 @@ export class BoothWorkflow {
     message: null,
     canRetryUpload: false,
   };
-  private readonly qrStationQueue: Array<{
+  private readonly qrStationQueue: {
     sessionId: string;
     collageUrl: string | null;
     qrImageUrl: string;
-  }> = [];
+  }[] = [];
   private qrDismissTimer: NodeJS.Timeout | null = null;
   private activeSessionId: string | null = null;
   private countdownEndsAt: number | null = null;
@@ -81,7 +79,8 @@ export class BoothWorkflow {
 
   async initialize(): Promise<void> {
     await this.frameService.ensureDefaultFrames();
-    await this.frameService.ensureMinistryFrames?.();
+    await (this.frameService as Partial<Pick<FrameService, 'ensureMinistryFrames'>>)
+      .ensureMinistryFrames?.();
     const recovered = this.repository.getLatestIncompleteSession();
     this.activeSessionId = recovered?.id ?? null;
     try {
@@ -98,7 +97,10 @@ export class BoothWorkflow {
       const uploadJob = this.repository.getUploadJobForSession(recovered.id);
       if (recovered.collageAssetId && uploadJob) {
         this.transition(recovered, 'resume_upload', {}, this.now());
-      } else if (recovered.captureCount === PHOTO_COUNT && currentCaptures.length === PHOTO_COUNT) {
+      } else if (
+        recovered.captureCount === requiredShotCount(recovered) &&
+        currentCaptures.length === requiredShotCount(recovered)
+      ) {
         this.transition(recovered, 'resume_processing', {}, this.now());
         void this.processCollage(recovered.id);
       } else {
@@ -202,7 +204,8 @@ export class BoothWorkflow {
   getSnapshot(): BoothSnapshot {
     const cameraPreviewEnabled = this.options.cameraPreviewEnabled ?? false;
     const session = this.activeSessionId ? this.repository.getSession(this.activeSessionId) : null;
-    if (!session || session.state === 'attract') return attractSnapshot(cameraPreviewEnabled);
+    if (!session || session.state === 'attract')
+      return attractSnapshot(cameraPreviewEnabled, this.repository.getActiveFrame()?.slots.length ?? 3);
     const assets = this.repository.listCurrentAssets(session.id);
     const captures = assets
       .filter((asset) => asset.kind === 'capture')
@@ -214,28 +217,30 @@ export class BoothWorkflow {
     const selectedFrame = session.selectedFrameId
       ? (this.repository.getFrame(session.selectedFrameId) ?? null)
       : this.repository.getActiveFrame();
+    const shotCount = session.requiredShotCount;
     return {
       screen: screenFor(session.state, qrImageUrl !== null),
       state: session.state,
       sessionId: session.id,
       shotNumber:
         session.state === 'countdown' || session.state === 'capturing'
-          ? Math.min(PHOTO_COUNT, session.captureCount + 1)
+          ? Math.min(shotCount, session.captureCount + 1)
           : null,
       captureCount: session.captureCount,
+      requiredShotCount: shotCount,
       countdownEndsAt: session.state === 'countdown' ? this.countdownEndsAt : null,
       cameraPreviewEnabled,
       media: {
         captureUrls: captures.map((asset) => mediaUrl(asset.id)),
         collageUrl: collage ? mediaUrl(collage.id) : null,
         frame: selectedFrame ? this.frameService.toSummary(selectedFrame) : null,
-        frames: this.frameService.getFrameSummaries(),
+        frames: this.frameService.getFrameSummaries().filter((frame) => frame.slots.length === shotCount),
         qrImageUrl,
       },
       controls: {
         canStart: false,
         canRetakeAll: session.state === 'review',
-        canAcceptPhotos: session.state === 'review' && session.captureCount === PHOTO_COUNT,
+        canAcceptPhotos: session.state === 'review' && session.captureCount === shotCount,
         canRetryUpload: session.state === 'upload_failed',
         canFinishOffline:
           session.state === 'upload_failed' ||
@@ -259,7 +264,13 @@ export class BoothWorkflow {
         throw new AppError('session_active', 'A photo session is already in progress.');
       }
     }
-    const session = this.repository.createSession(randomUUID(), this.now());
+    const activeFrame = this.repository.getActiveFrame();
+    const session = this.repository.createSession(
+      randomUUID(),
+      this.now(),
+      activeFrame?.id ?? null,
+      activeFrame?.slots.length ?? 3,
+    );
     if (reduceSessionState('attract', 'start') !== session.state) {
       throw new AppError('state_conflict', 'The new session state is invalid.');
     }
@@ -279,12 +290,15 @@ export class BoothWorkflow {
 
   acceptPhotos(frameId: string): BoothSnapshot {
     const session = this.requireActive();
-    if (session.state !== 'review' || session.captureCount !== PHOTO_COUNT) {
-      throw new AppError('review_incomplete', 'Three photos are required before processing.');
-    }
+    const lockedShotCount = requiredShotCount(session);
+    if (session.state !== 'review' || session.captureCount !== lockedShotCount)
+      throw new AppError('review_incomplete', `${lockedShotCount} photos are required before processing.`);
     const chosenFrame = this.repository.getFrame(frameId);
     if (!chosenFrame) {
       throw new AppError('frame_missing', 'The selected photo frame is missing.');
+    }
+    if (chosenFrame.archived || chosenFrame.slots.length !== lockedShotCount) {
+      throw new AppError('frame_incompatible', 'Choose a visible frame with the same number of slots.');
     }
     this.transition(
       session,
@@ -304,7 +318,7 @@ export class BoothWorkflow {
     }
     void this.processCollage(session.id);
     return dualActive
-      ? attractSnapshot(this.options.cameraPreviewEnabled ?? false)
+      ? attractSnapshot(this.options.cameraPreviewEnabled ?? false, this.repository.getActiveFrame()?.slots.length ?? 3)
       : this.getSnapshot();
   }
 
@@ -340,7 +354,7 @@ export class BoothWorkflow {
     this.qrBySession.delete(session.id);
     this.activeSessionId = null;
     this.emit();
-    return attractSnapshot(this.options.cameraPreviewEnabled ?? false);
+    return attractSnapshot(this.options.cameraPreviewEnabled ?? false, this.repository.getActiveFrame()?.slots.length ?? 3);
   }
 
   /**
@@ -405,8 +419,9 @@ export class BoothWorkflow {
     if (session.state !== 'countdown')
       throw new AppError('state_conflict', 'Countdown cannot start now.');
     if (this.countdownTimer) clearTimeout(this.countdownTimer);
-    const shotNumber = Math.min(PHOTO_COUNT, session.captureCount + 1);
-    const durationMs = this.options.shotCountdownsMs[shotNumber - 1];
+    const shotCount = requiredShotCount(session);
+    const shotNumber = Math.min(shotCount, session.captureCount + 1);
+    const durationMs = this.options.shotCountdownsMs[shotNumber - 1] ?? this.options.shotCountdownsMs.at(-1);
     if (durationMs === undefined) {
       throw new AppError('state_conflict', 'Countdown cannot start now.');
     }
@@ -479,14 +494,11 @@ export class BoothWorkflow {
         .listCurrentAssets(sessionId)
         .filter((asset) => asset.kind === 'capture')
         .sort((left, right) => (left.shotNumber ?? 0) - (right.shotNumber ?? 0));
-      if (assets.length !== PHOTO_COUNT)
-        throw new AppError('capture_count', 'Three photos are required.');
-      const captures = assets.map((asset) => this.vault.read(asset.encryptedPath)) as [
-        Buffer,
-        Buffer,
-        Buffer,
-      ];
       const session = this.repository.requireSession(sessionId);
+      const shotCount = requiredShotCount(session);
+      if (assets.length !== shotCount)
+        throw new AppError('capture_count', `${shotCount} photos are required.`);
+      const captures = assets.map((asset) => this.vault.read(asset.encryptedPath));
       const frame =
         (session.selectedFrameId ? this.repository.getFrame(session.selectedFrameId) : null) ??
         this.repository.getActiveFrame();
@@ -498,15 +510,10 @@ export class BoothWorkflow {
         slots: frame.slots,
         frameAspectRatio: frame.width / frame.height,
       });
-      if (
-        result.width !== PRODUCTION_STRIP_EXPORT.width ||
-        result.height !== PRODUCTION_STRIP_EXPORT.height ||
-        result.byteSize !== result.bytes.byteLength ||
-        result.byteSize < 1
-      ) {
+      if (result.byteSize !== result.bytes.byteLength || result.byteSize < 1) {
         throw new AppError(
           'output_validation',
-          'The finished strip did not match the required 1200 × 3600 export.',
+          'The finished photo could not be validated.',
         );
       }
       const stored = this.vault.write('completed', result.bytes);
@@ -705,13 +712,14 @@ export class BoothWorkflow {
   }
 }
 
-function attractSnapshot(cameraPreviewEnabled: boolean): BoothSnapshot {
+function attractSnapshot(cameraPreviewEnabled: boolean, requiredShotCount = 3): BoothSnapshot {
   return {
     screen: 'attract',
     state: null,
     sessionId: null,
     shotNumber: null,
     captureCount: 0,
+    requiredShotCount,
     countdownEndsAt: null,
     cameraPreviewEnabled,
     media: { captureUrls: [], collageUrl: null, qrImageUrl: null },
@@ -776,6 +784,10 @@ function messageFor(session: StoredSession): string | null {
 
 function mediaUrl(identifier: string): string {
   return `grace-booth-media://asset/${identifier}`;
+}
+
+function requiredShotCount(session: StoredSession): number {
+  return session.requiredShotCount;
 }
 
 async function captureBytes(result: CaptureResult): Promise<Buffer> {

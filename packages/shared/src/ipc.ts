@@ -16,6 +16,7 @@ import {
   DualDisplaySettingsSchema,
   EmptyResponseSchema,
   FrameLayoutSchema,
+  FrameImportCandidateSchema,
   FrameSummarySchema,
   GalleryItemSchema,
   GalleryCloudRepairResultSchema,
@@ -34,6 +35,7 @@ import {
   type DualDisplaySettings,
   type EmptyResponse,
   type FrameLayout,
+  type FrameImportCandidate,
   type FrameSummary,
   type GalleryItem,
   type GalleryCloudRepairResult,
@@ -259,8 +261,16 @@ export const IpcContracts = {
     request: EmptyRequestSchema,
     response: rpcResultSchema(z.array(FrameSummarySchema)),
   },
-  'admin:add-frame': {
+  'admin:choose-frame': {
     request: EmptyRequestSchema,
+    response: rpcResultSchema(FrameImportCandidateSchema.nullable()),
+  },
+  'admin:add-frame': {
+    request: z.object({
+      candidateId: OpaqueIdSchema,
+      name: z.string().trim().min(1).max(120),
+      shotCount: z.number().int().min(1).max(10),
+    }).strict(),
     response: rpcResultSchema(FrameSummarySchema.nullable()),
   },
   'admin:replace-frame-image': {
@@ -281,6 +291,10 @@ export const IpcContracts = {
   'admin:delete-frame': {
     request: z.object({ frameId: OpaqueIdSchema }).strict(),
     response: rpcResultSchema(z.array(FrameSummarySchema)),
+  },
+  'admin:activate-frame': {
+    request: z.object({ frameId: OpaqueIdSchema }).strict(),
+    response: rpcResultSchema(FrameSummarySchema),
   },
   'admin:move-frame': {
     request: z
@@ -418,7 +432,8 @@ export type GraceBoothBridge = {
     swapDisplays(): Promise<RpcResult<DisplayInfo[]>>;
     saveDualDisplaySettings(input: DualDisplaySettings): Promise<RpcResult<DualDisplaySettings>>;
     listFrames(): Promise<RpcResult<FrameSummary[]>>;
-    addFrame(): Promise<RpcResult<FrameSummary | null>>;
+    chooseFrame(): Promise<RpcResult<FrameImportCandidate | null>>;
+    addFrame(input: { candidateId: string; name: string; shotCount: number }): Promise<RpcResult<FrameSummary | null>>;
     replaceFrameImage(input: { frameId: string }): Promise<RpcResult<FrameSummary | null>>;
     updateFrameLayout(input: {
       frameId: string;
@@ -427,6 +442,7 @@ export type GraceBoothBridge = {
       expectedRevision: number;
     }): Promise<RpcResult<FrameSummary>>;
     deleteFrame(frameId: string): Promise<RpcResult<FrameSummary[]>>;
+    activateFrame(frameId: string): Promise<RpcResult<FrameSummary>>;
     moveFrame(input: {
       frameId: string;
       direction: 'up' | 'down';

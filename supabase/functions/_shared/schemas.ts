@@ -1,7 +1,6 @@
 import { z } from 'npm:zod@4.4.3';
 import {
   MAX_EDGE_PIXELS,
-  MIN_LONG_EDGE_PIXELS,
   PUBLIC_TOKEN_PATTERN,
   SHA256_HEX_PATTERN,
 } from './constants.ts';
@@ -38,18 +37,7 @@ const CreateUploadSchema = z
     // defensively and falls back to the current UTC time when absent or malformed.
     capturedAt: z.string().max(64).optional(),
   })
-  .strict()
-  .superRefine((value, context) => {
-    if (Math.max(value.width, value.height) < MIN_LONG_EDGE_PIXELS) {
-      context.addIssue({
-        code: 'custom',
-        path: ['width'],
-        message: `The finished image long edge must be at least ${
-          String(MIN_LONG_EDGE_PIXELS)
-        } pixels`,
-      });
-    }
-  });
+  .strict();
 
 const ResumeUploadSchema = z
   .object({ action: z.literal('resume'), photoSessionId: z.uuid() })
