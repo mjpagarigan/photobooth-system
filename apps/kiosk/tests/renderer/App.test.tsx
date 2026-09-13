@@ -46,6 +46,7 @@ const FRAME_2 = {
 
 const SETTINGS: AdminSettings = {
   googleFormsUrl: null,
+  recruitmentButtonText: 'Join a ministry',
   localRetentionDays: 60,
   cloudRetentionDays: 30,
   lan: {
@@ -59,6 +60,7 @@ const SETTINGS: AdminSettings = {
   cameraAdapter: 'webcam',
   cameraDeviceId: null,
   cameraResolution: '1080p',
+  webcamAlwaysActive: false,
   supabaseUrl: null,
   supabasePublishableKey: null,
   dualDisplay: {
@@ -144,6 +146,7 @@ function createBridge(
   cameraAdapter: CameraAdapterKind = 'mock',
   cameraDeviceId: string | null = null,
   cameraResolution: CameraResolution = '1080p',
+  webcamAlwaysActive = false,
 ): BridgeHarness {
   let listener: ((snapshot: BoothSnapshot) => void) | null = null;
   const startMock = vi.fn<GraceBoothBridge['booth']['start']>().mockResolvedValue(
@@ -188,6 +191,7 @@ function createBridge(
           adapter: cameraAdapter,
           deviceId: cameraDeviceId,
           resolution: cameraResolution,
+          alwaysActive: webcamAlwaysActive,
           status: {
             adapter: cameraAdapter,
             state: 'ready' as const,
@@ -203,6 +207,7 @@ function createBridge(
           adapter: 'webcam' as const,
           deviceId: null,
           resolution: '1080p' as const,
+          alwaysActive: false,
           status: {
             adapter: 'webcam' as const,
             state: 'ready' as const,
@@ -251,9 +256,9 @@ function createBridge(
     },
     gallery: {
       getRecent: getRecentMock,
-      repairCloudPhoto: vi.fn().mockResolvedValue(
-        ok({ status: 'repaired' as const, message: 'Cloud copy repaired.' }),
-      ),
+      repairCloudPhoto: vi
+        .fn()
+        .mockResolvedValue(ok({ status: 'repaired' as const, message: 'Cloud copy repaired.' })),
     },
     admin: {
       getAuthStatus: getAuthStatusMock,
@@ -269,19 +274,45 @@ function createBridge(
       saveSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
       getDisplays: vi.fn().mockResolvedValue(ok([])),
       swapDisplays: vi.fn().mockResolvedValue(ok([])),
-      saveDualDisplaySettings: vi.fn().mockResolvedValue(ok({ mode: 'auto', swapDisplays: false, qrDismissSeconds: 45 })),
-      getGooglePhotosStatus: vi.fn().mockResolvedValue(ok({
-        config: { connectedEmail: null, albumId: null, albumTitle: null, albumShareUrl: null, enabled: false },
-        stats: { syncedCount: 0, pendingCount: 0, failedCount: 0, lastSyncedAt: null },
-        hasRefreshToken: false,
-        hasCredentials: true,
-      })),
+      saveDualDisplaySettings: vi
+        .fn()
+        .mockResolvedValue(ok({ mode: 'auto', swapDisplays: false, qrDismissSeconds: 45 })),
+      getGooglePhotosStatus: vi.fn().mockResolvedValue(
+        ok({
+          config: {
+            connectedEmail: null,
+            albumId: null,
+            albumTitle: null,
+            albumShareUrl: null,
+            enabled: false,
+          },
+          stats: { syncedCount: 0, pendingCount: 0, failedCount: 0, lastSyncedAt: null },
+          hasRefreshToken: false,
+          hasCredentials: true,
+        }),
+      ),
       saveGooglePhotosConfig: vi.fn().mockImplementation((cfg) => Promise.resolve(ok(cfg))),
-      createGooglePhotosAlbum: vi.fn().mockResolvedValue(ok({ albumId: 'album_created_123', albumTitle: 'M.A.T. Photobooth', shareUrl: 'https://photos.app.goo.gl/created' })),
+      createGooglePhotosAlbum: vi.fn().mockResolvedValue(
+        ok({
+          albumId: 'album_created_123',
+          albumTitle: 'M.A.T. Photobooth',
+          shareUrl: 'https://photos.app.goo.gl/created',
+        }),
+      ),
       listGooglePhotosAlbums: vi.fn().mockResolvedValue(ok([])),
-      resolveGooglePhotosAlbum: vi.fn().mockResolvedValue(ok({ albumId: 'album_123', albumTitle: 'Sunday Service', shareUrl: 'https://photos.app.goo.gl/xyz' })),
+      resolveGooglePhotosAlbum: vi.fn().mockResolvedValue(
+        ok({
+          albumId: 'album_123',
+          albumTitle: 'Sunday Service',
+          shareUrl: 'https://photos.app.goo.gl/xyz',
+        }),
+      ),
       syncGooglePhotosNow: vi.fn().mockResolvedValue(ok({ processed: 0, succeeded: 0, failed: 0 })),
-      testGooglePhotosUpload: vi.fn().mockResolvedValue(ok({ success: true, message: 'Google Photos album connectivity verified successfully.' })),
+      testGooglePhotosUpload: vi
+        .fn()
+        .mockResolvedValue(
+          ok({ success: true, message: 'Google Photos album connectivity verified successfully.' }),
+        ),
       disconnectGooglePhotos: vi.fn().mockResolvedValue(ok({})),
       listFrames: vi.fn().mockResolvedValue(ok([FRAME])),
       chooseFrame: vi.fn().mockResolvedValue(ok(null)),
@@ -427,6 +458,31 @@ describe('App guest flow', () => {
     await user.click(screen.getByRole('button', { name: /start photo session/i }));
 
     expect(harness.startMock).toHaveBeenCalledOnce();
+  });
+
+  it('keeps an enabled webcam stream warm across guest screens and releases it on unmount', async () => {
+    const stream = cameraStream(1_920, 1_080);
+    const getUserMedia = vi.fn(() => Promise.resolve(stream));
+    stubCamera(getUserMedia);
+    const initial = { ...ATTRACT, cameraPreviewEnabled: true };
+    const harness = createBridge(initial, 'webcam', 'camera-1', '1080p', true);
+    window.graceBooth = harness.bridge;
+
+    const rendered = render(<App />);
+    await screen.findByTestId('attract-screen');
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({ screen: 'review', state: 'review', cameraPreviewEnabled: true }),
+      ),
+    );
+    await screen.findByTestId('review-screen');
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    expect(stream.track.stop).not.toHaveBeenCalled();
+
+    rendered.unmount();
+    expect(stream.track.stop).toHaveBeenCalledOnce();
   });
 
   it('maps review to exactly the two approved guest decisions', async () => {

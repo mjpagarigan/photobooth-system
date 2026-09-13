@@ -98,6 +98,7 @@ type AdminSettingsProps = {
   onRetryJob?: (jobId: string) => void;
   onSaveSettings: (input: {
     googleFormsUrl: string | null;
+    recruitmentButtonText: string;
     lanEnabled: boolean;
     lanBindHost: string;
     lanPort: number;
@@ -123,6 +124,9 @@ export function AdminSettings({
   status,
 }: AdminSettingsProps) {
   const [googleFormsUrl, setGoogleFormsUrl] = useState(settings.googleFormsUrl ?? '');
+  const [recruitmentButtonText, setRecruitmentButtonText] = useState(
+    settings.recruitmentButtonText,
+  );
   const [lanEnabled, setLanEnabled] = useState(settings.lan.enabled);
   const [lanBindHost, setLanBindHost] = useState(settings.lan.bindHost);
   const [lanPort, setLanPort] = useState(String(settings.lan.port));
@@ -459,6 +463,15 @@ export function AdminSettings({
       return;
     }
     const trimmedUrl = googleFormsUrl.trim();
+    const trimmedButtonText = recruitmentButtonText.trim();
+    if (
+      trimmedButtonText.length === 0 ||
+      trimmedButtonText.length > 80 ||
+      /[\r\n]/u.test(trimmedButtonText)
+    ) {
+      setLocalError('Ministry button text must be a single line containing 1–80 characters.');
+      return;
+    }
     let validatedUrl: string | null = null;
     if (trimmedUrl.length > 0) {
       if (trimmedUrl.length > 2048) {
@@ -487,6 +500,7 @@ export function AdminSettings({
     }
     onSaveSettings({
       googleFormsUrl: validatedUrl,
+      recruitmentButtonText: trimmedButtonText,
       lanEnabled,
       lanBindHost,
       lanPort: parsedPort,
@@ -759,7 +773,28 @@ export function AdminSettings({
               </Fieldset>
               <Fieldset className="lan-fieldset">
                 <FieldsetLegend>Ministry recruitment</FieldsetLegend>
-                <Field invalid={Boolean(localError?.includes('Ministry'))} name="google-forms-url">
+                <Field
+                  invalid={Boolean(localError?.includes('button text'))}
+                  name="recruitment-button-text"
+                >
+                  <FieldLabel>Recruitment button text</FieldLabel>
+                  <Input
+                    maxLength={80}
+                    onChange={(event) => setRecruitmentButtonText(event.target.value)}
+                    placeholder="Join a ministry"
+                    required
+                    type="text"
+                    value={recruitmentButtonText}
+                  />
+                  <FieldDescription>
+                    Required single-line label shown on guest download pages (maximum 80
+                    characters).
+                  </FieldDescription>
+                  {localError?.includes('button text') ? (
+                    <FieldError>{localError}</FieldError>
+                  ) : null}
+                </Field>
+                <Field invalid={Boolean(localError?.includes('URL'))} name="google-forms-url">
                   <FieldLabel>Join a ministry URL</FieldLabel>
                   <Input
                     onChange={(event) => setGoogleFormsUrl(event.target.value)}
@@ -771,7 +806,7 @@ export function AdminSettings({
                     Destination URL for the &quot;Join a ministry&quot; link on guest download pages
                     (must be HTTPS). Leave blank for default.
                   </FieldDescription>
-                  {localError?.includes('Ministry') ? <FieldError>{localError}</FieldError> : null}
+                  {localError?.includes('URL') ? <FieldError>{localError}</FieldError> : null}
                 </Field>
               </Fieldset>
               <Button

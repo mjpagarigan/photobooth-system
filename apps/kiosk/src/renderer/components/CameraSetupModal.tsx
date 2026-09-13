@@ -28,6 +28,7 @@ import {
   DialogPopup,
   DialogTitle,
   Field,
+  FieldDescription,
   FieldLabel,
   Radio,
   RadioGroup,
@@ -36,6 +37,7 @@ import {
   SelectPopup,
   SelectTrigger,
   SelectValue,
+  Switch,
 } from '@grace-booth/ui';
 import { enumerateVideoDevices, useCameraStream } from '../hooks/useCameraStream';
 
@@ -46,6 +48,7 @@ type CameraSetupModalProps = {
     adapter: CameraAdapterKind,
     deviceId: string | null,
     resolution: CameraResolution,
+    alwaysActive: boolean,
   ) => void;
 };
 
@@ -58,6 +61,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const [selectedAdapter, setSelectedAdapter] = useState<CameraAdapterKind>('webcam');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedResolution, setSelectedResolution] = useState<CameraResolution>('1080p');
+  const [alwaysActive, setAlwaysActive] = useState(false);
   const [videoDevices, setVideoDevices] = useState<CameraDevice[]>([]);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,6 +120,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
         setSelectedAdapter(configResult.data.adapter);
         setSelectedDeviceId(configResult.data.deviceId);
         setSelectedResolution(configResult.data.resolution);
+        setAlwaysActive(configResult.data.alwaysActive);
         setCameraStatus(configResult.data.status);
       }
     } catch {
@@ -147,6 +152,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
         adapter: selectedAdapter,
         deviceId: selectedDeviceId,
         resolution: selectedResolution,
+        alwaysActive,
       });
       if (!result.ok) {
         setError(result.error.message);
@@ -154,7 +160,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
       }
       setCameraStatus(result.data.status);
       setSuccessMessage('Camera configuration saved successfully.');
-      onCameraSaved?.(selectedAdapter, selectedDeviceId, selectedResolution);
+      onCameraSaved?.(selectedAdapter, selectedDeviceId, selectedResolution, alwaysActive);
       setTimeout(() => {
         onClose();
       }, 700);
@@ -284,6 +290,18 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                     ))}
                   </SelectPopup>
                 </Select>
+              </Field>
+
+              <Field className="camera-device-select-row">
+                <div className="toggle-row">
+                  <div>
+                    <FieldLabel>Keep webcam always active</FieldLabel>
+                    <FieldDescription>
+                      Keeps the webcam warm invisibly throughout the guest flow for faster captures.
+                    </FieldDescription>
+                  </div>
+                  <Switch checked={alwaysActive} onCheckedChange={setAlwaysActive} />
+                </div>
               </Field>
 
               <div className="camera-preview-container">

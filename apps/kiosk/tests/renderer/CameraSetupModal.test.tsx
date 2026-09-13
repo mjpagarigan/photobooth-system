@@ -27,6 +27,7 @@ function cameraConfiguration(
   adapter: 'webcam' | 'sony',
   deviceId: string | null,
   resolution: CameraResolution = '1080p',
+  alwaysActive = false,
 ) {
   return {
     ok: true as const,
@@ -34,6 +35,7 @@ function cameraConfiguration(
       adapter,
       deviceId,
       resolution,
+      alwaysActive,
       status: {
         adapter,
         state: adapter === 'sony' ? ('unsupported' as const) : ('ready' as const),
@@ -153,6 +155,7 @@ describe('CameraSetupModal resolution preferences', () => {
     await user.click(screen.getByRole('button', { name: /apply & save/i }));
     expect(setCamera).toHaveBeenCalledWith({
       adapter: 'webcam',
+      alwaysActive: false,
       deviceId: 'camo-camera',
       resolution: '720p',
     });
@@ -174,8 +177,30 @@ describe('CameraSetupModal resolution preferences', () => {
     await user.click(save);
     expect(setCamera).toHaveBeenCalledWith({
       adapter: 'webcam',
+      alwaysActive: false,
       deviceId: 'camo-camera',
       resolution: '720p',
+    });
+  });
+
+  it('loads and persists the always-active webcam preference', async () => {
+    stubCamo(vi.fn(() => Promise.resolve(streamAt(1_920, 1_080))));
+    const setCamera = installBridge(
+      vi.fn().mockResolvedValue(cameraConfiguration('webcam', 'camo-camera', '1080p', true)),
+    );
+    const user = userEvent.setup();
+    render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
+
+    const toggle = await screen.findByRole('switch', { name: /keep webcam always active/i });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    await user.click(screen.getByRole('button', { name: /apply & save/i }));
+
+    expect(setCamera).toHaveBeenCalledWith({
+      adapter: 'webcam',
+      alwaysActive: false,
+      deviceId: 'camo-camera',
+      resolution: '1080p',
     });
   });
 

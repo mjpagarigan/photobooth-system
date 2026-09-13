@@ -567,7 +567,8 @@ describe('dual display handoff', () => {
           },
         }),
       validateSourceJpeg: () => Promise.resolve({ width: 100, height: 100 }),
-      normalizeFramePng: () => Promise.resolve({ bytes: Buffer.from([]), width: 1200, height: 3600 }),
+      normalizeFramePng: () =>
+        Promise.resolve({ bytes: Buffer.from([]), width: 1200, height: 3600 }),
       createThumbnail: () => Promise.resolve({ bytes: Buffer.from([]), width: 300, height: 900 }),
       close: () => Promise.resolve(),
     };
@@ -625,9 +626,36 @@ describe('dual display handoff', () => {
         updatedAt: 1000,
       },
       [
-        { slotIndex: 1, zIndex: 0, name: 'Photo 1', x: 0.1, y: 0.1, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
-        { slotIndex: 2, zIndex: 1, name: 'Photo 2', x: 0.1, y: 0.4, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
-        { slotIndex: 3, zIndex: 2, name: 'Photo 3', x: 0.1, y: 0.7, width: 0.8, height: 0.25, cropMode: 'crop-to-fill' },
+        {
+          slotIndex: 1,
+          zIndex: 0,
+          name: 'Photo 1',
+          x: 0.1,
+          y: 0.1,
+          width: 0.8,
+          height: 0.25,
+          cropMode: 'crop-to-fill',
+        },
+        {
+          slotIndex: 2,
+          zIndex: 1,
+          name: 'Photo 2',
+          x: 0.1,
+          y: 0.4,
+          width: 0.8,
+          height: 0.25,
+          cropMode: 'crop-to-fill',
+        },
+        {
+          slotIndex: 3,
+          zIndex: 2,
+          name: 'Photo 3',
+          x: 0.1,
+          y: 0.7,
+          width: 0.8,
+          height: 0.25,
+          cropMode: 'crop-to-fill',
+        },
       ],
     );
 
@@ -655,7 +683,7 @@ describe('dual display handoff', () => {
     expect(workflow.getQrStationState().status).toBe('idle');
   });
 
-  it('enforces FIFO presentation queue and CAS-style dismiss', async () => {
+  it('immediately presents the newest session and rejects stale results and dismissals', async () => {
     const queue = new FakeUploadQueue();
     const camera = new SequencedCamera(['ready']);
     const testStore = createTestStore();
@@ -700,56 +728,62 @@ describe('dual display handoff', () => {
     testStore.repository.setDualDisplaySettings('enabled', false, 45);
 
     const session1 = testStore.repository.createSession(randomUUID(), currentTime);
+    currentTime += 1;
     const session2 = testStore.repository.createSession(randomUUID(), currentTime);
-    const session3 = testStore.repository.createSession(randomUUID(), currentTime);
 
     // 1. First session finishes upload: presented immediately
     await queue.completeOffline(session1.id);
     let qrState = workflow.getQrStationState();
     expect(qrState.status).toBe('active');
     expect(qrState.sessionId).toBe(session1.id);
-    expect(qrState.queuedCount).toBe(0);
     expect(qrState.expiresAt).toBe(currentTime + 45_000);
 
-    // 2. Second session finishes upload while session 1 is active: enqueued in FIFO order
+    // A newer session replaces the current result immediately with a fresh timer.
     currentTime = 20_000;
     await queue.completeOffline(session2.id);
     qrState = workflow.getQrStationState();
     expect(qrState.status).toBe('active');
-    expect(qrState.sessionId).toBe(session1.id);
-    expect(qrState.queuedCount).toBe(1);
-    expect(qrState.expiresAt).toBe(10_000 + 45_000);
+    expect(qrState.sessionId).toBe(session2.id);
+    expect(qrState.expiresAt).toBe(currentTime + 45_000);
 
-    // 3. Upload failure for session 3 does NOT disturb active QR session 1
-    testStore.database.raw
-      .prepare("UPDATE sessions SET state = 'ready' WHERE id = ?")
-      .run(session3.id);
-    queue.emit('failed', session3.id);
+    // A late duplicate result from the older session cannot replace the newer one.
+    await queue.completeOffline(session1.id);
     qrState = workflow.getQrStationState();
     expect(qrState.status).toBe('active');
-    expect(qrState.sessionId).toBe(session1.id);
-    expect(qrState.queuedCount).toBe(1);
+    expect(qrState.sessionId).toBe(session2.id);
 
-    // 4. CAS dismiss with wrong sessionId is ignored
-    workflow.dismissQrStation('wrong-session-id');
-    expect(workflow.getQrStationState().sessionId).toBe(session1.id);
+    // A newer terminal failure replaces the successful result and receives the same timer.
+    currentTime += 1;
+    const session3 = testStore.repository.createSession(randomUUID(), currentTime);
+    const collageId = randomUUID();
+    testStore.database.raw
+      .prepare(
+        `INSERT INTO session_assets
+          (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type,
+            width, height, byte_size, sha256, created_at)
+        VALUES (?, ?, 'collage', 0, NULL, ?, 'image/jpeg', 1200, 3600, 10, ?, ?)`,
+      )
+      .run(collageId, session3.id, `collages/${collageId}.gbv`, 'd'.repeat(64), currentTime);
+    testStore.database.raw
+      .prepare("UPDATE sessions SET state = 'pending_upload', collage_asset_id = ? WHERE id = ?")
+      .run(collageId, session3.id);
+    queue.emit('failed', session3.id);
+    qrState = workflow.getQrStationState();
+    expect(qrState.status).toBe('error');
+    expect(qrState.sessionId).toBe(session3.id);
+    expect(qrState.expiresAt).toBe(currentTime + 45_000);
 
-    // 5. CAS dismiss matching session1 promotes session2 with full duration
-    currentTime = 30_000;
-    const afterDismiss = workflow.dismissQrStation(session1.id);
-    expect(afterDismiss.status).toBe('active');
-    expect(afterDismiss.sessionId).toBe(session2.id);
-    expect(afterDismiss.queuedCount).toBe(0);
-    expect(afterDismiss.expiresAt).toBe(currentTime + 45_000);
+    // A stale Done action is ignored.
+    workflow.dismissQrStation(session1.id);
+    expect(workflow.getQrStationState().sessionId).toBe(session3.id);
 
-    // 6. Dismissing session2 returns station to idle
-    const finalDismiss = workflow.dismissQrStation(session2.id);
+    // Dismissing the displayed session returns the station to idle.
+    const finalDismiss = workflow.dismissQrStation(session3.id);
     expect(finalDismiss.status).toBe('idle');
     expect(finalDismiss.sessionId).toBeNull();
-    expect(finalDismiss.queuedCount).toBe(0);
   });
 
-  it('promotes next queued item on authoritative timer expiration', async () => {
+  it('restarts the authoritative timer on replacement and then returns to idle', async () => {
     vi.useFakeTimers();
     try {
       const queue = new FakeUploadQueue();
@@ -794,22 +828,20 @@ describe('dual display handoff', () => {
       testStore.repository.setDualDisplaySettings('enabled', false, 45);
 
       const s1 = testStore.repository.createSession(randomUUID(), Date.now());
-      const s2 = testStore.repository.createSession(randomUUID(), Date.now());
+      const s2 = testStore.repository.createSession(randomUUID(), Date.now() + 1);
 
       await queue.completeOffline(s1.id);
+      vi.advanceTimersByTime(10_000);
       await queue.completeOffline(s2.id);
 
-      expect(workflow.getQrStationState().sessionId).toBe(s1.id);
-      expect(workflow.getQrStationState().queuedCount).toBe(1);
+      expect(workflow.getQrStationState().sessionId).toBe(s2.id);
 
-      // Advance time by 45s: session 1 expires, promoting session 2
-      vi.advanceTimersByTime(45_000);
+      // The first timer was cancelled; the replacement keeps its full duration.
+      vi.advanceTimersByTime(44_000);
 
       expect(workflow.getQrStationState().sessionId).toBe(s2.id);
-      expect(workflow.getQrStationState().queuedCount).toBe(0);
 
-      // Advance time by 45s: session 2 expires, returning to idle
-      vi.advanceTimersByTime(45_000);
+      vi.advanceTimersByTime(1_000);
 
       expect(workflow.getQrStationState().status).toBe('idle');
       expect(workflow.getQrStationState().sessionId).toBeNull();

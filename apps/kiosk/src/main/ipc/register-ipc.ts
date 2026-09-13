@@ -86,14 +86,18 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   };
 
   register('qr-station:get-state', () => dependencies.workflow.getQrStationState());
-  register('qr-station:dismiss', (_event, input) => dependencies.workflow.dismissQrStation(input?.sessionId));
+  register('qr-station:dismiss', (_event, input) =>
+    dependencies.workflow.dismissQrStation(input?.sessionId),
+  );
   register('admin:google-photos:get-status', async (event) => {
     requireAdmin(event);
     const localSettings = dependencies.repository.getSettings();
     let remoteStatus: GooglePhotosStatus | null = null;
     try {
       if (dependencies.delivery.isConfigured()) {
-        remoteStatus = dependencies.delivery.getGooglePhotosStatus ? await dependencies.delivery.getGooglePhotosStatus() : null;
+        remoteStatus = dependencies.delivery.getGooglePhotosStatus
+          ? await dependencies.delivery.getGooglePhotosStatus()
+          : null;
       }
     } catch {
       // fallback to local settings
@@ -108,7 +112,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
           connectedEmail: remoteStatus.config.connectedEmail,
           albumId: remoteStatus.config.albumId ?? localSettings.googlePhotosAlbumId,
           albumTitle: remoteStatus.config.albumTitle ?? localSettings.googlePhotosAlbumTitle,
-          albumShareUrl: remoteStatus.config.albumShareUrl ?? localSettings.googlePhotosAlbumShareUrl,
+          albumShareUrl:
+            remoteStatus.config.albumShareUrl ?? localSettings.googlePhotosAlbumShareUrl,
           enabled: remoteStatus.config.enabled,
         });
       }
@@ -146,7 +151,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     dependencies.repository.setGooglePhotosConfig(config);
     try {
       if (dependencies.delivery.isConfigured()) {
-        if (dependencies.delivery.saveGooglePhotosConfig) await dependencies.delivery.saveGooglePhotosConfig(config);
+        if (dependencies.delivery.saveGooglePhotosConfig)
+          await dependencies.delivery.saveGooglePhotosConfig(config);
       }
     } catch {
       // local save succeeded
@@ -205,7 +211,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     const shareUrl = input.shareUrl.trim();
     try {
       if (dependencies.delivery.isConfigured()) {
-        if (dependencies.delivery.resolveGooglePhotosAlbum) return await dependencies.delivery.resolveGooglePhotosAlbum(shareUrl);
+        if (dependencies.delivery.resolveGooglePhotosAlbum)
+          return await dependencies.delivery.resolveGooglePhotosAlbum(shareUrl);
       }
     } catch {
       // fallback
@@ -226,7 +233,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     requireAdmin(event);
     try {
       if (dependencies.delivery.isConfigured()) {
-        if (dependencies.delivery.testGooglePhotosUpload) return await dependencies.delivery.testGooglePhotosUpload();
+        if (dependencies.delivery.testGooglePhotosUpload)
+          return await dependencies.delivery.testGooglePhotosUpload();
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to reach Google Photos';
@@ -249,7 +257,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     });
     try {
       if (dependencies.delivery.isConfigured()) {
-        if (dependencies.delivery.disconnectGooglePhotos) await dependencies.delivery.disconnectGooglePhotos();
+        if (dependencies.delivery.disconnectGooglePhotos)
+          await dependencies.delivery.disconnectGooglePhotos();
       }
     } catch {
       // ignore
@@ -309,6 +318,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       adapter: dependencies.camera.getActiveAdapterKind(),
       deviceId: dependencies.camera.getDeviceId(),
       resolution: settings.cameraResolution,
+      alwaysActive: settings.webcamAlwaysActive,
       status,
     };
   });
@@ -318,6 +328,8 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       input.adapter,
       input.deviceId ?? null,
       input.resolution,
+      Date.now(),
+      input.alwaysActive,
     );
     dependencies.workflow.setCameraPreviewEnabled(
       input.adapter === 'webcam' || input.adapter === 'internal_webcam',
@@ -326,6 +338,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       adapter: input.adapter,
       deviceId: input.deviceId ?? null,
       resolution: input.resolution,
+      alwaysActive: input.alwaysActive,
       status,
     };
   });
@@ -461,7 +474,9 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   });
   register('admin:activate-frame', (event, input) => {
     requireAdmin(event);
-    return dependencies.frameService.toSummary(dependencies.frameService.activateFrame(input.frameId));
+    return dependencies.frameService.toSummary(
+      dependencies.frameService.activateFrame(input.frameId),
+    );
   });
   register('admin:move-frame', (event, input) => {
     requireAdmin(event);
@@ -565,6 +580,7 @@ async function adminSettings(
   }
   return {
     googleFormsUrl: settings.googleFormsUrl,
+    recruitmentButtonText: settings.recruitmentButtonText,
     localRetentionDays: 60,
     cloudRetentionDays: 30,
     lan: {
@@ -579,6 +595,7 @@ async function adminSettings(
     cameraAdapter: settings.cameraAdapter,
     cameraDeviceId: settings.cameraDeviceId,
     cameraResolution: settings.cameraResolution,
+    webcamAlwaysActive: settings.webcamAlwaysActive,
     supabaseUrl: settings.supabaseUrl,
     supabasePublishableKey: settings.supabasePublishableKey,
     dualDisplay: {

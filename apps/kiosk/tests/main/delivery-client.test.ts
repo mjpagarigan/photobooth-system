@@ -13,6 +13,7 @@ const REQUEST: CreateUploadRequest = {
   width: 2_700,
   height: 1_800,
   googleFormsUrl: null,
+  recruitmentButtonText: 'Join a ministry',
   capturedAt: '2026-08-24T07:19:44.000Z',
 };
 
@@ -46,9 +47,9 @@ describe('Supabase delivery request compatibility', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createDeliveryClient();
-    await expect(
-      client.checkPhotoAvailability(token, 'https://photos.example.test'),
-    ).resolves.toBe('available');
+    await expect(client.checkPhotoAvailability(token, 'https://photos.example.test')).resolves.toBe(
+      'available',
+    );
 
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe('https://project.example.test/functions/v1/photo/resolve');

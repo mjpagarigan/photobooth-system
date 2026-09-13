@@ -273,6 +273,7 @@ export async function handler(request: Request): Promise<Response> {
           p_image_width: input.width,
           p_image_height: input.height,
           p_google_forms_url: input.googleFormsUrl,
+          p_recruitment_button_text: input.recruitmentButtonText,
         },
       );
       insertError = result.error;

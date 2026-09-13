@@ -75,6 +75,7 @@ const DEFAULT_FRAME_2: FrameSummary = {
 
 const SETTINGS: AdminSettings = {
   googleFormsUrl: 'https://example.invalid/fixture-form',
+  recruitmentButtonText: 'Join a ministry',
   localRetentionDays: 60,
   cloudRetentionDays: 30,
   lan: {
@@ -89,6 +90,7 @@ const SETTINGS: AdminSettings = {
   cameraAdapter: 'mock',
   cameraDeviceId: null,
   cameraResolution: '1080p',
+  webcamAlwaysActive: false,
   supabaseUrl: null,
   supabasePublishableKey: null,
   dualDisplay: {
@@ -253,7 +255,6 @@ export async function createQrStationVisualState(): Promise<QrStationState> {
     qrImageUrl: await buildReadyQr(),
     expiresAt: Date.now() + 45_000,
     durationSeconds: 45,
-    queuedCount: 2,
     message: null,
     canRetryUpload: false,
   };

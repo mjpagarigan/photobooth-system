@@ -12,6 +12,7 @@ export const settings = sqliteTable('settings', {
   activeFrameId: text('active_frame_id'),
   collage2FrameId: text('collage_2_frame_id'),
   googleFormsUrl: text('google_forms_url'),
+  recruitmentButtonText: text('recruitment_button_text').notNull().default('Join a ministry'),
   localRetentionDays: integer('local_retention_days').notNull(),
   cloudRetentionDays: integer('cloud_retention_days').notNull(),
   lanEnabled: integer('lan_enabled', { mode: 'boolean' }).notNull(),
@@ -22,6 +23,7 @@ export const settings = sqliteTable('settings', {
   cameraAdapter: text('camera_adapter', { enum: ['mock', 'sony', 'webcam', 'internal_webcam'] }),
   cameraDeviceId: text('camera_device_id'),
   cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
+  webcamAlwaysActive: integer('webcam_always_active', { mode: 'boolean' }).notNull().default(false),
   supabaseUrl: text('supabase_url'),
   supabasePublishableKey: text('supabase_publishable_key'),
   dualDisplayMode: text('dual_display_mode', { enum: ['auto', 'enabled', 'disabled'] })
@@ -29,7 +31,9 @@ export const settings = sqliteTable('settings', {
     .default('auto'),
   swapDisplays: integer('swap_displays', { mode: 'boolean' }).notNull().default(false),
   qrDismissSeconds: integer('qr_dismiss_seconds').notNull().default(45),
-  googlePhotosEnabled: integer('google_photos_enabled', { mode: 'boolean' }).notNull().default(false),
+  googlePhotosEnabled: integer('google_photos_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   googlePhotosEmail: text('google_photos_email'),
   googlePhotosAlbumId: text('google_photos_album_id'),
   googlePhotosAlbumTitle: text('google_photos_album_title'),

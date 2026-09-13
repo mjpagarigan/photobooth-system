@@ -242,6 +242,7 @@ export class UploadQueue extends EventEmitter {
             width: asset.width,
             height: asset.height,
             googleFormsUrl: settings.googleFormsUrl,
+            recruitmentButtonText: settings.recruitmentButtonText,
             capturedAt: new Date(session.createdAt).toISOString(),
           }),
         );

@@ -1,4 +1,4 @@
-import { CalendarBlank, CheckCircle, Images } from '@grace-booth/ui';
+import { CalendarBlank, CheckCircle, Images, WarningCircle } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
@@ -19,7 +19,6 @@ const DEFAULT_QR_STATE: QrStationState = {
   qrImageUrl: null,
   expiresAt: null,
   durationSeconds: 45,
-  queuedCount: 0,
   message: null,
   canRetryUpload: false,
 };
@@ -62,7 +61,7 @@ export function QrStationScreen(): React.ReactElement {
 
   // Countdown timer for active QR display
   useEffect(() => {
-    if (stationState.status !== 'active' || !stationState.expiresAt) {
+    if (stationState.status === 'idle' || !stationState.expiresAt) {
       return;
     }
 
@@ -113,7 +112,7 @@ export function QrStationScreen(): React.ReactElement {
   }, []);
 
   const progressPercentage = useMemo(() => {
-    if (stationState.status !== 'active' || !stationState.durationSeconds) return 0;
+    if (stationState.status === 'idle' || !stationState.durationSeconds) return 0;
     return Math.max(0, Math.min(100, (secondsRemaining / stationState.durationSeconds) * 100));
   }, [stationState.status, stationState.durationSeconds, secondsRemaining]);
 
@@ -121,6 +120,57 @@ export function QrStationScreen(): React.ReactElement {
     ('ministryIdleBackground' in LOCAL_FIXTURES
       ? (LOCAL_FIXTURES as unknown as Record<string, string>).ministryIdleBackground
       : null) ?? LOCAL_FIXTURES.finalBackground;
+
+  if (stationState.status === 'error') {
+    return (
+      <main
+        className="screen screen--final screen--qr-station qr-station--error"
+        data-testid="qr-station-error"
+      >
+        <img
+          className="final-background qr-station__background"
+          src={LOCAL_FIXTURES.finalBackground}
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+        />
+        <div className="final-scrim" aria-hidden="true" />
+        <div className="final-composition">
+          <section className="qr-panel" aria-labelledby="qr-station-error-title">
+            <div className="qr-panel__copy">
+              <WarningCircle aria-hidden="true" size={48} weight="bold" />
+              <h1 id="qr-station-error-title" data-screen-heading tabIndex={-1}>
+                Photo delivery unavailable
+              </h1>
+              <p>
+                {stationState.message ?? 'Ask an operator for help or try another photo session.'}
+              </p>
+            </div>
+            <div className="qr-station__timer-bar" aria-hidden="true">
+              <div
+                className="qr-station__timer-progress"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+            <div className="qr-panel__notice">
+              <CalendarBlank aria-hidden="true" weight="bold" />
+              <span>Auto-clearing in {secondsRemaining}s</span>
+            </div>
+            <div className="qr-panel__actions">
+              <Button
+                className="qr-panel__done"
+                iconAfter={<CheckCircle aria-hidden="true" weight="bold" />}
+                onClick={() => void handleDismiss()}
+                wide
+              >
+                Done
+              </Button>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   // 1. Idle State: Full bleed background with top-right Recent Photos button
   if (stationState.status === 'idle' || !stationState.collageUrl || !stationState.qrImageUrl) {
@@ -216,12 +266,7 @@ export function QrStationScreen(): React.ReactElement {
 
           <div className="qr-panel__notice">
             <CalendarBlank aria-hidden="true" weight="bold" />
-            <span>
-              {stationState.queuedCount > 0
-                ? `Next photo replaces this in ${secondsRemaining}s`
-                : `Auto-clearing in ${secondsRemaining}s`}{' '}
-              • Available for 30 days
-            </span>
+            <span>Auto-clearing in {secondsRemaining}s • Available for 30 days</span>
           </div>
 
           <div className="qr-panel__actions">

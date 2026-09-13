@@ -119,7 +119,9 @@ export function App() {
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminStatus, setAdminStatus] = useState<string | null>(null);
-  const [frameImportCandidate, setFrameImportCandidate] = useState<FrameImportCandidate | null>(null);
+  const [frameImportCandidate, setFrameImportCandidate] = useState<FrameImportCandidate | null>(
+    null,
+  );
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -127,6 +129,7 @@ export function App() {
   const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState<string | null>(null);
   const [selectedCameraResolution, setSelectedCameraResolution] =
     useState<CameraResolution>('1080p');
+  const [webcamAlwaysActive, setWebcamAlwaysActive] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [recent, setRecent] = useState<{
     open: boolean;
@@ -148,11 +151,13 @@ export function App() {
     visualSeed?.countdownSeconds,
   );
 
-  // The webcam stream exists only inside an active capture window (countdown or shutter); it is
-  // released as soon as the session leaves those states so no track stays live while idle.
   const captureWindowOpen = snapshot.screen === 'countdown' || snapshot.screen === 'capturing';
+  const guestFlowOpen = !adminOpen && !dialog && !cameraSetupOpen;
   const liveCameraEnabled =
-    !visualSeed && snapshot.cameraPreviewEnabled && captureWindowOpen && !cameraSetupOpen;
+    !visualSeed &&
+    snapshot.cameraPreviewEnabled &&
+    guestFlowOpen &&
+    (captureWindowOpen || webcamAlwaysActive);
   const camera = useCameraStream(
     liveCameraEnabled,
     selectedCameraDeviceId,
@@ -247,6 +252,7 @@ export function App() {
         if (cameraConfig?.ok) {
           setSelectedCameraDeviceId(cameraConfig.data.deviceId);
           setSelectedCameraResolution(cameraConfig.data.resolution);
+          setWebcamAlwaysActive(cameraConfig.data.alwaysActive);
         }
         if (result.ok) {
           setSnapshot(result.data);
@@ -654,31 +660,34 @@ export function App() {
     }
   }, [visualSeed]);
 
-  const confirmAddFrame = useCallback(async (name: string, shotCount: number) => {
-    if (!frameImportCandidate || visualSeed) return;
-    const bridge = getBridge();
-    if (!bridge) return;
-    setAdminBusy(true);
-    setAdminError(null);
-    try {
-      const result = await bridge.admin.addFrame({
-        candidateId: frameImportCandidate.candidateId,
-        name,
-        shotCount,
-      });
-      if (result.ok) {
-        if (result.data) {
-          setFrameImportCandidate(null);
-          await refreshAdminData();
-          setAdminStatus('Transparent frame added to the library. Review the slots, then save.');
+  const confirmAddFrame = useCallback(
+    async (name: string, shotCount: number) => {
+      if (!frameImportCandidate || visualSeed) return;
+      const bridge = getBridge();
+      if (!bridge) return;
+      setAdminBusy(true);
+      setAdminError(null);
+      try {
+        const result = await bridge.admin.addFrame({
+          candidateId: frameImportCandidate.candidateId,
+          name,
+          shotCount,
+        });
+        if (result.ok) {
+          if (result.data) {
+            setFrameImportCandidate(null);
+            await refreshAdminData();
+            setAdminStatus('Transparent frame added to the library. Review the slots, then save.');
+          }
+        } else {
+          setAdminError(adminErrorMessage(result));
         }
-      } else {
-        setAdminError(adminErrorMessage(result));
+      } finally {
+        setAdminBusy(false);
       }
-    } finally {
-      setAdminBusy(false);
-    }
-  }, [frameImportCandidate, refreshAdminData, visualSeed]);
+    },
+    [frameImportCandidate, refreshAdminData, visualSeed],
+  );
 
   const deleteFrame = useCallback(
     async (frameId: string) => {
@@ -1021,7 +1030,10 @@ export function App() {
         <CaptureScreen
           phase={snapshot.screen}
           secondsRemaining={countdownSeconds}
-          shotNumber={snapshot.shotNumber ?? Math.min(snapshot.requiredShotCount ?? 3, snapshot.captureCount + 1)}
+          shotNumber={
+            snapshot.shotNumber ??
+            Math.min(snapshot.requiredShotCount ?? 3, snapshot.captureCount + 1)
+          }
           totalShots={snapshot.requiredShotCount ?? 3}
           {...(liveCameraEnabled
             ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
@@ -1191,9 +1203,10 @@ export function App() {
             <CameraSetupModal
               isOpen={cameraSetupOpen}
               onClose={() => setCameraSetupOpen(false)}
-              onCameraSaved={(_adapter, deviceId, resolution) => {
+              onCameraSaved={(_adapter, deviceId, resolution, alwaysActive) => {
                 setSelectedCameraDeviceId(deviceId);
                 setSelectedCameraResolution(resolution);
+                setWebcamAlwaysActive(alwaysActive);
                 void refreshAdminData();
               }}
             />
@@ -1246,9 +1259,10 @@ export function App() {
           <CameraSetupModal
             isOpen={cameraSetupOpen}
             onClose={() => setCameraSetupOpen(false)}
-            onCameraSaved={(_adapter, deviceId, resolution) => {
+            onCameraSaved={(_adapter, deviceId, resolution, alwaysActive) => {
               setSelectedCameraDeviceId(deviceId);
               setSelectedCameraResolution(resolution);
+              setWebcamAlwaysActive(alwaysActive);
               void refreshAdminData();
             }}
           />

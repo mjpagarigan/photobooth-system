@@ -45,6 +45,7 @@ const FRAME_2 = {
 
 const SETTINGS: AdminSettings = {
   googleFormsUrl: null,
+  recruitmentButtonText: 'Join a ministry',
   localRetentionDays: 60,
   cloudRetentionDays: 30,
   lan: {
@@ -59,6 +60,7 @@ const SETTINGS: AdminSettings = {
   cameraAdapter: 'webcam',
   cameraDeviceId: null,
   cameraResolution: '1080p',
+  webcamAlwaysActive: false,
   supabaseUrl: null,
   supabasePublishableKey: null,
   dualDisplay: {
@@ -523,6 +525,33 @@ describe('AdminSettings', () => {
     expect(screen.getByLabelText('Current passcode')).toHaveAttribute('maxLength', '64');
     expect(screen.getByLabelText('New passcode')).toHaveAttribute('maxLength', '64');
     expect(screen.getByLabelText('Confirm passcode')).toHaveAttribute('maxLength', '64');
+  });
+
+  it('rejects blank recruitment button text', async () => {
+    const user = userEvent.setup();
+    const onSaveSettings = vi.fn();
+    render(<AdminSettingsScreen {...props} onSaveSettings={onSaveSettings} />);
+    await user.click(screen.getByRole('tab', { name: 'Network' }));
+    const input = screen.getByLabelText('Recruitment button text');
+
+    fireEvent.change(input, { target: { value: '   ' } });
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('1–80 characters');
+    expect(onSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it('trims and saves valid Unicode recruitment button text', async () => {
+    const user = userEvent.setup();
+    const onSaveSettings = vi.fn();
+    render(<AdminSettingsScreen {...props} onSaveSettings={onSaveSettings} />);
+    await user.click(screen.getByRole('tab', { name: 'Network' }));
+    fireEvent.change(screen.getByLabelText('Recruitment button text'), {
+      target: { value: '  Sumali sa ministeryo 🙌  ' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    expect(onSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ recruitmentButtonText: 'Sumali sa ministeryo 🙌' }),
+    );
   });
 });
 

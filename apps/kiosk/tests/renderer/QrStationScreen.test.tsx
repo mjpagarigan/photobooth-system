@@ -88,7 +88,6 @@ describe('QrStationScreen', () => {
         qrImageUrl: 'data:image/png;base64,mockqr',
         expiresAt: Date.now() + 90_000,
         durationSeconds: 90,
-        queuedCount: 0,
         message: null,
         canRetryUpload: false,
       },
@@ -116,18 +115,17 @@ describe('QrStationScreen', () => {
     });
   });
 
-  it('renders replacement countdown label when queuedCount > 0', async () => {
+  it('renders an auto-clearing error state for a failed newest session', async () => {
     mockBridge.qrStation.getState.mockResolvedValue({
       ok: true,
       data: {
-        status: 'active',
+        status: 'error',
         sessionId: '11111111-1111-4111-8111-111111111111',
         collageUrl: 'grace-booth-media://asset/collage-1',
-        qrImageUrl: 'data:image/png;base64,mockqr',
+        qrImageUrl: null,
         expiresAt: Date.now() + 30_000,
         durationSeconds: 45,
-        queuedCount: 2,
-        message: null,
+        message: 'Upload failed. Ask an operator for help.',
         canRetryUpload: false,
       },
     });
@@ -135,11 +133,11 @@ describe('QrStationScreen', () => {
     render(<QrStationScreen />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('qr-station-active')).toBeInTheDocument();
+      expect(screen.getByTestId('qr-station-error')).toBeInTheDocument();
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/next photo replaces this in 30s/i)).toBeInTheDocument();
+      expect(screen.getByText(/auto-clearing in 30s/i)).toBeInTheDocument();
     });
   });
 
@@ -154,7 +152,6 @@ describe('QrStationScreen', () => {
         qrImageUrl: 'data:image/png;base64,mockqr',
         expiresAt: Date.now() + 45000,
         durationSeconds: 45,
-        queuedCount: 0,
         message: null,
         canRetryUpload: false,
       },

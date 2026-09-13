@@ -54,7 +54,10 @@ describe('photo API client', () => {
       ),
     );
 
-    await expect(resolvePhoto(token)).resolves.toMatchObject({ status: 'ready' });
+    await expect(resolvePhoto(token)).resolves.toMatchObject({
+      status: 'ready',
+      recruitmentButtonText: 'Join a ministry',
+    });
     const [url, init] = vi.mocked(fetch).mock.calls[0] ?? [];
     expect(url ? requestUrl(url) : '').toBe('https://api.example.test/functions/v1/photo/resolve');
     expect(url ? requestUrl(url) : '').not.toContain(token);
@@ -85,6 +88,25 @@ describe('photo API client', () => {
     expect(result.googleFormsUrl).toBe(customUrl);
   });
 
+  it('accepts and trims a custom recruitment button label', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      responseAt(
+        `${apiOrigin}/functions/v1/photo/resolve`,
+        JSON.stringify({
+          status: 'ready',
+          expiresAt: '2026-09-16T10:00:00.000Z',
+          googleFormsUrl: null,
+          recruitmentButtonText: '  Serve with us 🙌  ',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    await expect(resolvePhoto(token)).resolves.toMatchObject({
+      recruitmentButtonText: 'Serve with us 🙌',
+    });
+  });
+
   it('rejects an invalid googleFormsUrl returned by resolve payload', async () => {
     vi.mocked(fetch).mockResolvedValue(
       responseAt(
@@ -101,6 +123,22 @@ describe('photo API client', () => {
     await expect(resolvePhoto(token)).rejects.toThrow('could not load');
   });
 
+  it('rejects an invalid recruitment button label returned by resolve payload', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      responseAt(
+        `${apiOrigin}/functions/v1/photo/resolve`,
+        JSON.stringify({
+          status: 'ready',
+          expiresAt: '2026-09-16T10:00:00.000Z',
+          googleFormsUrl: null,
+          recruitmentButtonText: 'first\nsecond',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    await expect(resolvePhoto(token)).rejects.toThrow('could not load');
+  });
 
   it('uses separate controlled image and download POST routes', async () => {
     vi.mocked(fetch).mockImplementation(() => Promise.resolve(jpegResponse(apiOrigin, false)));
@@ -143,7 +181,10 @@ describe('photo API client', () => {
         bytes,
         {
           status: 200,
-          headers: { 'Content-Type': 'text/html;charset=utf-8', 'Content-Length': String(bytes.byteLength) },
+          headers: {
+            'Content-Type': 'text/html;charset=utf-8',
+            'Content-Length': String(bytes.byteLength),
+          },
         },
         false,
       ),
@@ -156,7 +197,12 @@ describe('photo API client', () => {
 
   it('rejects empty bodies even when the headers claim a JPEG', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      responseAt(`${apiOrigin}/private/photo.jpg`, new Uint8Array(0), { status: 200, headers: { 'Content-Type': 'image/jpeg' } }, false),
+      responseAt(
+        `${apiOrigin}/private/photo.jpg`,
+        new Uint8Array(0),
+        { status: 200, headers: { 'Content-Type': 'image/jpeg' } },
+        false,
+      ),
     );
 
     const error = await fetchPhotoDownload(token).catch((caught: unknown) => caught);

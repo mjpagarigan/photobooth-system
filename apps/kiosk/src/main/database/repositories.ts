@@ -25,6 +25,7 @@ type RawSettingsRow = {
   active_frame_id: string | null;
   collage_2_frame_id: string | null;
   google_forms_url: string | null;
+  recruitment_button_text: string;
   local_retention_days: number;
   cloud_retention_days: number;
   lan_enabled: number;
@@ -35,6 +36,7 @@ type RawSettingsRow = {
   camera_adapter: string | null;
   camera_device_id: string | null;
   camera_resolution: string;
+  webcam_always_active: number;
   supabase_url: string | null;
   supabase_publishable_key: string | null;
   dual_display_mode: string;
@@ -61,6 +63,7 @@ export type LocalSettings = {
   activeFrameId: string | null;
   collage2FrameId: string | null;
   googleFormsUrl: string | null;
+  recruitmentButtonText: string;
   localRetentionDays: 60;
   cloudRetentionDays: 30;
   lanEnabled: boolean;
@@ -71,6 +74,7 @@ export type LocalSettings = {
   cameraAdapter: CameraAdapterKind;
   cameraDeviceId: string | null;
   cameraResolution: CameraResolution;
+  webcamAlwaysActive: boolean;
   supabaseUrl: string | null;
   supabasePublishableKey: string | null;
   dualDisplayMode: DualDisplayMode;
@@ -175,9 +179,11 @@ export type NewAsset = {
 
 const SETTINGS_SELECT = `
   SELECT passcode_hash, passcode_salt, scrypt_version, scrypt_n, scrypt_r, scrypt_p, scrypt_key_length,
-    active_frame_id, collage_2_frame_id, google_forms_url, local_retention_days, cloud_retention_days,
+    active_frame_id, collage_2_frame_id, google_forms_url, recruitment_button_text,
+    local_retention_days, cloud_retention_days,
     lan_enabled, lan_bind_host, lan_port, lan_tls_secret_ref,
     lan_certificate_fingerprint, camera_adapter, camera_device_id, camera_resolution,
+    webcam_always_active,
     supabase_url, supabase_publishable_key, dual_display_mode, swap_displays, qr_dismiss_seconds,
     google_photos_enabled, google_photos_email, google_photos_album_id, google_photos_album_title, google_photos_album_share_url,
     revision, created_at, updated_at
@@ -245,6 +251,7 @@ export class LocalRepository {
   updateSettings(
     input: {
       googleFormsUrl: string | null;
+      recruitmentButtonText: string;
       lanEnabled: boolean;
       lanBindHost: string;
       lanPort: number;
@@ -254,12 +261,14 @@ export class LocalRepository {
   ): LocalSettings {
     const result = this.database.raw
       .prepare(
-        `UPDATE settings SET google_forms_url = ?, lan_enabled = ?, lan_bind_host = ?,
+        `UPDATE settings SET google_forms_url = ?, recruitment_button_text = ?,
+          lan_enabled = ?, lan_bind_host = ?,
           lan_port = ?, revision = revision + 1, updated_at = ?
         WHERE id = 1 AND revision = ?`,
       )
       .run(
         input.googleFormsUrl,
+        input.recruitmentButtonText,
         input.lanEnabled ? 1 : 0,
         input.lanBindHost,
         input.lanPort,
@@ -289,13 +298,15 @@ export class LocalRepository {
     deviceId: string | null = null,
     resolution: CameraResolution = '1080p',
     now = Date.now(),
+    alwaysActive = false,
   ): LocalSettings {
     this.database.raw
       .prepare(
         `UPDATE settings SET camera_adapter = ?, camera_device_id = ?, camera_resolution = ?,
+          webcam_always_active = ?,
           revision = revision + 1, updated_at = ? WHERE id = 1`,
       )
-      .run(adapter, deviceId, resolution, now);
+      .run(adapter, deviceId, resolution, alwaysActive ? 1 : 0, now);
     this.recordAudit('settings_change', 'success', 'camera_adapter_updated', now);
     return this.getSettings();
   }
@@ -345,10 +356,7 @@ export class LocalRepository {
     })();
   }
 
-  setGooglePhotosConfig(
-    input: GooglePhotosConfig,
-    now = Date.now(),
-  ): LocalSettings {
+  setGooglePhotosConfig(input: GooglePhotosConfig, now = Date.now()): LocalSettings {
     this.database.raw
       .prepare(
         `UPDATE settings SET
@@ -372,7 +380,7 @@ export class LocalRepository {
     return this.getSettings();
   }
 
-    setDualDisplaySettings(
+  setDualDisplaySettings(
     modeOrInput: DualDisplayMode | DualDisplaySettings,
     swapDisplaysOrNow?: boolean | number,
     qrDismissSeconds?: number,
@@ -711,7 +719,10 @@ export class LocalRepository {
       }
       const requiredCount = current.requiredShotCount;
       const isComplete = current.captureCount + 1 >= requiredCount;
-      const expectedState = reduceSessionState(current.state, isComplete ? 'capture_complete' : 'capture_more');
+      const expectedState = reduceSessionState(
+        current.state,
+        isComplete ? 'capture_complete' : 'capture_more',
+      );
       this.insertAsset(asset);
       const result = this.database.raw
         .prepare(
@@ -1501,6 +1512,7 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     activeFrameId: row.active_frame_id,
     collage2FrameId: row.collage_2_frame_id,
     googleFormsUrl: row.google_forms_url,
+    recruitmentButtonText: row.recruitment_button_text,
     localRetentionDays: 60,
     cloudRetentionDays: 30,
     lanEnabled: row.lan_enabled === 1,
@@ -1511,6 +1523,7 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     cameraAdapter: (row.camera_adapter as CameraAdapterKind | null) ?? 'webcam',
     cameraDeviceId: row.camera_device_id,
     cameraResolution: row.camera_resolution === '720p' ? '720p' : '1080p',
+    webcamAlwaysActive: row.webcam_always_active === 1,
     supabaseUrl: row.supabase_url,
     supabasePublishableKey: row.supabase_publishable_key,
     dualDisplayMode: (row.dual_display_mode as DualDisplayMode | null) ?? 'auto',

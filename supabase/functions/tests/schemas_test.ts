@@ -21,6 +21,9 @@ Deno.test('create upload schema accepts a constrained finished JPEG and standard
     googleFormsUrl: 'https://docs.google.com/forms/d/e/example/viewform',
   });
   assertEquals(value.action, 'create');
+  if (value.action === 'create') {
+    assertEquals(value.recruitmentButtonText, 'Join a ministry');
+  }
 
   const strip = parseWithSchema(CreateOrResumeUploadSchema, {
     action: 'create',

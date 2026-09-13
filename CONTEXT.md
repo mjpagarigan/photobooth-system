@@ -35,3 +35,11 @@ _Avoid_: Capture count, slot count
 **Layer order**:
 The back-to-front ordering of photo slots beneath the transparent frame artwork.
 _Avoid_: Slot number, shot order
+
+**Recruitment action**:
+The required button label and destination URL captured with a photo delivery so its guest page keeps the call to action configured when the photo was created.
+_Avoid_: Google Forms link, ministry link
+
+**Second-display result**:
+The finished photo delivery or delivery failure for the newest session presented on the secondary monitor until a newer result replaces it or its display timer expires.
+_Avoid_: QR queue, queued photo

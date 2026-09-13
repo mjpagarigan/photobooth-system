@@ -22,6 +22,7 @@ import {
   GalleryCloudRepairResultSchema,
   OpaqueIdSchema,
   OptionalGoogleFormsUrlSchema,
+  RecruitmentButtonTextSchema,
   GooglePhotosConfigSchema,
   GooglePhotosStatusSchema,
   QrStationStateSchema,
@@ -101,6 +102,7 @@ export const IpcContracts = {
         adapter: CameraAdapterKindSchema,
         deviceId: z.string().nullable().optional(),
         resolution: CameraResolutionSchema.default('1080p'),
+        alwaysActive: z.boolean().default(false),
       })
       .strict(),
     response: rpcResultSchema(CameraConfigSchema),
@@ -171,6 +173,7 @@ export const IpcContracts = {
     request: z
       .object({
         googleFormsUrl: OptionalGoogleFormsUrlSchema,
+        recruitmentButtonText: RecruitmentButtonTextSchema,
         lanEnabled: z.boolean(),
         lanBindHost: z.ipv4(),
         lanPort: z.number().int().min(1_024).max(65_535),
@@ -266,11 +269,13 @@ export const IpcContracts = {
     response: rpcResultSchema(FrameImportCandidateSchema.nullable()),
   },
   'admin:add-frame': {
-    request: z.object({
-      candidateId: OpaqueIdSchema,
-      name: z.string().trim().min(1).max(120),
-      shotCount: z.number().int().min(1).max(10),
-    }).strict(),
+    request: z
+      .object({
+        candidateId: OpaqueIdSchema,
+        name: z.string().trim().min(1).max(120),
+        shotCount: z.number().int().min(1).max(10),
+      })
+      .strict(),
     response: rpcResultSchema(FrameSummarySchema.nullable()),
   },
   'admin:replace-frame-image': {
@@ -386,6 +391,7 @@ export type GraceBoothBridge = {
       adapter: CameraAdapterKind;
       deviceId?: string | null;
       resolution: CameraResolution;
+      alwaysActive: boolean;
     }): Promise<RpcResult<CameraConfig>>;
     submitCameraFrame(captureId: string, jpegBase64: string): Promise<RpcResult<EmptyResponse>>;
     subscribe(listener: (snapshot: BoothSnapshot) => void): () => void;
@@ -409,6 +415,7 @@ export type GraceBoothBridge = {
     getSettings(): Promise<RpcResult<AdminSettings>>;
     saveSettings(input: {
       googleFormsUrl: string | null;
+      recruitmentButtonText: string;
       lanEnabled: boolean;
       lanBindHost: string;
       lanPort: number;
@@ -419,7 +426,9 @@ export type GraceBoothBridge = {
     createGooglePhotosAlbum(
       title: string,
     ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
-    listGooglePhotosAlbums(): Promise<RpcResult<({ id: string; title: string; shareUrl?: string | undefined })[]>>;
+    listGooglePhotosAlbums(): Promise<
+      RpcResult<{ id: string; title: string; shareUrl?: string | undefined }[]>
+    >;
     resolveGooglePhotosAlbum(
       shareUrl: string,
     ): Promise<RpcResult<{ albumId: string; albumTitle: string; shareUrl: string }>>;
@@ -433,7 +442,11 @@ export type GraceBoothBridge = {
     saveDualDisplaySettings(input: DualDisplaySettings): Promise<RpcResult<DualDisplaySettings>>;
     listFrames(): Promise<RpcResult<FrameSummary[]>>;
     chooseFrame(): Promise<RpcResult<FrameImportCandidate | null>>;
-    addFrame(input: { candidateId: string; name: string; shotCount: number }): Promise<RpcResult<FrameSummary | null>>;
+    addFrame(input: {
+      candidateId: string;
+      name: string;
+      shotCount: number;
+    }): Promise<RpcResult<FrameSummary | null>>;
     replaceFrameImage(input: { frameId: string }): Promise<RpcResult<FrameSummary | null>>;
     updateFrameLayout(input: {
       frameId: string;

@@ -60,6 +60,7 @@ export const CameraConfigSchema = z
     adapter: CameraAdapterKindSchema,
     deviceId: z.string().nullable(),
     resolution: CameraResolutionSchema.default('1080p'),
+    alwaysActive: z.boolean().default(false),
     status: CameraStatusSchema,
   })
   .strict();

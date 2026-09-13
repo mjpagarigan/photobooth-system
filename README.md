@@ -89,6 +89,8 @@ On the first successful launch:
 4. Select the built-in/USB webcam and confirm that the preview works.
    The saved device must report at least 1920×1080. For a Sony ILCE-7M4, enable 1080p USB Streaming,
    connect over USB 3/SuperSpeed, and select its UVC webcam entry; native PC Remote is unsupported.
+   Enable **Keep webcam always active** only when the booth should keep an invisible warm stream
+   throughout the guest flow; it is off by default and pauses in operator screens.
 5. Obtain the dedicated booth-account email and password assigned to this laptop by the Supabase project owner. The installer does not need a Supabase Dashboard account.
 6. Under **Cloud connection**, leave **Supabase Project URL** and **Supabase Publishable / Anon Key** blank to use the production project embedded in the official build. Enter only the assigned booth-account email and password, then click **Connect cloud**.
 7. Never enter a Supabase Dashboard-owner password, `sb_secret_...` key, or legacy `service_role` key in the kiosk.
@@ -129,6 +131,14 @@ Open **Admin > Settings & Health > Dual-Monitor Setup**:
 2. **Display Swapping**: Click **Swap Displays** to quickly interchange the primary capture window and secondary delivery window without reconfiguring Windows display settings.
 3. **QR Auto-Dismiss Duration**: Set the timer (30s, 45s default, 60s, or 90s) after which the secondary delivery screen automatically clears to protect privacy and prepare for subsequent guest sessions.
 
+A newly finished session replaces the current secondary-display result immediately and restarts the
+full timer. Late results from older sessions cannot overwrite a newer result. If no replacement is
+ready before expiry, the display returns to the M.A.T. background.
+
+Under **Admin > Settings & Health > Network > Ministry recruitment**, operators can configure both
+the HTTPS recruitment URL and its required guest-facing button text. Each finished delivery keeps the
+label and URL that were configured when it was created.
+
 ## Google Photos live album sync
 
 Grace Booth can automatically upload completed high-resolution photostrips directly to a designated Google Photos shared album in real time.
@@ -151,6 +161,7 @@ Grace Booth can automatically upload completed high-resolution photostrips direc
 ```
 
 ### Architecture & Non-Blocking Design
+
 - **Zero Guest Latency**: Captures and QR code delivery on Screen 1 / Screen 2 complete instantly. Guests never wait for Google Photos sync.
 - **Asynchronous Resilient Worker**: When a photostrip is confirmed, a database trigger automatically enqueues a sync task in `google_sync_queue`. The `sync-google-photos` Supabase Edge Function streams the image bytes directly from Cloudflare R2 into the designated Google Photos album in the background.
 - **Offline & Retry Resilient**: If the internet drops or Google Photos API throttles, jobs remain queued with exponential backoff and retry mechanisms.

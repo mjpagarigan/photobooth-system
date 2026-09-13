@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(86);
+select plan(87);
 
 set local timezone = 'America/Denver';
 
@@ -13,6 +13,12 @@ select has_column('public', 'photo_sessions', 'public_token_hash', 'token hash i
 select has_column('public', 'photo_sessions', 'storage_object_path', 'private path is stored');
 select has_column('public', 'photo_sessions', 'storage_backend', 'storage provider is stored');
 select has_column('public', 'photo_sessions', 'status', 'status is stored');
+select has_column(
+  'public',
+  'photo_sessions',
+  'recruitment_button_text',
+  'recruitment button text is snapshotted with the photo'
+);
 select has_column(
   'public',
   'photo_sessions',
@@ -103,7 +109,7 @@ select has_function(
   'create_or_get_photo_session',
   array[
     'uuid', 'uuid', 'uuid', 'text', 'text', 'text', 'text', 'bigint', 'text', 'integer',
-    'integer', 'text'
+    'integer', 'text', 'text'
   ],
   'atomic stable create replay exists'
 );

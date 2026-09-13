@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { OpaqueIdSchema, OptionalGoogleFormsUrlSchema } from './domain.js';
+import {
+  DEFAULT_RECRUITMENT_BUTTON_TEXT,
+  OpaqueIdSchema,
+  OptionalGoogleFormsUrlSchema,
+  RecruitmentButtonTextSchema,
+} from './domain.js';
 
 export const Sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const PublicTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
@@ -14,6 +19,7 @@ export const CreateUploadRequestSchema = z
     width: z.number().int().min(1).max(12_000),
     height: z.number().int().min(1).max(12_000),
     googleFormsUrl: OptionalGoogleFormsUrlSchema,
+    recruitmentButtonText: RecruitmentButtonTextSchema.default(DEFAULT_RECRUITMENT_BUTTON_TEXT),
     /** ISO-8601 capture instant used to derive the human-readable cloud object name. */
     capturedAt: z.iso.datetime({ offset: true }).optional(),
   })
@@ -94,11 +100,7 @@ export const ConfirmUploadResponseSchema = z
   .strict();
 export type ConfirmUploadResponse = z.infer<typeof ConfirmUploadResponseSchema>;
 
-export const PhotoAvailabilitySchema = z.enum([
-  'available',
-  'unavailable',
-  'verification-failed',
-]);
+export const PhotoAvailabilitySchema = z.enum(['available', 'unavailable', 'verification-failed']);
 export type PhotoAvailability = z.infer<typeof PhotoAvailabilitySchema>;
 
 export const PhotoRepairMetadataSchema = z

@@ -23,6 +23,7 @@ describe('public photo page', () => {
       status: 'ready',
       expiresAt: '2026-09-16T10:00:00.000Z',
       googleFormsUrl: null,
+      recruitmentButtonText: 'Join a ministry',
     });
     vi.mocked(api.fetchPhotoImage).mockResolvedValue(jpeg);
     vi.mocked(api.fetchPhotoDownload).mockResolvedValue(jpeg);
@@ -77,6 +78,21 @@ describe('public photo page', () => {
     expect(api.fetchPhotoDownload).toHaveBeenNthCalledWith(1, token);
     expect(api.fetchPhotoDownload).toHaveBeenNthCalledWith(2, token);
     expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders the snapshotted recruitment button text', async () => {
+    vi.mocked(api.resolvePhoto).mockResolvedValue({
+      status: 'ready',
+      expiresAt: '2026-09-16T10:00:00.000Z',
+      googleFormsUrl: 'https://example.org/serve',
+      recruitmentButtonText: 'Serve with us 🙌',
+    });
+
+    render(<App />);
+    expect(await screen.findByRole('link', { name: 'Serve with us 🙌' })).toHaveAttribute(
+      'href',
+      'https://example.org/serve',
+    );
   });
 
   it('makes one fresh authenticated image POST for each explicit page retry', async () => {

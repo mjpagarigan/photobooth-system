@@ -4,7 +4,10 @@ export type ResolvedPhoto = {
   status: 'ready';
   expiresAt: string;
   googleFormsUrl: string | null;
+  recruitmentButtonText: string;
 };
+
+const DEFAULT_RECRUITMENT_BUTTON_TEXT = 'Join a ministry';
 
 export class PhotoApiError extends Error {
   readonly retryable: boolean;
@@ -34,6 +37,14 @@ function allowedGoogleFormsUrl(value: unknown): string | null | undefined {
   } catch {
     return undefined;
   }
+}
+
+function allowedRecruitmentButtonText(value: unknown): string | undefined {
+  if (value === undefined || value === null) return DEFAULT_RECRUITMENT_BUTTON_TEXT;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length < 1 || trimmed.length > 80 || /[\r\n]/u.test(trimmed)) return undefined;
+  return trimmed;
 }
 
 async function post(route: 'resolve' | 'image' | 'download', token: string, signal?: AbortSignal) {
@@ -70,15 +81,22 @@ export async function resolvePhoto(token: string, signal?: AbortSignal): Promise
   const response = await post('resolve', token, signal);
   const payload = (await response.json()) as Record<string, unknown>;
   const googleFormsUrl = allowedGoogleFormsUrl(payload.googleFormsUrl);
+  const recruitmentButtonText = allowedRecruitmentButtonText(payload.recruitmentButtonText);
   if (
     payload.status !== 'ready' ||
     typeof payload.expiresAt !== 'string' ||
     !Number.isFinite(Date.parse(payload.expiresAt)) ||
-    googleFormsUrl === undefined
+    googleFormsUrl === undefined ||
+    recruitmentButtonText === undefined
   ) {
     throw new PhotoApiError('We could not load this photo right now.', true);
   }
-  return { status: 'ready', expiresAt: payload.expiresAt, googleFormsUrl };
+  return {
+    status: 'ready',
+    expiresAt: payload.expiresAt,
+    googleFormsUrl,
+    recruitmentButtonText,
+  };
 }
 
 async function fetchPhotoBlob(

@@ -13,6 +13,7 @@ type ResolvedRow = {
   content_type: 'image/jpeg';
   byte_size: number;
   google_forms_url: null;
+  recruitment_button_text: string;
   expires_at: string;
 };
 
@@ -23,6 +24,7 @@ const PHOTO: ResolvedRow = {
   content_type: 'image/jpeg',
   byte_size: 6,
   google_forms_url: null,
+  recruitment_button_text: 'Join a ministry',
   expires_at: new Date(NOW + 10 * 60_000).toISOString(),
 };
 
@@ -140,6 +142,7 @@ Deno.test('resolve verifies the R2 object and reauthorizes before reporting read
     status: 'ready',
     expiresAt: PHOTO.expires_at,
     googleFormsUrl: null,
+    recruitmentButtonText: 'Join a ministry',
   });
   assertEquals(admin.rpcCalls(), 2);
 });

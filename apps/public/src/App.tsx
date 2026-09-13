@@ -76,9 +76,7 @@ function LoadingView(): React.JSX.Element {
           </Badge>
         </div>
         <h1>Your photo is almost ready</h1>
-        <p className="lead-copy">
-          We’re securely opening the photo connected to this QR code.
-        </p>
+        <p className="lead-copy">We’re securely opening the photo connected to this QR code.</p>
         <div className="skeleton-lines">
           <Skeleton className="h-4 w-full max-w-sm my-1.5" />
           <Skeleton className="h-4 w-3/4 max-w-xs my-1.5" />
@@ -212,7 +210,7 @@ function ReadyView({
             rel="noopener noreferrer external"
           >
             <HandHeart size={20} weight="bold" aria-hidden="true" />
-            <span>Join a ministry</span>
+            <span>{details.recruitmentButtonText}</span>
           </a>
           <p className="mobile-save-hint">
             <Info aria-hidden="true" size={16} />

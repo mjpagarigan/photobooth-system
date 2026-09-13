@@ -40,15 +40,10 @@ export class BoothWorkflow {
     qrImageUrl: null,
     expiresAt: null,
     durationSeconds: 45,
-    queuedCount: 0,
     message: null,
     canRetryUpload: false,
   };
-  private readonly qrStationQueue: {
-    sessionId: string;
-    collageUrl: string | null;
-    qrImageUrl: string;
-  }[] = [];
+  private latestQrStationSession: { createdAt: number; sessionId: string } | null = null;
   private qrDismissTimer: NodeJS.Timeout | null = null;
   private activeSessionId: string | null = null;
   private countdownEndsAt: number | null = null;
@@ -79,8 +74,9 @@ export class BoothWorkflow {
 
   async initialize(): Promise<void> {
     await this.frameService.ensureDefaultFrames();
-    await (this.frameService as Partial<Pick<FrameService, 'ensureMinistryFrames'>>)
-      .ensureMinistryFrames?.();
+    await (
+      this.frameService as Partial<Pick<FrameService, 'ensureMinistryFrames'>>
+    ).ensureMinistryFrames?.();
     const recovered = this.repository.getLatestIncompleteSession();
     this.activeSessionId = recovered?.id ?? null;
     try {
@@ -148,11 +144,6 @@ export class BoothWorkflow {
       clearTimeout(this.qrDismissTimer);
       this.qrDismissTimer = null;
     }
-    const nextItem = this.qrStationQueue.shift();
-    if (nextItem) {
-      this.presentQrStationItem(nextItem);
-      return this.qrStationState;
-    }
     this.qrStationState = {
       status: 'idle',
       sessionId: null,
@@ -160,7 +151,6 @@ export class BoothWorkflow {
       qrImageUrl: null,
       expiresAt: null,
       durationSeconds: 45,
-      queuedCount: 0,
       message: null,
       canRetryUpload: false,
     };
@@ -170,9 +160,12 @@ export class BoothWorkflow {
 
   private presentQrStationItem(item: {
     sessionId: string;
+    createdAt: number;
     collageUrl: string | null;
     qrImageUrl: string;
   }): void {
+    if (!this.canPresentQrStationSession(item.sessionId, item.createdAt)) return;
+    this.latestQrStationSession = { sessionId: item.sessionId, createdAt: item.createdAt };
     const settings = this.repository.getSettings();
     const duration = settings.qrDismissSeconds || 45;
     const expiresAt = this.now() + duration * 1000;
@@ -183,7 +176,6 @@ export class BoothWorkflow {
       qrImageUrl: item.qrImageUrl,
       expiresAt,
       durationSeconds: duration,
-      queuedCount: this.qrStationQueue.length,
       message: null,
       canRetryUpload: false,
     };
@@ -197,6 +189,35 @@ export class BoothWorkflow {
     this.emitQrStation();
   }
 
+  private canPresentQrStationSession(sessionId: string, createdAt: number): boolean {
+    const latest = this.latestQrStationSession;
+    if (!latest || latest.sessionId === sessionId) return true;
+    return (
+      createdAt > latest.createdAt ||
+      (createdAt === latest.createdAt && sessionId > latest.sessionId)
+    );
+  }
+
+  private presentQrStationError(session: StoredSession, collageUrl: string | null): void {
+    if (!this.canPresentQrStationSession(session.id, session.createdAt)) return;
+    this.latestQrStationSession = { sessionId: session.id, createdAt: session.createdAt };
+    const duration = this.repository.getSettings().qrDismissSeconds || 45;
+    const expiresAt = this.now() + duration * 1000;
+    this.qrStationState = {
+      status: 'error',
+      sessionId: session.id,
+      collageUrl,
+      qrImageUrl: null,
+      expiresAt,
+      durationSeconds: duration,
+      message: 'Upload failed. Ask an operator for help or try another photo session.',
+      canRetryUpload: false,
+    };
+    if (this.qrDismissTimer) clearTimeout(this.qrDismissTimer);
+    this.qrDismissTimer = setTimeout(() => this.dismissQrStation(session.id), duration * 1000);
+    this.emitQrStation();
+  }
+
   isDualDisplayActive(): boolean {
     return this.options.isDualDisplayActive();
   }
@@ -205,7 +226,10 @@ export class BoothWorkflow {
     const cameraPreviewEnabled = this.options.cameraPreviewEnabled ?? false;
     const session = this.activeSessionId ? this.repository.getSession(this.activeSessionId) : null;
     if (!session || session.state === 'attract')
-      return attractSnapshot(cameraPreviewEnabled, this.repository.getActiveFrame()?.slots.length ?? 3);
+      return attractSnapshot(
+        cameraPreviewEnabled,
+        this.repository.getActiveFrame()?.slots.length ?? 3,
+      );
     const assets = this.repository.listCurrentAssets(session.id);
     const captures = assets
       .filter((asset) => asset.kind === 'capture')
@@ -234,7 +258,9 @@ export class BoothWorkflow {
         captureUrls: captures.map((asset) => mediaUrl(asset.id)),
         collageUrl: collage ? mediaUrl(collage.id) : null,
         frame: selectedFrame ? this.frameService.toSummary(selectedFrame) : null,
-        frames: this.frameService.getFrameSummaries().filter((frame) => frame.slots.length === shotCount),
+        frames: this.frameService
+          .getFrameSummaries()
+          .filter((frame) => frame.slots.length === shotCount),
         qrImageUrl,
       },
       controls: {
@@ -292,13 +318,19 @@ export class BoothWorkflow {
     const session = this.requireActive();
     const lockedShotCount = requiredShotCount(session);
     if (session.state !== 'review' || session.captureCount !== lockedShotCount)
-      throw new AppError('review_incomplete', `${lockedShotCount} photos are required before processing.`);
+      throw new AppError(
+        'review_incomplete',
+        `${lockedShotCount} photos are required before processing.`,
+      );
     const chosenFrame = this.repository.getFrame(frameId);
     if (!chosenFrame) {
       throw new AppError('frame_missing', 'The selected photo frame is missing.');
     }
     if (chosenFrame.archived || chosenFrame.slots.length !== lockedShotCount) {
-      throw new AppError('frame_incompatible', 'Choose a visible frame with the same number of slots.');
+      throw new AppError(
+        'frame_incompatible',
+        'Choose a visible frame with the same number of slots.',
+      );
     }
     this.transition(
       session,
@@ -318,7 +350,10 @@ export class BoothWorkflow {
     }
     void this.processCollage(session.id);
     return dualActive
-      ? attractSnapshot(this.options.cameraPreviewEnabled ?? false, this.repository.getActiveFrame()?.slots.length ?? 3)
+      ? attractSnapshot(
+          this.options.cameraPreviewEnabled ?? false,
+          this.repository.getActiveFrame()?.slots.length ?? 3,
+        )
       : this.getSnapshot();
   }
 
@@ -354,7 +389,10 @@ export class BoothWorkflow {
     this.qrBySession.delete(session.id);
     this.activeSessionId = null;
     this.emit();
-    return attractSnapshot(this.options.cameraPreviewEnabled ?? false, this.repository.getActiveFrame()?.slots.length ?? 3);
+    return attractSnapshot(
+      this.options.cameraPreviewEnabled ?? false,
+      this.repository.getActiveFrame()?.slots.length ?? 3,
+    );
   }
 
   /**
@@ -421,7 +459,8 @@ export class BoothWorkflow {
     if (this.countdownTimer) clearTimeout(this.countdownTimer);
     const shotCount = requiredShotCount(session);
     const shotNumber = Math.min(shotCount, session.captureCount + 1);
-    const durationMs = this.options.shotCountdownsMs[shotNumber - 1] ?? this.options.shotCountdownsMs.at(-1);
+    const durationMs =
+      this.options.shotCountdownsMs[shotNumber - 1] ?? this.options.shotCountdownsMs.at(-1);
     if (durationMs === undefined) {
       throw new AppError('state_conflict', 'Countdown cannot start now.');
     }
@@ -511,10 +550,7 @@ export class BoothWorkflow {
         frameAspectRatio: frame.width / frame.height,
       });
       if (result.byteSize !== result.bytes.byteLength || result.byteSize < 1) {
-        throw new AppError(
-          'output_validation',
-          'The finished photo could not be validated.',
-        );
+        throw new AppError('output_validation', 'The finished photo could not be validated.');
       }
       const stored = this.vault.write('completed', result.bytes);
       const assetId = randomUUID();
@@ -579,6 +615,12 @@ export class BoothWorkflow {
         // Handled if already transitioned
       }
     }
+    const collage = this.repository
+      .listCurrentAssets(sessionId)
+      .find((asset) => asset.kind === 'collage');
+    if (collage) {
+      this.presentQrStationError(session, mediaUrl(collage.id));
+    }
     this.emitIfActive(sessionId);
   }
 
@@ -605,18 +647,7 @@ export class BoothWorkflow {
     const sessionAssets = this.repository.listCurrentAssets(sessionId);
     const collage = sessionAssets.find((asset) => asset.kind === 'collage');
     if (collage) {
-      this.qrStationState = {
-        status: 'error',
-        sessionId,
-        collageUrl: mediaUrl(collage.id),
-        qrImageUrl: null,
-        expiresAt: null,
-        durationSeconds: 45,
-        queuedCount: this.qrStationQueue.length,
-        message: 'Upload failed. You can finish offline or retry.',
-        canRetryUpload: true,
-      };
-      this.emitQrStation();
+      this.presentQrStationError(session, mediaUrl(collage.id));
     }
     this.emitIfActive(sessionId);
   }
@@ -637,19 +668,10 @@ export class BoothWorkflow {
     const collage = sessionAssets.find((asset) => asset.kind === 'collage');
     const item = {
       sessionId,
+      createdAt: session.createdAt,
       collageUrl: collage ? mediaUrl(collage.id) : null,
       qrImageUrl: qr.imageDataUrl,
     };
-    if (this.qrStationState.status === 'active' && this.qrStationState.sessionId !== sessionId) {
-      this.qrStationQueue.push(item);
-      this.qrStationState = {
-        ...this.qrStationState,
-        queuedCount: this.qrStationQueue.length,
-      };
-      this.emitQrStation();
-      this.emitIfActive(sessionId);
-      return;
-    }
     this.presentQrStationItem(item);
     this.emitIfActive(sessionId);
   }

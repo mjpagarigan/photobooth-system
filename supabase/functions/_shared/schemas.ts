@@ -23,6 +23,14 @@ const GoogleFormsUrlSchema = z
     }
   });
 
+const RecruitmentButtonTextSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .refine((value) => !/[\r\n]/u.test(value), 'Invalid button label')
+  .default('Join a ministry');
+
 const CreateUploadSchema = z
   .object({
     action: z.literal('create'),
@@ -33,6 +41,7 @@ const CreateUploadSchema = z
     width: z.number().int().min(1).max(MAX_EDGE_PIXELS),
     height: z.number().int().min(1).max(MAX_EDGE_PIXELS),
     googleFormsUrl: GoogleFormsUrlSchema,
+    recruitmentButtonText: RecruitmentButtonTextSchema,
     // Deliberately lenient: naming must never reject an upload. The handler parses this
     // defensively and falls back to the current UTC time when absent or malformed.
     capturedAt: z.string().max(64).optional(),

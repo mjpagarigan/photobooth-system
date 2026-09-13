@@ -24,6 +24,7 @@ type ResolvedPhoto = {
   content_type: 'image/jpeg';
   byte_size: number;
   google_forms_url: string | null;
+  recruitment_button_text: string;
   expires_at: string;
 };
 
@@ -48,6 +49,7 @@ function isResolvedPhoto(value: unknown): value is ResolvedPhoto {
     row.content_type === 'image/jpeg' &&
     typeof row.byte_size === 'number' &&
     (typeof row.google_forms_url === 'string' || row.google_forms_url === null) &&
+    typeof row.recruitment_button_text === 'string' &&
     typeof row.expires_at === 'string'
   );
 }
@@ -181,6 +183,7 @@ export async function handler(
           status: 'ready',
           expiresAt: photo.expires_at,
           googleFormsUrl: photo.google_forms_url,
+          recruitmentButtonText: photo.recruitment_button_text,
         },
         200,
         publicCorsHeaders(allowedOrigin),

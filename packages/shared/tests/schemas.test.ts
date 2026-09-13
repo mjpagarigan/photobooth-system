@@ -5,6 +5,7 @@ import {
   FrameLayoutSchema,
   IpcContracts,
   OptionalGoogleFormsUrlSchema,
+  RecruitmentButtonTextSchema,
   isAllowedGoogleFormsUrl,
 } from '../src/index.js';
 
@@ -31,7 +32,10 @@ describe('shared boundary schemas', () => {
       googleFormsUrl: null,
       capturedAt: '2026-08-24T12:00:00.000Z',
     };
-    expect(CreateUploadRequestSchema.parse(valid)).toEqual(valid);
+    expect(CreateUploadRequestSchema.parse(valid)).toEqual({
+      ...valid,
+      recruitmentButtonText: 'Join a ministry',
+    });
     expect(CreateUploadRequestSchema.parse({ ...valid, byteSize: 20_000_000 }).byteSize).toBe(
       20_000_000,
     );
@@ -65,18 +69,29 @@ describe('shared boundary schemas', () => {
 
     expect(OptionalGoogleFormsUrlSchema.parse('')).toBeNull();
     expect(
-      OptionalGoogleFormsUrlSchema.parse('https://volunteer-management.ccf.org.ph/recruitment/form'),
+      OptionalGoogleFormsUrlSchema.parse(
+        'https://volunteer-management.ccf.org.ph/recruitment/form',
+      ),
     ).toBe('https://volunteer-management.ccf.org.ph/recruitment/form');
     expect(() => OptionalGoogleFormsUrlSchema.parse('http://insecure.org')).toThrow();
   });
 
-  it('validates QrStationState with queuedCount and CAS dismiss contract', () => {
+  it('validates QrStationState with the session-aware dismiss contract', () => {
     expect(
       IpcContracts['qr-station:dismiss'].request.parse({
         sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
       }),
     ).toEqual({ sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022' });
     expect(IpcContracts['qr-station:dismiss'].request.parse({})).toEqual({});
+  });
+
+  it('accepts a trimmed Unicode recruitment label and rejects invalid button text', () => {
+    expect(RecruitmentButtonTextSchema.parse('  Sumali sa ministeryo 🙌  ')).toBe(
+      'Sumali sa ministeryo 🙌',
+    );
+    expect(() => RecruitmentButtonTextSchema.parse('   ')).toThrow();
+    expect(() => RecruitmentButtonTextSchema.parse('first\nsecond')).toThrow();
+    expect(() => RecruitmentButtonTextSchema.parse('x'.repeat(81))).toThrow();
   });
 
   it('rejects extra IPC payload fields and weak passcodes', () => {
@@ -126,7 +141,9 @@ describe('shared boundary schemas', () => {
         shotCount: 11,
       }),
     ).toThrow();
-    expect(IpcContracts['admin:replace-frame-image'].request.parse({ frameId })).toEqual({ frameId });
+    expect(IpcContracts['admin:replace-frame-image'].request.parse({ frameId })).toEqual({
+      frameId,
+    });
     expect(
       IpcContracts['admin:update-frame-layout'].request.parse({
         frameId,

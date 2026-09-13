@@ -2,6 +2,13 @@ import { z } from 'zod';
 
 export const OpaqueIdSchema = z.uuid();
 export const UtcMillisSchema = z.number().int().nonnegative();
+export const DEFAULT_RECRUITMENT_BUTTON_TEXT = 'Join a ministry';
+export const RecruitmentButtonTextSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .refine((value) => !/[\r\n]/u.test(value), 'Enter a single-line button label');
 
 export const SessionStateSchema = z.enum([
   'attract',
@@ -102,11 +109,7 @@ export function isAllowedGoogleFormsUrl(value: string): boolean {
 export const OptionalGoogleFormsUrlSchema = z
   .union([
     z.literal(''),
-    z
-      .string()
-      .trim()
-      .max(2_048)
-      .refine(isAllowedGoogleFormsUrl, 'Enter a valid HTTPS URL'),
+    z.string().trim().max(2_048).refine(isAllowedGoogleFormsUrl, 'Enter a valid HTTPS URL'),
     z.null(),
   ])
   .transform((value) => (value === '' ? null : value));
@@ -137,13 +140,15 @@ export const FrameSummarySchema = z
   .strict();
 export type FrameSummary = z.infer<typeof FrameSummarySchema>;
 
-export const FrameImportCandidateSchema = z.object({
-  candidateId: OpaqueIdSchema,
-  suggestedName: z.string().trim().min(1).max(120),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  byteSize: z.number().int().positive(),
-}).strict();
+export const FrameImportCandidateSchema = z
+  .object({
+    candidateId: OpaqueIdSchema,
+    suggestedName: z.string().trim().min(1).max(120),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    byteSize: z.number().int().positive(),
+  })
+  .strict();
 export type FrameImportCandidate = z.infer<typeof FrameImportCandidateSchema>;
 
 export const DualDisplayModeSchema = z.enum(['auto', 'enabled', 'disabled']);
@@ -185,7 +190,6 @@ export const QrStationStateSchema = z
     durationSeconds: z.number().int().positive(),
     message: z.string().nullable(),
     canRetryUpload: z.boolean().default(false),
-    queuedCount: z.number().int().nonnegative().default(0),
   })
   .strict();
 export type QrStationState = z.infer<typeof QrStationStateSchema>;
@@ -225,6 +229,7 @@ export type GooglePhotosStatus = z.infer<typeof GooglePhotosStatusSchema>;
 export const AdminSettingsSchema = z
   .object({
     googleFormsUrl: OptionalGoogleFormsUrlSchema,
+    recruitmentButtonText: RecruitmentButtonTextSchema.default(DEFAULT_RECRUITMENT_BUTTON_TEXT),
     localRetentionDays: z.literal(60),
     cloudRetentionDays: z.literal(30),
     lan: LanSettingsSchema,
@@ -233,6 +238,7 @@ export const AdminSettingsSchema = z
     cameraAdapter: z.enum(['mock', 'sony', 'webcam', 'internal_webcam']).default('webcam'),
     cameraDeviceId: z.string().nullable().default(null),
     cameraResolution: z.enum(['720p', '1080p']).default('1080p'),
+    webcamAlwaysActive: z.boolean().default(false),
     supabaseUrl: z.url().max(500).nullable().default(null),
     supabasePublishableKey: z.string().max(1_000).nullable().default(null),
     dualDisplay: DualDisplaySettingsSchema.optional().default({

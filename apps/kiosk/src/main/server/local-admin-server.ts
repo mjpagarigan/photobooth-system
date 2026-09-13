@@ -20,6 +20,13 @@ const RetrySchema = z.object({ uploadJobId: z.uuid() }).strict();
 const SettingsSchema = z
   .object({
     googleFormsUrl: z.string().max(2_048).nullable(),
+    recruitmentButtonText: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .refine((value) => !/[\r\n]/u.test(value))
+      .optional(),
     lanEnabled: z.boolean(),
     lanBindHost: z.ipv4(),
     lanPort: z.number().int().min(1_024).max(65_535),
@@ -150,6 +157,7 @@ export async function startLocalAdminListener(
         ok: true,
         settings: {
           googleFormsUrl: settings.googleFormsUrl,
+          recruitmentButtonText: settings.recruitmentButtonText,
           localRetentionDays: 60,
           cloudRetentionDays: 30,
           lan: {
@@ -201,7 +209,11 @@ export async function startLocalAdminListener(
           throw new AppError('lan_tls_required', 'Choose a PFX certificate on the booth first.');
         }
       }
-      const settings = dependencies.repository.updateSettings(input);
+      const currentSettings = dependencies.repository.getSettings();
+      const settings = dependencies.repository.updateSettings({
+        ...input,
+        recruitmentButtonText: input.recruitmentButtonText ?? currentSettings.recruitmentButtonText,
+      });
       setTimeout(() => dependencies.onNetworkSettingsChanged(), 100);
       return { ok: true, revision: settings.revision };
     } catch (error) {
