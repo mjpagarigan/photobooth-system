@@ -305,9 +305,16 @@ Open **Admin > Settings & health > Displays** to select `Auto`, `Force Enabled`,
 
 This workflow creates a new Supabase database/Auth/Function backend, private Cloudflare R2 storage, and a Cloudflare Pages download site. Run terminal commands from the repository root unless a different location is stated.
 
+The two configuration blocks below serve different purposes. **Use the block in [step 6](#6-configure-hosted-function-secrets) for hosted backend configuration.**
+
+| Block                                                                   | Purpose                                                                                                     | Where it belongs                                                                                           |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [Step 1: deployment worksheet](#1-collect-deployment-values)            | Collects values used throughout project setup, booth enrollment, kiosk configuration, and Pages deployment. | Approved password manager; this is not a runtime environment file.                                         |
+| [Step 6: hosted Function secrets](#6-configure-hosted-function-secrets) | Configures the backend's token generation, public origin, cleanup, and private storage.                     | Ignored `supabase/.env.deploy.local`, uploaded to the linked Supabase project with `supabase secrets set`. |
+
 ### 1. Collect deployment values
 
-Keep the completed worksheet in an approved password manager, not in Git:
+Keep this deployment worksheet in an approved password manager, not in Git. Fill it in as you complete the setup steps; the booth Auth UUID is created in step 9. Do not pass this worksheet to `supabase secrets set` or use it as the kiosk or public app's `.env` file:
 
 ```text
 SUPABASE_PROJECT_REF=<SUPABASE_PROJECT_REF>
@@ -321,6 +328,8 @@ PUBLIC_PAGE_ORIGIN=https://<PAGES_PROJECT>.pages.dev
 BOOTH_EMAIL=<BOOTH_EMAIL>
 BOOTH_AUTH_USER_UUID=<BOOTH_AUTH_USER_UUID>
 ```
+
+`CLOUDFLARE_ACCOUNT_ID` is a worksheet label for your Cloudflare Account ID. Copy that value into **`R2_ACCOUNT_ID`** in step 6; the backend reads `R2_ACCOUNT_ID` and does not read `CLOUDFLARE_ACCOUNT_ID`. `PUBLIC_TOKEN_DERIVATION_KEY` and `CLEANUP_SECRET` are generated separately in step 5 and added to the step 6 file.
 
 ### 2. Create the Supabase project
 
@@ -398,7 +407,7 @@ Create `supabase/.env.deploy.local` with a trusted editor. The repository's `.gi
 git check-ignore supabase/.env.deploy.local
 ```
 
-Populate the ignored file without committing it:
+Populate the ignored file with the hosted backend runtime configuration below, replacing every placeholder with its actual value. Do not commit it:
 
 ```dotenv
 PUBLIC_TOKEN_DERIVATION_KEY=<PUBLIC_TOKEN_DERIVATION_KEY>
@@ -410,6 +419,10 @@ R2_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
 R2_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
 R2_BUCKET_NAME=<R2_BUCKET_NAME>
 ```
+
+Do not copy the entire step 1 worksheet into this file. `SUPABASE_PROJECT_REF` is used to link the CLI; `SUPABASE_PROJECT_URL` and `SUPABASE_PUBLISHABLE_KEY` are used for kiosk setup; `BOOTH_EMAIL` and `BOOTH_AUTH_USER_UUID` are used for booth authentication and enrollment. Hosted Functions receive `SUPABASE_URL` and server credentials from Supabase automatically. Custom secret names beginning with `SUPABASE_` are reserved and cannot be uploaded. See Supabase's [Function environment variables guide](https://supabase.com/docs/guides/functions/secrets).
+
+`PHOTO_BUCKET=photos` names the Supabase Storage fallback bucket, not the R2 bucket. The R2 bucket is selected by `R2_BUCKET_NAME`. For a deployment using only Supabase Storage, omit all four `R2_*` entries and create the fallback bucket as described in step 3; a partial R2 configuration fails closed.
 
 Push the values and verify only their names/digests:
 
