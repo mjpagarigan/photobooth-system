@@ -73,6 +73,7 @@ export async function bootstrap(page: Page): Promise<void> {
   await page.locator('#operator-passcode-confirmation').fill(PASSCODE);
   await page.getByRole('button', { name: 'Save passcode' }).click();
   await expect(page.getByTestId('attract-screen')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
 export async function closeKiosk(kiosk: Kiosk | null): Promise<void> {
