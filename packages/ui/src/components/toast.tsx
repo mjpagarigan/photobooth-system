@@ -44,7 +44,7 @@ function Toasts({
           const Icon = toast.type ? icons[toast.type as keyof typeof icons] : null;
           return (
             <Toast.Root
-              className="rounded-[4px] border border-[#e0e0e0] bg-white text-[#242424] shadow-[var(--shadow-16)] transition-[transform,opacity] data-starting-style:translate-y-2 data-starting-style:opacity-0 data-ending-style:translate-y-2 data-ending-style:opacity-0 motion-reduce:transition-none"
+              className="rounded-[14px] border border-[#e8e8ed] bg-white text-[#1d1d1f] shadow-[var(--shadow-16)] transition-[transform,opacity] data-starting-style:translate-y-2 data-starting-style:opacity-0 data-ending-style:translate-y-2 data-ending-style:opacity-0 motion-reduce:transition-none"
               key={toast.id}
               swipeDirection={position.startsWith('top') ? 'up' : 'down'}
               toast={toast}
@@ -64,7 +64,7 @@ function Toasts({
                   <Toast.Description className="text-sm leading-5 text-muted-foreground" />
                 </div>
                 {toast.actionProps ? (
-                  <Toast.Action className="min-h-8 rounded-[4px] px-3 text-sm font-semibold" />
+                  <Toast.Action className="min-h-8 rounded-full px-3 text-sm font-semibold" />
                 ) : null}
               </Toast.Content>
             </Toast.Root>
