@@ -518,8 +518,7 @@ describe('AdminSettings', () => {
   it('keeps retention read-only and passcode inputs aligned to 8 to 64 characters', async () => {
     const user = userEvent.setup();
     render(<AdminSettingsScreen {...props} />);
-    expect(screen.getByText('30')).toBeVisible();
-    expect(screen.getByText('60')).toBeVisible();
+    expect(screen.getByText(/Photos 60 days · Links 30 days/)).toBeVisible();
     expect(screen.queryByRole('spinbutton', { name: /retention/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Security & Cloud' }));
     expect(screen.getByLabelText('Current passcode')).toHaveAttribute('maxLength', '64');
