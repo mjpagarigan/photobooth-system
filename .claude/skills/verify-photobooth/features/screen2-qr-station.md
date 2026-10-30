@@ -5,7 +5,7 @@ In dual-display mode, the second screen shows the newest finished collage with i
 ## Sub-features
 
 - `screen2-active` shows the latest collage, QR code, and timer.
-- `screen2-idle` shows the idle background and the Recent control. Not reachable by this harness.
+- `screen2-idle` shows the M.A.T. logo, "Your photo appears here.", and the Recent control. The journeys do not reach it; `scripts/compare.mjs qr-station-idle=Screen2Idle` renders its fixture.
 - `screen2-routing` sends a newer result to Screen 2 and replaces an older one. Not reachable by this harness.
 
 ## How to get to it (user POV)
