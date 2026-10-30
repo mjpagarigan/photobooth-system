@@ -2,8 +2,6 @@ import type { FrameLayout, FrameSummary } from '@grace-booth/shared';
 
 export const LOCAL_FIXTURES = {
   finalBackground: '/backgrounds/ministry-fair-download.jpeg',
-  processingBackground: '/backgrounds/processing.jpg',
-  processingAnimation: '/animations/loading.json',
   countdownAudio: '/audio/countdown.wav',
   annivFrame: '/frames/anniv-frame.png',
   defaultFrame: '/frames/mat-frame.png',

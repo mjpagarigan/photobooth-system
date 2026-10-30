@@ -169,7 +169,7 @@ describe('guest screen components', () => {
         onRetake={() => undefined}
       />,
     );
-    expect(screen.getAllByRole('figure')).toHaveLength(6);
+    expect(screen.getAllByRole('figure')).toHaveLength(9);
     expect(screen.getByTestId('collage-option-1')).toHaveClass('is-selected');
     expect(screen.getByTestId('collage-option-2')).not.toHaveClass('is-selected');
 
@@ -257,13 +257,13 @@ describe('guest screen components', () => {
 
   it('distinguishes collage processing from upload backoff without claiming readiness', () => {
     const { rerender } = render(<ProcessingScreen state="processing" />);
-    expect(screen.getByText('Creating your collage')).toBeVisible();
-    expect(screen.getByText('Combining your photos into one finished image.')).toBeVisible();
+    expect(screen.getByRole('heading', { name: /Creating your keepsake\./ })).toBeVisible();
+    expect(screen.getByText('It only takes a few seconds.')).toBeVisible();
     expect(screen.getByTestId('processing-animation')).toBeVisible();
     expect(screen.queryByText('Photo ready')).not.toBeInTheDocument();
 
     rerender(<ProcessingScreen state="pending_upload" />);
-    expect(screen.getByText('Your photo is safely saved')).toBeVisible();
+    expect(screen.getByRole('heading', { name: /Your photo is safely saved\./ })).toBeVisible();
     expect(screen.getByTestId('processing-screen')).toHaveAttribute('data-state', 'pending_upload');
   });
 

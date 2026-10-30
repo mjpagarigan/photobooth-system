@@ -384,20 +384,16 @@ test('reduced motion removes cosmetic rotation and shutter flash', async ({ page
     .toEqual({ animationName: 'none', opacity: '0' });
 });
 
-test('processing loads the packaged Lottie animation without external requests', async ({
-  page,
-}) => {
+test('processing shows its local animation without external requests', async ({ page }) => {
   const externalRequests: string[] = [];
-  const animationRequests: string[] = [];
   page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.endsWith('/animations/loading.json')) animationRequests.push(request.url());
-    if (url.origin !== 'http://127.0.0.1:4174') externalRequests.push(request.url());
+    if (new URL(request.url()).origin !== 'http://127.0.0.1:4174') {
+      externalRequests.push(request.url());
+    }
   });
   await page.setViewportSize({ width: 1_366, height: 768 });
   await page.goto('/?visual=processing');
   await expect(page.locator('.processing-animation svg')).toBeVisible();
-  expect(animationRequests).toHaveLength(1);
   expect(externalRequests).toEqual([]);
 });
 
