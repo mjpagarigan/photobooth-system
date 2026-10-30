@@ -15,7 +15,13 @@ export function ProgressStepper({ activeStep, label, total = 3 }: ProgressSteppe
       <div className="progress-stepper__bars" aria-hidden="true">
         {Array.from({ length: total }, (_, index) => (
           <span
-            className={`progress-stepper__bar${index < safeActiveStep ? ' is-active' : ''}`}
+            className={`progress-stepper__bar${
+              index + 1 === safeActiveStep
+                ? ' is-current'
+                : index + 1 < safeActiveStep
+                  ? ' is-done'
+                  : ''
+            }`}
             key={index}
           />
         ))}

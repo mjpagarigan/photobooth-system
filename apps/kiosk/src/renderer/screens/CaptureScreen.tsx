@@ -1,5 +1,3 @@
-import { CheckCircle } from '@grace-booth/ui';
-
 import { ProgressStepper } from '../components/ProgressStepper';
 import { mockPhotoFor } from '../local-fixtures';
 
@@ -33,11 +31,10 @@ export function CaptureScreen({
   return (
     <main className="screen screen--capture" data-phase={phase} data-testid="capture-screen">
       <header className="capture-header">
-        <ProgressStepper activeStep={safeShot} total={totalShots} />
         <div className="camera-ready-badge" role="status">
-          <CheckCircle aria-hidden="true" weight="bold" />
-          <span>{liveVideoRef && !liveStreamReady ? 'Getting camera ready…' : 'Camera ready'}</span>
+          {liveVideoRef && !liveStreamReady ? 'Getting camera ready…' : null}
         </div>
+        <ProgressStepper activeStep={safeShot} total={totalShots} />
       </header>
       <section className="viewfinder" aria-labelledby="capture-title">
         {liveVideoRef ? (
@@ -61,25 +58,23 @@ export function CaptureScreen({
           />
         )}
         <div className="viewfinder__scrim" aria-hidden="true" />
-        <div className="viewfinder__pose-copy">
-          <span>{poseSuggestion}</span>
-        </div>
         {phase === 'countdown' ? (
-          <div className="countdown-card">
-            <span
-              className="countdown-card__number"
-              data-testid="countdown-value"
-              role="timer"
-              aria-label={`${secondsRemaining} seconds until photo ${safeShot}`}
-            >
-              {secondsRemaining}
-            </span>
-            <h1
-              className="sr-only"
-              id="capture-title"
-              data-screen-heading
-              tabIndex={-1}
-            >
+          <div className="countdown-stack">
+            <p className="countdown-stack__prompt" aria-hidden="true">
+              {secondsRemaining <= 3 ? 'Hold your pose…' : 'Get ready! Snapping your photo in…'}
+            </p>
+            <p className="countdown-stack__pose">{poseSuggestion}</p>
+            <div className="countdown-card">
+              <span
+                className="countdown-card__number"
+                data-testid="countdown-value"
+                role="timer"
+                aria-label={`${secondsRemaining} seconds until photo ${safeShot}`}
+              >
+                {secondsRemaining}
+              </span>
+            </div>
+            <h1 className="sr-only" id="capture-title" data-screen-heading tabIndex={-1}>
               {countdownHint}
             </h1>
           </div>
