@@ -2816,166 +2816,154 @@ body,
    ========================================================================== */
 
 .camera-setup-dialog {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: min(900px, calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 32px);
   overflow: hidden;
-  border: 1px solid #d2d2d7;
-  border-radius: var(--radius-lg);
-  background: #ffffff;
-  box-shadow: var(--shadow-28);
-  color: #1d1d1f;
 }
 
 .camera-setup-dialog__header {
-  display: flex;
+  position: relative;
   align-items: center;
-  gap: 16px;
-  padding: 18px 24px;
-  border-bottom: 1px solid #f0f0f2;
-  background: #fbfbfd;
-}
-
-.camera-setup-dialog__icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-  border: 1px solid #d6e8fb;
-  border-radius: var(--radius-full);
-  background: #e8f2fd;
-  color: var(--color-primary);
-}
-
-.camera-setup-dialog__header h2 {
-  margin: 0 0 2px;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  color: #1d1d1f;
+  padding: 0 48px 4px;
+  text-align: center;
 }
 
 .camera-setup-dialog__subtitle {
-  margin: 0;
-  color: #636366;
-  font-size: 13px;
+  font-size: 15px;
+  color: var(--color-ink-muted);
+}
+
+.camera-setup-dialog__close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  border-radius: var(--radius-full);
+  background: #f5f5f7;
 }
 
 .camera-setup-dialog__content {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  gap: 18px;
-  min-height: 0;
+  gap: 16px;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 8px 2px 4px;
+}
+
+.camera-adapter-selector > label {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .camera-source-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 14px;
+  background: #f5f5f7;
 }
 
 .camera-source-card {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 10px;
-  min-height: 80px;
-  padding: 12px 14px;
-  border: 1px solid #d2d2d7;
-  border-radius: var(--radius-sm);
-  background: #ffffff;
-  color: #424245;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  min-height: 52px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-ink-pure);
   cursor: pointer;
-  text-align: left;
-  transition: all 120ms ease;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .camera-source-card > svg {
-  grid-row: 1 / span 2;
-  margin-top: 2px;
+  width: 20px;
+  height: 20px;
+  color: var(--color-ink-secondary);
 }
 
-.camera-source-card:hover,
-.camera-source-card:focus-visible {
-  border-color: var(--color-primary);
-  background: #e8e8ed;
-  color: #1d1d1f;
+.camera-source-card:hover {
+  background: rgba(255, 255, 255, 0.6);
 }
 
-.camera-source-card:focus-visible {
+.camera-source-card:focus-within {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .camera-source-card--active {
-  border-color: var(--color-primary);
-  background: #e8f2fd;
-  box-shadow: inset 3px 0 0 var(--color-primary);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .camera-source-card__title {
-  color: #1d1d1f;
-  font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .camera-source-card__desc {
-  color: #636366;
-  font-size: 11px;
-  line-height: 1.35;
+  grid-column: 3;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-ink-muted);
+}
+
+.camera-webcam-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .camera-preview-container {
   display: grid;
-  grid-template-columns: minmax(300px, 1.25fr) minmax(220px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr) 220px;
   gap: 14px;
+  align-items: stretch;
 }
 
 .camera-preview-box {
   position: relative;
-  min-height: 200px;
+  aspect-ratio: 16 / 9;
+  max-height: 34vh;
   overflow: hidden;
-  border: 1px solid #d2d2d7;
-  border-radius: var(--radius-sm);
-  background: #000000;
+  border-radius: 20px;
+  background: #1c1c1e;
 }
 
 .camera-preview-video {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 200px;
   object-fit: cover;
 }
 
 .camera-preview-box__crosshair {
   position: absolute;
   z-index: 2;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.5);
   font: 16px var(--font-mono);
 }
 
 .camera-preview-box__crosshair--tl {
-  top: 8px;
-  left: 10px;
+  top: 10px;
+  left: 14px;
 }
+
 .camera-preview-box__crosshair--tr {
-  top: 8px;
-  right: 10px;
+  top: 10px;
+  right: 14px;
 }
+
 .camera-preview-box__crosshair--bl {
-  bottom: 8px;
-  left: 10px;
+  bottom: 10px;
+  left: 14px;
 }
+
 .camera-preview-box__crosshair--br {
-  right: 10px;
-  bottom: 8px;
+  right: 14px;
+  bottom: 10px;
 }
 
 .camera-preview-overlay {
@@ -2986,8 +2974,9 @@ body,
   justify-content: center;
   gap: 8px;
   padding: 20px;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.6);
   color: #ffffff;
+  font-size: 15px;
   text-align: center;
 }
 
@@ -2996,27 +2985,49 @@ body,
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid #e8e8ed;
-  border-radius: var(--radius-sm);
-  background: #fbfbfd;
-  color: #424245;
-  font-size: 12px;
+  padding: 16px;
+  border: 0;
+  border-radius: 16px;
+  background: #f5f5f7;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .camera-preview-caption strong,
 .camera-info-card strong {
-  color: #1d1d1f;
+  color: var(--color-ink-pure);
+}
+
+.camera-select-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.select-with-refresh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select-with-refresh > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .camera-setup-dialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #f0f0f2;
-  background: #fbfbfd;
+  padding-top: 12px;
 }
 
 .passcode-dialog {

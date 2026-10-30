@@ -179,18 +179,21 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
         showCloseButton={false}
       >
         <DialogHeader className="camera-setup-dialog__header">
-          <div className="camera-setup-dialog__icon">
-            <Camera aria-hidden="true" weight="bold" size={32} />
-          </div>
-          <div>
-            <DialogTitle>Camera configuration</DialogTitle>
-            <DialogDescription className="camera-setup-dialog__subtitle">
-              Select active optical capture source and verify live telemetry feed.
-            </DialogDescription>
-          </div>
+          <DialogTitle>Camera configuration</DialogTitle>
+          <DialogDescription className="camera-setup-dialog__subtitle">
+            Make sure guests are centered and well lit.
+          </DialogDescription>
           <DialogClose
             disabled={saving}
-            render={<Button aria-label="Close" size="icon" type="button" variant="ghost" />}
+            render={
+              <Button
+                aria-label="Close"
+                className="camera-setup-dialog__close"
+                size="icon"
+                type="button"
+                variant="ghost"
+              />
+            }
           >
             <X aria-hidden="true" weight="bold" />
           </DialogClose>
@@ -239,71 +242,6 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
 
           {(selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam') && (
             <div className="camera-webcam-section">
-              <Field className="camera-device-select-row">
-                <FieldLabel>Active device node</FieldLabel>
-                <div className="select-with-refresh">
-                  <Select
-                    items={deviceItems}
-                    value={selectedDeviceId ?? ''}
-                    onValueChange={(value) => setSelectedDeviceId(value ?? null)}
-                  >
-                    <SelectTrigger aria-label="Active device node">
-                      <SelectValue placeholder="Default system webcam" />
-                    </SelectTrigger>
-                    <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
-                      {deviceItems.map((item) => (
-                        <SelectItem key={item.value ? item.value : 'default'} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectPopup>
-                  </Select>
-                  <Button
-                    title="Refresh camera devices"
-                    aria-label="Refresh camera devices"
-                    onClick={() => void loadCameras()}
-                    disabled={loading}
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ArrowsClockwise className={loading ? 'spin' : ''} size={18} weight="bold" />
-                  </Button>
-                </div>
-              </Field>
-
-              <Field className="camera-device-select-row">
-                <FieldLabel>Capture resolution</FieldLabel>
-                <Select
-                  items={RESOLUTION_ITEMS}
-                  value={selectedResolution}
-                  onValueChange={(value) => value !== null && setSelectedResolution(value)}
-                >
-                  <SelectTrigger aria-label="Capture resolution">
-                    <SelectValue placeholder="Select resolution" />
-                  </SelectTrigger>
-                  <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
-                    {RESOLUTION_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-              </Field>
-
-              <Field className="camera-device-select-row">
-                <div className="toggle-row">
-                  <div>
-                    <FieldLabel>Keep webcam always active</FieldLabel>
-                    <FieldDescription>
-                      Keeps the webcam warm invisibly throughout the guest flow for faster captures.
-                    </FieldDescription>
-                  </div>
-                  <Switch checked={alwaysActive} onCheckedChange={setAlwaysActive} />
-                </div>
-              </Field>
-
               <div className="camera-preview-container">
                 <div className="camera-preview-box">
                   <video
@@ -397,6 +335,72 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                   </span>
                 </div>
               </div>
+              <div className="camera-select-grid">
+                <Field className="camera-device-select-row">
+                  <FieldLabel>Active device node</FieldLabel>
+                  <div className="select-with-refresh">
+                    <Select
+                      items={deviceItems}
+                      value={selectedDeviceId ?? ''}
+                      onValueChange={(value) => setSelectedDeviceId(value ?? null)}
+                    >
+                      <SelectTrigger aria-label="Active device node">
+                        <SelectValue placeholder="Default system webcam" />
+                      </SelectTrigger>
+                      <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
+                        {deviceItems.map((item) => (
+                          <SelectItem key={item.value ? item.value : 'default'} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectPopup>
+                    </Select>
+                    <Button
+                      title="Refresh camera devices"
+                      aria-label="Refresh camera devices"
+                      onClick={() => void loadCameras()}
+                      disabled={loading}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <ArrowsClockwise className={loading ? 'spin' : ''} size={18} weight="bold" />
+                    </Button>
+                  </div>
+                </Field>
+
+                <Field className="camera-device-select-row">
+                  <FieldLabel>Capture resolution</FieldLabel>
+                  <Select
+                    items={RESOLUTION_ITEMS}
+                    value={selectedResolution}
+                    onValueChange={(value) => value !== null && setSelectedResolution(value)}
+                  >
+                    <SelectTrigger aria-label="Capture resolution">
+                      <SelectValue placeholder="Select resolution" />
+                    </SelectTrigger>
+                    <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>
+                      {RESOLUTION_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                </Field>
+              </div>
+
+              <Field className="camera-device-select-row">
+                <div className="toggle-row">
+                  <div>
+                    <FieldLabel>Keep webcam always active</FieldLabel>
+                    <FieldDescription>
+                      Keeps the webcam warm invisibly throughout the guest flow for faster captures.
+                    </FieldDescription>
+                  </div>
+                  <Switch checked={alwaysActive} onCheckedChange={setAlwaysActive} />
+                </div>
+              </Field>
             </div>
           )}
 
