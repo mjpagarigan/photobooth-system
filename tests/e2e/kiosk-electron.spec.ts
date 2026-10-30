@@ -68,7 +68,9 @@ test('the Anniversary selection produces and displays the second collage', async
     await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
     await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
 
-    const collage = kiosk.page.getByRole('img', { name: 'Your finished three-photo strip' });
+    const collage = kiosk.page
+      .getByRole('region', { name: 'Your finished photo' })
+      .getByRole('img', { name: 'Your finished photo' });
     await expect(collage).toBeVisible();
     await expect
       .poll(() =>
