@@ -1,7 +1,6 @@
 import type { FrameLayout, FrameSummary } from '@grace-booth/shared';
 
 export const LOCAL_FIXTURES = {
-  attractBackground: '/backgrounds/attract.jpg',
   finalBackground: '/backgrounds/ministry-fair-download.jpeg',
   processingBackground: '/backgrounds/processing.jpg',
   processingAnimation: '/animations/loading.json',
