@@ -40,3 +40,6 @@ Thumbs.db
 .vscode/
 *.swp
 .impeccable/
+
+# verify-photobooth evidence (baseline-fluent is kept locally, never committed)
+artifacts/verify/
