@@ -221,10 +221,10 @@ test('QR station active queue fits at 1920x1080', async ({ page }) => {
   await expect(page.getByTestId('qr-station-active')).toBeVisible();
   await expect(
     page.getByRole('heading', {
-      name: 'Please scan the QR Code beside to download the photo',
+      name: 'You’re all set. Scan to take it home.',
     }),
   ).toBeVisible();
-  await expect(page.getByText(/Next photo replaces this in \d+s/)).toBeVisible();
+  await expect(page.getByText(/Clears in \d+s/)).toBeVisible();
   await waitForVisualAssets(page);
   await expectNoPageOverflow(page);
 

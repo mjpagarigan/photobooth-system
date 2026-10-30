@@ -1,4 +1,4 @@
-import { CalendarBlank, CheckCircle, Images, WarningCircle } from '@grace-booth/ui';
+import { WarningCircle } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
@@ -116,180 +116,101 @@ export function QrStationScreen(): React.ReactElement {
     return Math.max(0, Math.min(100, (secondsRemaining / stationState.durationSeconds) * 100));
   }, [stationState.status, stationState.durationSeconds, secondsRemaining]);
 
-  const idleBackground =
-    ('ministryIdleBackground' in LOCAL_FIXTURES
-      ? (LOCAL_FIXTURES as unknown as Record<string, string>).ministryIdleBackground
-      : null) ?? LOCAL_FIXTURES.finalBackground;
+  const recentButton = (
+    <button
+      className="operator-access recent-access qr-station__recent"
+      onClick={() => void openRecentGallery()}
+      aria-label="Recent Photos"
+      title="Recent Photos"
+      type="button"
+    >
+      <span className="operator-access__text">Recent</span>
+    </button>
+  );
+
+  const recentGallery = recentOpen ? (
+    <RecentGallery
+      items={recentItems}
+      busy={recentBusy}
+      error={recentError}
+      onClose={closeRecentGallery}
+    />
+  ) : null;
+
+  const timer = (
+    <div className="qr-station__timer">
+      <span>Clears in {secondsRemaining}s</span>
+      <div className="qr-station__timer-bar" aria-hidden="true">
+        <div className="qr-station__timer-progress" style={{ width: `${progressPercentage}%` }} />
+      </div>
+    </div>
+  );
 
   if (stationState.status === 'error') {
     return (
-      <main
-        className="screen screen--final screen--qr-station qr-station--error"
-        data-testid="qr-station-error"
-      >
-        <img
-          className="final-background qr-station__background"
-          src={LOCAL_FIXTURES.finalBackground}
-          alt=""
-          aria-hidden="true"
-          draggable="false"
-        />
-        <div className="final-scrim" aria-hidden="true" />
-        <div className="final-composition">
-          <section className="qr-panel" aria-labelledby="qr-station-error-title">
-            <div className="qr-panel__copy">
-              <WarningCircle aria-hidden="true" size={48} weight="bold" />
-              <h1 id="qr-station-error-title" data-screen-heading tabIndex={-1}>
-                Photo delivery unavailable
-              </h1>
-              <p>
-                {stationState.message ?? 'Ask an operator for help or try another photo session.'}
-              </p>
-            </div>
-            <div className="qr-station__timer-bar" aria-hidden="true">
-              <div
-                className="qr-station__timer-progress"
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-            <div className="qr-panel__notice">
-              <CalendarBlank aria-hidden="true" weight="bold" />
-              <span>Auto-clearing in {secondsRemaining}s</span>
-            </div>
-            <div className="qr-panel__actions">
-              <Button
-                className="qr-panel__done"
-                iconAfter={<CheckCircle aria-hidden="true" weight="bold" />}
-                onClick={() => void handleDismiss()}
-                wide
-              >
-                Done
-              </Button>
-            </div>
-          </section>
-        </div>
+      <main className="screen screen--qr-station qr-station--error" data-testid="qr-station-error">
+        {timer}
+        <section className="qr-station__message" aria-labelledby="qr-station-error-title">
+          <WarningCircle aria-hidden="true" size={56} />
+          <h1 id="qr-station-error-title" data-screen-heading tabIndex={-1}>
+            Photo delivery unavailable
+          </h1>
+          <p>{stationState.message ?? 'Ask an operator for help or try another photo session.'}</p>
+          <Button className="button--station-done" onClick={() => void handleDismiss()}>
+            Done
+          </Button>
+        </section>
       </main>
     );
   }
 
-  // 1. Idle State: Full bleed background with top-right Recent Photos button
   if (stationState.status === 'idle' || !stationState.collageUrl || !stationState.qrImageUrl) {
     return (
-      <main
-        className="screen screen--final screen--qr-station qr-station--idle"
-        data-testid="qr-station-idle"
-      >
-        <img
-          className="final-background qr-station__background"
-          src={idleBackground}
-          alt=""
-          aria-hidden="true"
-          draggable="false"
-        />
-        <div className="final-top-controls qr-station__top-controls">
-          <button
-            className="operator-access recent-access"
-            onClick={() => void openRecentGallery()}
-            aria-label="Recent Photos"
-            title="Recent Photos"
-          >
-            <Images aria-hidden="true" weight="bold" />
-            <span className="operator-access__text">Recent</span>
-          </button>
-        </div>
-
-        {recentOpen && (
-          <RecentGallery
-            items={recentItems}
-            busy={recentBusy}
-            error={recentError}
-            onClose={closeRecentGallery}
+      <main className="screen screen--qr-station qr-station--idle" data-testid="qr-station-idle">
+        {recentButton}
+        <section className="qr-station__message" aria-labelledby="qr-station-idle-title">
+          <img
+            className="qr-station__logo"
+            src={LOCAL_FIXTURES.ministryIdleBackground}
+            alt="M.A.T. Media and Technology"
+            draggable="false"
           />
-        )}
+          <h1 id="qr-station-idle-title">Your photo appears here.</h1>
+          <p>Finish on the main screen, then scan your code right here.</p>
+        </section>
+        {recentGallery}
       </main>
     );
   }
 
-  // 2. Active QR State: Collage preview + QR code + timer + actions
   return (
-    <main
-      className="screen screen--final screen--qr-station qr-station--active"
-      data-testid="qr-station-active"
-    >
-      <img
-        className="final-background qr-station__background"
-        src={LOCAL_FIXTURES.finalBackground}
-        alt=""
-        aria-hidden="true"
-        draggable="false"
-      />
-      <div className="final-scrim" aria-hidden="true" />
-      <div className="final-top-controls qr-station__top-controls">
-        <button
-          className="operator-access recent-access"
-          onClick={() => void openRecentGallery()}
-          aria-label="Recent Photos"
-          title="Recent Photos"
-        >
-          <Images aria-hidden="true" weight="bold" />
-          <span className="operator-access__text">Recent</span>
-        </button>
+    <main className="screen screen--qr-station qr-station--active" data-testid="qr-station-active">
+      <div className="qr-station__corner">
+        {timer}
+        {recentButton}
       </div>
-
-      <div className="final-composition">
-        <section className="final-result" aria-label="Your finished photo">
+      <div className="qr-station__layout">
+        <section className="final-result qr-station__result" aria-label="Your finished photo">
           <Photostrip
             collageUrl={stationState.collageUrl}
             label="Your finished photo"
             variant="collage"
           />
         </section>
-
-        <section className="qr-panel" aria-labelledby="qr-station-title">
-          <div className="qr-panel__copy">
-            <h1 id="qr-station-title" data-screen-heading tabIndex={-1}>
-              Please scan the QR Code beside to download the photo
-            </h1>
-            <p>Scan the QR code with your phone camera to download your photo strip.</p>
-          </div>
-
-          <div className="qr-panel__code">
+        <section className="qr-station__panel" aria-labelledby="qr-station-title">
+          <h1 id="qr-station-title" data-screen-heading tabIndex={-1}>
+            You’re all set. <span>Scan to take it home.</span>
+          </h1>
+          <p>Available for 30 days</p>
+          <div className="qr-station__code">
             <img src={stationState.qrImageUrl} alt="QR code for photo download" draggable="false" />
           </div>
-
-          <div className="qr-station__timer-bar" aria-hidden="true">
-            <div
-              className="qr-station__timer-progress"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-
-          <div className="qr-panel__notice">
-            <CalendarBlank aria-hidden="true" weight="bold" />
-            <span>Auto-clearing in {secondsRemaining}s • Available for 30 days</span>
-          </div>
-
-          <div className="qr-panel__actions">
-            <Button
-              className="qr-panel__done"
-              iconAfter={<CheckCircle aria-hidden="true" weight="bold" />}
-              onClick={() => void handleDismiss()}
-              wide
-            >
-              Done
-            </Button>
-          </div>
+          <Button className="button--station-done" onClick={() => void handleDismiss()}>
+            Done
+          </Button>
         </section>
       </div>
-
-      {recentOpen && (
-        <RecentGallery
-          items={recentItems}
-          busy={recentBusy}
-          error={recentError}
-          onClose={closeRecentGallery}
-        />
-      )}
+      {recentGallery}
     </main>
   );
 }

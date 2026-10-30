@@ -30,7 +30,8 @@ try {
     await page.evaluate('document.fonts.ready');
     const prototype = (await page.screenshot()).toString('base64');
 
-    await page.goto(`http://127.0.0.1:4174/?visual=${state}`);
+    const view = state.startsWith('qr-station') ? 'view=qr-station&' : '';
+    await page.goto(`http://127.0.0.1:4174/?${view}visual=${state}`);
     await page.getByTestId('renderer-loading').waitFor({ state: 'detached', timeout: 30_000 });
     await page.evaluate('document.fonts.ready');
     await page.waitForTimeout(400);

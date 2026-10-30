@@ -70,12 +70,12 @@ describe('QrStationScreen', () => {
 
     const recentButton = screen.getByRole('button', { name: /recent photos/i });
     expect(recentButton).toBeInTheDocument();
-    expect(screen.getByTestId('qr-station-idle')).toHaveClass('screen--final');
-    expect(document.querySelector<HTMLImageElement>('img.qr-station__background')).toHaveAttribute(
+    expect(screen.getByTestId('qr-station-idle')).toHaveClass('screen--qr-station');
+    expect(screen.getByRole('img', { name: 'M.A.T. Media and Technology' })).toHaveAttribute(
       'src',
       '/backgrounds/ministry-idle.jpg',
     );
-    expect(screen.queryByText(/please scan the qr code/i)).not.toBeInTheDocument();
+    expect(screen.queryByAltText(/qr code for photo download/i)).not.toBeInTheDocument();
   });
 
   it('renders active QR screen with collage, QR code and countdown timer', async () => {
@@ -100,9 +100,9 @@ describe('QrStationScreen', () => {
     });
 
     expect(
-      screen.getByText(/please scan the qr code beside to download the photo/i),
+      screen.getByRole('heading', { name: /you’re all set\. scan to take it home\./i }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('qr-station-active')).toHaveClass('screen--final');
+    expect(screen.getByTestId('qr-station-active')).toHaveClass('screen--qr-station');
     expect(screen.getByRole('button', { name: /recent photos/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /done/i })).toBeInTheDocument();
     expect(screen.getByAltText(/qr code for photo download/i)).toBeInTheDocument();
@@ -111,11 +111,11 @@ describe('QrStationScreen', () => {
       'intrinsic',
     );
     await waitFor(() => {
-      expect(screen.getByText(/auto-clearing in 90s/i)).toBeInTheDocument();
+      expect(screen.getByText(/clears in 90s/i)).toBeInTheDocument();
     });
   });
 
-  it('renders an auto-clearing error state for a failed newest session', async () => {
+  it('renders a self-clearing error state for a failed newest session', async () => {
     mockBridge.qrStation.getState.mockResolvedValue({
       ok: true,
       data: {
@@ -137,7 +137,7 @@ describe('QrStationScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/auto-clearing in 30s/i)).toBeInTheDocument();
+      expect(screen.getByText(/clears in 30s/i)).toBeInTheDocument();
     });
   });
 
