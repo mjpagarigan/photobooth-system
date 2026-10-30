@@ -1,12 +1,12 @@
-/* Grace Booth guest download page. Apple-style palette: #0071E3 action blue, #1D1D1F ink, #F5F5F7 canvas. */
+/* Grace Booth guest download page. Apple-style palette: #0066CC action blue, #1D1D1F ink, #F5F5F7 canvas. */
 
 @import '@grace-booth/ui/styles/theme.css';
 
 :root {
   color-scheme: light;
-  --color-primary: #0071e3;
-  --color-primary-hover: #0077ed;
-  --color-primary-pressed: #006edb;
+  --color-primary: #0066cc;
+  --color-primary-hover: #0071e3;
+  --color-primary-pressed: #00539f;
   --color-primary-tint: #e8f2fd;
 
   --color-secondary: #ffffff;
@@ -20,7 +20,7 @@
   --color-ink: #1d1d1f;
   --color-ink-pure: #1d1d1f;
   --color-ink-secondary: #424245;
-  --color-ink-muted: #6e6e73;
+  --color-ink-muted: #636366;
   --color-ink-disabled: #aeaeb2;
 
   --color-stroke-1: #d2d2d7;
@@ -250,7 +250,7 @@ a:focus-visible,
 }
 
 .success-eyebrow {
-  color: #248a3d;
+  color: #1b6f30;
   background: #e3f5e7;
   border: 1px solid #b5e2c0;
   border-radius: var(--radius-full);

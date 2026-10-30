@@ -7,7 +7,7 @@ import {
 import React, { type ReactNode } from 'react';
 
 /**
- * Brand ramp anchored to the Apple-style action blue #0071E3
+ * Brand ramp anchored to the Apple-style action blue #0066CC
  */
 export const fluentBrandRamp: BrandVariants = {
   10: '#001a33',
@@ -16,9 +16,9 @@ export const fluentBrandRamp: BrandVariants = {
   40: '#004c99',
   50: '#005bb8',
   60: '#0066cc',
-  70: '#006edb',
-  80: '#0071e3',
-  90: '#0077ed',
+  70: '#00539f',
+  80: '#0066cc',
+  90: '#0071e3',
   100: '#2b8cf0',
   110: '#4d9ff2',
   120: '#70b2f5',
@@ -36,16 +36,16 @@ const appleFontStack =
 export const graceBoothFluentTheme: Theme = {
   ...baseTheme,
 
-  colorBrandBackground: '#0071E3',
-  colorBrandBackgroundHover: '#0077ED',
-  colorBrandBackgroundPressed: '#006EDB',
+  colorBrandBackground: '#0066CC',
+  colorBrandBackgroundHover: '#0071E3',
+  colorBrandBackgroundPressed: '#00539F',
   colorBrandBackground2: '#E8F2FD',
   colorBrandForeground1: '#0066CC',
   colorBrandForeground2: '#004C99',
 
   colorNeutralForeground1: '#1D1D1F',
   colorNeutralForeground2: '#424245',
-  colorNeutralForeground3: '#6E6E73',
+  colorNeutralForeground3: '#636366',
   colorNeutralForeground4: '#86868B',
   colorNeutralForegroundDisabled: '#AEAEB2',
   colorNeutralForegroundOnBrand: '#FFFFFF',
