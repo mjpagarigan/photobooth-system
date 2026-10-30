@@ -87,7 +87,9 @@ test('resolves, displays, and downloads a private photo without leaking the toke
   const calls = await installReadyApi(page);
   await page.goto(`/photo#${TOKEN}`);
 
-  await expect(page.getByRole('heading', { name: 'Hold on to this moment.' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'You’re all set. Here’s your keepsake.' }),
+  ).toBeVisible();
   await expect(page.getByAltText('M.A.T. Photobooth finished event collage')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Join a ministry' })).toHaveAttribute(
     'href',
