@@ -28,8 +28,10 @@ export function AttractScreen({
   const startButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    startButtonRef.current?.focus();
-  }, []);
+    if (!canStart || busy) return;
+    const active = document.activeElement;
+    if (active === null || active === document.body) startButtonRef.current?.focus();
+  }, [busy, canStart]);
 
   const shotWord = SHOT_WORDS[shotCount] ?? String(shotCount);
 
