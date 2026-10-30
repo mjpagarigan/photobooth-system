@@ -1,4 +1,4 @@
-import { Eye, EyeSlash, LockKey, X } from '@grace-booth/ui';
+import { Eye, EyeSlash, X } from '@grace-booth/ui';
 import { useRef, useState } from 'react';
 
 import {
@@ -95,9 +95,6 @@ export function PasscodeDialog({
         showCloseButton={false}
       >
         <DialogHeader className="passcode-dialog__header">
-          <div className="passcode-dialog__motif">
-            <LockKey aria-hidden="true" weight="bold" />
-          </div>
           <div>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
@@ -122,14 +119,11 @@ export function PasscodeDialog({
         <Form className="contents" noValidate onSubmit={submit}>
           <DialogPanel className="passcode-dialog__form">
             {displayedError ? (
-              <div
-                className="form-error"
-                role="alert"
-              >
+              <div className="form-error" role="alert">
                 {displayedError}
               </div>
             ) : null}
-            <Field name="passcode">
+            <Field className="passcode-field" name="passcode">
               <FieldLabel>Passcode</FieldLabel>
               <div className="password-field">
                 <Input
@@ -166,7 +160,7 @@ export function PasscodeDialog({
               <FieldDescription>Use at least {MIN_PASSCODE_LENGTH} characters.</FieldDescription>
             </Field>
             {isBootstrap ? (
-              <Field name="confirmation">
+              <Field className="passcode-field" name="confirmation">
                 <FieldLabel>Confirm passcode</FieldLabel>
                 <Input
                   autoComplete="new-password"
@@ -187,10 +181,7 @@ export function PasscodeDialog({
           </DialogPanel>
           <DialogFooter className="passcode-dialog__actions">
             {dismissible ? (
-              <DialogClose
-                disabled={busy}
-                render={<Button type="button" variant="secondary" />}
-              >
+              <DialogClose disabled={busy} render={<Button type="button" variant="secondary" />}>
                 Cancel
               </DialogClose>
             ) : null}

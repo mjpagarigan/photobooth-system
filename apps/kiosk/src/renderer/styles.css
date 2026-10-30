@@ -2836,71 +2836,52 @@ body,
 }
 
 .passcode-dialog {
-  display: flex;
-  flex-direction: column;
-  padding: 32px 36px;
-  border-radius: var(--radius-lg);
-  background: #ffffff;
-  border: 1px solid #d2d2d7;
-  box-shadow: var(--shadow-28);
-  max-width: 440px;
-  width: 100%;
-  position: relative;
-}
-
-.passcode-dialog__close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  max-width: 420px;
 }
 
 .passcode-dialog__header {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.passcode-dialog__motif {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  background: #e8f2fd;
-  border: 1px solid #d6e8fb;
-  color: var(--color-primary);
-  flex-shrink: 0;
-}
-
-.passcode-dialog__header h2 {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  color: #1d1d1f;
-  margin: 0 0 4px 0;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding-right: 44px;
 }
 
 .passcode-dialog__header p {
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: #636366;
   margin: 0;
+  font-size: 15px;
   line-height: 1.45;
+  color: var(--color-ink-muted);
+}
+
+.passcode-dialog__close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  border-radius: var(--radius-full);
+  background: #f5f5f7;
 }
 
 .passcode-dialog__form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.passcode-dialog__form label {
-  font-family: var(--font-body);
+.passcode-field {
+  position: relative;
+  gap: 8px;
+}
+
+.passcode-field > label {
+  position: absolute;
+  top: 9px;
+  left: 15px;
+  z-index: 1;
   font-size: 12px;
-  font-weight: 600;
-  color: #1d1d1f;
+  font-weight: 400;
+  color: var(--color-ink-muted);
+  pointer-events: none;
 }
 
 .password-field {
@@ -2909,51 +2890,57 @@ body,
   align-items: center;
 }
 
-.password-field input,
 .passcode-dialog__form input {
   width: 100%;
-  height: 40px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  height: 58px;
+  min-height: 58px;
+  padding: 22px 56px 6px 14px;
+  border-radius: 12px;
+  border: 1px solid #86868b;
   background: #ffffff;
-  border: 1px solid #1d1d1f;
-  color: #1d1d1f;
+  color: var(--color-ink-pure);
   font-family: var(--font-body);
-  font-size: 14px;
-  outline: none;
+  font-size: 17px;
   box-shadow: none;
-  transition: border-color 100ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.password-field input:hover,
-.passcode-dialog__form input:hover {
-  border-color: #000000;
+.passcode-dialog__form input:focus-visible,
+.passcode-dialog__form input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.25);
 }
 
-.password-field input:focus,
-.password-field input:focus-visible,
-.passcode-dialog__form input:focus,
-.passcode-dialog__form input:focus-visible {
-  border: 1px solid #1d1d1f;
-  border-color: #1d1d1f;
-  outline: none;
-  box-shadow: none;
+.passcode-dialog__form input[aria-invalid='true'] {
+  border-color: var(--color-maroon);
 }
 
 .password-field__toggle {
   position: absolute;
-  right: 8px;
+  right: 6px;
+  top: 7px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-full);
   background: transparent;
-  border: none;
-  color: #636366;
+  color: var(--color-ink-muted);
   cursor: pointer;
 }
 
 .passcode-dialog__actions {
   display: flex;
-  gap: 12px;
-  margin-top: 12px;
   justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.passcode-dialog__actions .button {
+  min-height: 44px;
+  padding: 0 22px;
 }
 
 .form-error {
