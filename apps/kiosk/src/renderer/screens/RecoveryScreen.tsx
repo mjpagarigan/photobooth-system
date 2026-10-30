@@ -1,16 +1,7 @@
-import {
-  ArrowClockwise,
-  CheckCircle,
-  CloudSlash,
-  LockKey,
-  SpinnerGap,
-  VideoCameraSlash,
-} from '@grace-booth/ui';
+import { CloudSlash, SpinnerGap, VideoCameraSlash } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
 
 import { Button } from '../components/Button';
-import { BrandMark } from '../components/BrandMark';
-import { LOCAL_FIXTURES } from '../local-fixtures';
 import type { RecoveryVariant } from '../types';
 
 type RecoveryScreenProps = {
@@ -27,20 +18,20 @@ type RecoveryScreenProps = {
 
 const COPY = {
   camera: {
-    title: 'Camera needs attention',
-    body: 'An operator needs to check the camera connection before you can continue.',
+    title: 'Your camera needs a hand.',
+    body: 'Ask a booth volunteer to check the camera connection, then start again.',
     action: 'Restart session',
     icon: VideoCameraSlash,
   },
   upload: {
-    title: 'Upload did not finish',
-    body: 'Your photo is saved on this booth. You can try uploading again or finish without cloud upload.',
+    title: 'Your upload didn’t finish.',
+    body: 'Your photo is safe on this booth. Try again, or finish offline and download it over the booth’s network.',
     action: 'Retry upload',
     icon: CloudSlash,
   },
   interrupted: {
-    title: 'Restoring your session',
-    body: 'Please wait while the booth checks your saved progress.',
+    title: 'Picking up where you left off.',
+    body: 'The booth is checking your saved photos.',
     action: null,
     icon: SpinnerGap,
   },
@@ -67,57 +58,59 @@ export function RecoveryScreen({
 
   return (
     <main className="screen screen--recovery" data-testid={`recovery-${variant}`}>
-      <section className="recovery-art" aria-hidden="true">
-        <img src={LOCAL_FIXTURES.recoveryBackground} alt="" draggable="false" />
-        <div className="recovery-art__fade" />
-      </section>
-      <section className="recovery-content">
-        <BrandMark compact muted />
-        <article
-          className="recovery-card"
-          role={variant === 'interrupted' ? 'status' : 'alert'}
-          aria-live={variant === 'interrupted' ? 'polite' : 'assertive'}
-        >
-          <div className={`recovery-card__icon recovery-card__icon--${variant}`} aria-hidden="true">
-            <Icon weight="bold" />
-          </div>
-          <h1 ref={headingRef} tabIndex={-1} data-screen-heading>
-            {copy.title}
-          </h1>
-          <p>{message ?? copy.body}</p>
-          {variant === 'camera' ? (
-            <Button icon={<LockKey aria-hidden="true" weight="bold" />} loading={busy} onClick={onRestart}>
+      <article
+        className="recovery-card"
+        role={variant === 'interrupted' ? 'status' : 'alert'}
+        aria-live={variant === 'interrupted' ? 'polite' : 'assertive'}
+      >
+        <div className={`recovery-card__icon recovery-card__icon--${variant}`} aria-hidden="true">
+          <Icon />
+        </div>
+        <h1 ref={headingRef} tabIndex={-1} data-screen-heading>
+          {copy.title}
+        </h1>
+        <p>{message ?? copy.body}</p>
+        {variant === 'camera' ? (
+          <div className="recovery-actions recovery-actions--single">
+            <Button className="button--recovery-primary" loading={busy} onClick={onRestart}>
               {copy.action}
             </Button>
-          ) : null}
-          {variant === 'upload' ? (
-            <div className="recovery-actions">
+          </div>
+        ) : null}
+        {variant === 'upload' ? (
+          <div className="recovery-actions">
+            {onFinishOffline && (
               <Button
-                disabled={!canRetryUpload}
-                icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
+                className="button--recovery-dark"
+                disabled={!canFinishOffline}
                 loading={busy}
-                onClick={onRetryUpload}
+                onClick={onFinishOffline}
               >
-                {copy.action}
+                Finish offline
               </Button>
-              {onFinishOffline && (
-                <Button
-                  disabled={!canFinishOffline}
-                  variant="secondary"
-                  icon={<CheckCircle aria-hidden="true" weight="bold" />}
-                  loading={busy}
-                  onClick={onFinishOffline}
-                >
-                  Finish offline
-                </Button>
-              )}
-            </div>
-          ) : null}
-        </article>
-      </section>
+            )}
+            <Button
+              className="button--recovery-primary"
+              disabled={!canRetryUpload}
+              loading={busy}
+              onClick={onRetryUpload}
+            >
+              {copy.action}
+            </Button>
+          </div>
+        ) : null}
+        {variant !== 'interrupted' ? (
+          <p className="recovery-card__help">Still stuck? Ask a booth volunteer.</p>
+        ) : null}
+      </article>
       {variant !== 'interrupted' ? (
-        <button className="operator-access" onClick={onOpenAdmin} aria-label="Admin" title="Admin">
-          <LockKey aria-hidden="true" weight="bold" />
+        <button
+          className="operator-access recovery-admin"
+          onClick={onOpenAdmin}
+          aria-label="Admin"
+          title="Admin"
+          type="button"
+        >
           <span>Admin</span>
         </button>
       ) : null}

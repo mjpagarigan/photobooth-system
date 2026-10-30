@@ -7,7 +7,6 @@ export const LOCAL_FIXTURES = {
   defaultFrame: '/frames/mat-frame.png',
   matFrame: '/frames/mat-frame.png',
   mockPhotos: ['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg'],
-  recoveryBackground: '/backgrounds/recovery.jpg',
   shutterAudio: '/audio/shutter.wav',
   ministryIdleBackground: '/backgrounds/ministry-idle.jpg',
 } as const;

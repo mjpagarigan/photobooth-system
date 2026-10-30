@@ -5,7 +5,7 @@ When cloud delivery fails, the booth retries after 1, 3 and 8 seconds, then show
 ## Sub-features
 
 - `upload-retrying` shows processing in `pending_upload` state while retries run.
-- `upload-failed` shows the `Upload did not finish` recovery screen with `Retry upload` and `Finish offline`.
+- `upload-failed` shows the `Your upload didn’t finish.` recovery screen with `Retry upload` and `Finish offline`.
 - `upload-retry` retries and reaches the final screen.
 - `upload-offline` finishes offline and reaches the final screen with a same-network QR.
 
@@ -21,7 +21,7 @@ Preconditions:
 
 - **Run.** `pnpm exec playwright test -c .claude/skills/verify-photobooth/playwright.config.ts --project=kiosk kiosk-upload-failed`.
 - **Retrying.** After `Use these photos`, `processing-screen` reports `data-state="pending_upload"`. Evidence `upload-failed/01-retrying`.
-- **Failed.** `recovery-upload` shows the heading `Upload did not finish`. Evidence `02-upload-failed`.
+- **Failed.** `recovery-upload` shows the heading `Your upload didn’t finish.`. Evidence `02-upload-failed`.
 - **Finish offline.** `Finish offline` is enabled; tap it. `final-screen` shows the download QR. Evidence `03-final-offline`.
 
 ## Gotchas

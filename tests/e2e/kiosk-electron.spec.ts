@@ -141,7 +141,9 @@ test('automatic 1/3/8 second retry cycle exhausts and manual retry succeeds', as
     await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
     await expect(kiosk.page.getByTestId('recovery-upload')).toBeVisible({ timeout: 40_000 });
     expect(Date.now() - acceptedAt).toBeGreaterThanOrEqual(11_500);
-    await expect(kiosk.page.getByRole('heading', { name: 'Upload did not finish' })).toBeVisible();
+    await expect(
+      kiosk.page.getByRole('heading', { name: 'Your upload didn’t finish.' }),
+    ).toBeVisible();
 
     await kiosk.page.getByRole('button', { name: 'Retry upload' }).click();
     await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 30_000 });
