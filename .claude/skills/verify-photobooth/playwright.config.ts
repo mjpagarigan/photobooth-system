@@ -32,6 +32,10 @@ export default defineConfig({
       testMatch: /kiosk-.*\.spec\.ts/,
     },
     {
+      name: 'audit',
+      testMatch: /audit-.*\.spec\.ts/,
+    },
+    {
       name: 'screen2',
       testMatch: /screen2\.spec\.ts/,
       use: {
