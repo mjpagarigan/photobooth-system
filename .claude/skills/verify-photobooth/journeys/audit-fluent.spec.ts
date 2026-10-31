@@ -278,8 +278,16 @@ test('operator screens carry no Fluent components, icons, or off-palette styles'
     const { page } = kiosk;
     await bootstrap(page);
 
+    await page.getByRole('button', { name: 'Start photo session' }).click();
+    await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Use these photos' }).click();
+    await expect(page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByTestId('attract-screen')).toBeVisible();
+
     await page.getByRole('button', { name: 'Recent Photos' }).first().click();
     await expect(page.getByTestId('recent-gallery')).toBeVisible();
+    await expect(page.locator('.gallery-tile').first()).toBeVisible();
     audits.push(await auditPage(page, 'recent-photos-dialog', palette));
     await page.getByRole('button', { name: 'Close recent photos' }).click();
 
@@ -301,6 +309,7 @@ test('operator screens carry no Fluent components, icons, or off-palette styles'
     audits.push(await auditPage(page, 'admin-frame-editor', palette));
 
     await page.getByRole('button', { name: 'Recent photos' }).click();
+    await expect(page.locator('.gallery-tile').first()).toBeVisible();
     audits.push(await auditPage(page, 'admin-recent-photos', palette));
 
     await page.getByRole('button', { name: 'Settings & health' }).click();
