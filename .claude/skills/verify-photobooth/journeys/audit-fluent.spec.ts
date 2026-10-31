@@ -15,6 +15,7 @@ type Offender = { value: string; count: number; sample: string };
 
 type ScreenAudit = {
   screen: string;
+  scanned: number;
   fluentComponents: Offender[];
   fluentIcons: Offender[];
   colors: Offender[];
@@ -131,11 +132,13 @@ async function auditPage(
         (scopeSelector ? document.querySelector(scopeSelector) : null) ??
         dialogs[dialogs.length - 1] ??
         document.body;
+      let scanned = 0;
       for (const element of scope.querySelectorAll('*')) {
         if (!(element instanceof HTMLElement || element instanceof SVGElement)) continue;
         if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
         const rect = element.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) continue;
+        scanned += 1;
 
         const classList = [...element.classList];
         const fluentIcon = classList.some((c) => c.startsWith('fui-Icon'));
@@ -178,6 +181,7 @@ async function auditPage(
           .sort((a, b) => b.count - a.count);
       return {
         screen,
+        scanned,
         fluentComponents: list('fluentComponents'),
         fluentIcons: list('fluentIcons'),
         colors: list('colors'),
@@ -230,7 +234,7 @@ function toMarkdown(audits: ScreenAudit[], imports: string[]): string {
   const kinds = ['fluentComponents', 'fluentIcons', 'colors', 'fonts', 'radii', 'shadows'] as const;
   const rows = audits.map(
     (a) =>
-      `| ${a.screen} | ${kinds.map((k) => a[k].reduce((s, o) => s + o.count, 0)).join(' | ')} |`,
+      `| ${a.screen} | ${a.scanned} | ${kinds.map((k) => a[k].reduce((s, o) => s + o.count, 0)).join(' | ')} |`,
   );
   const details = audits.map((a) => {
     const sections = kinds
@@ -249,8 +253,8 @@ function toMarkdown(audits: ScreenAudit[], imports: string[]): string {
     '',
     'Counts are visible elements. Allowed values come from the @theme tokens in packages/ui/src/styles/theme.css plus #fff and #000.',
     '',
-    `| Screen | ${kinds.join(' | ')} |`,
-    `| --- | ${kinds.map(() => '---').join(' | ')} |`,
+    `| Screen | scanned | ${kinds.join(' | ')} |`,
+    `| --- | --- | ${kinds.map(() => '---').join(' | ')} |`,
     ...rows,
     '',
     `## @fluentui imports and FluentProvider (${imports.length})`,
@@ -331,5 +335,8 @@ test('operator screens carry no Fluent components, icons, or off-palette styles'
   await writeFile(resolve(dir, 'report.md'), toMarkdown(audits, imports));
 
   expect(imports, 'no @fluentui imports or FluentProvider remain').toEqual([]);
-  for (const audit of audits) expect(total(audit), `${audit.screen} is clean`).toBe(0);
+  for (const audit of audits) {
+    expect(audit.scanned, `${audit.screen} was actually inspected`).toBeGreaterThan(10);
+    expect(total(audit), `${audit.screen} is clean`).toBe(0);
+  }
 });
