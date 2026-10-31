@@ -1,4 +1,4 @@
-import { Eye, EyeSlash, X } from '@grace-booth/ui';
+import { ArrowRight, Eye, EyeSlash, X } from '@grace-booth/ui';
 import { useRef, useState } from 'react';
 
 import {
@@ -156,6 +156,18 @@ export function PasscodeDialog({
                     <Eye aria-hidden="true" weight="bold" />
                   )}
                 </Button>
+                {mode === 'login' ? (
+                  <Button
+                    aria-label="Unlock"
+                    className="password-field__submit"
+                    loading={busy}
+                    size="icon"
+                    type="submit"
+                    variant="ghost"
+                  >
+                    <ArrowRight aria-hidden="true" />
+                  </Button>
+                ) : null}
               </div>
               <FieldDescription>Use at least {MIN_PASSCODE_LENGTH} characters.</FieldDescription>
             </Field>
@@ -179,16 +191,18 @@ export function PasscodeDialog({
               </Field>
             ) : null}
           </DialogPanel>
-          <DialogFooter className="passcode-dialog__actions">
-            {dismissible ? (
-              <DialogClose disabled={busy} render={<Button type="button" variant="secondary" />}>
-                Cancel
-              </DialogClose>
-            ) : null}
-            <Button loading={busy} type="submit">
-              {mode === 'restart' ? 'Restart session' : isBootstrap ? 'Save passcode' : 'Unlock'}
-            </Button>
-          </DialogFooter>
+          {mode === 'login' ? null : (
+            <DialogFooter className="passcode-dialog__actions">
+              {dismissible ? (
+                <DialogClose disabled={busy} render={<Button type="button" variant="secondary" />}>
+                  Cancel
+                </DialogClose>
+              ) : null}
+              <Button loading={busy} type="submit">
+                {mode === 'restart' ? 'Restart session' : 'Save passcode'}
+              </Button>
+            </DialogFooter>
+          )}
         </Form>
       </DialogPopup>
     </Dialog>

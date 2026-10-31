@@ -4,6 +4,9 @@ import { defineConfig } from '@playwright/test';
 
 const ROOT = resolve(__dirname, '../../..');
 
+// Electron journeys (kiosk, audit) need neither server: VERIFY_WEB_SERVERS=none.
+const WEB_SERVERS = (process.env.VERIFY_WEB_SERVERS ?? 'public,renderer').split(',');
+
 process.env.VERIFY_OUT ??= resolve(
   ROOT,
   'artifacts/verify',
@@ -32,6 +35,10 @@ export default defineConfig({
       testMatch: /kiosk-.*\.spec\.ts/,
     },
     {
+      name: 'audit',
+      testMatch: /audit-.*\.spec\.ts/,
+    },
+    {
       name: 'screen2',
       testMatch: /screen2\.spec\.ts/,
       use: {
@@ -55,6 +62,7 @@ export default defineConfig({
   ],
   webServer: [
     {
+      name: 'public',
       command: 'pnpm --filter @grace-booth/public dev --mode test',
       cwd: ROOT,
       url: 'http://127.0.0.1:4173/photo',
@@ -62,11 +70,12 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
+      name: 'renderer',
       command: 'pnpm --filter @grace-booth/kiosk dev:renderer',
       cwd: ROOT,
       url: 'http://127.0.0.1:4174/?visual=attract',
       reuseExistingServer: false,
       timeout: 60_000,
     },
-  ],
+  ].filter(({ name }) => WEB_SERVERS.includes(name)),
 });

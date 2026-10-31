@@ -22,7 +22,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     server: {
       deps: {
-        inline: [/@fluentui/, 'tabster', /@grace-booth/],
+        inline: [/@grace-booth/],
       },
     },
   },

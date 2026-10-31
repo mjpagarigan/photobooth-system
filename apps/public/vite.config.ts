@@ -162,7 +162,10 @@ export function securityTemplatePlugin(environment: ValidatedBuildEnvironment): 
     },
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
-        if (req.url && (req.url === '/photo' || req.url.startsWith('/photo?') || req.url.startsWith('/photo#'))) {
+        if (
+          req.url &&
+          (req.url === '/photo' || req.url.startsWith('/photo?') || req.url.startsWith('/photo#'))
+        ) {
           req.url = '/index.html';
         }
         next();
@@ -205,7 +208,7 @@ export default defineConfig(({ mode }) => {
       restoreMocks: true,
       server: {
         deps: {
-          inline: [/@fluentui/, 'tabster', /@grace-booth/],
+          inline: [/@grace-booth/],
         },
       },
     },

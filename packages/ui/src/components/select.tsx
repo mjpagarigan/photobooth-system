@@ -1,5 +1,5 @@
 import { Select as BaseSelect } from '@base-ui/react';
-import { Checkmark16Regular, ChevronDown16Regular } from '@fluentui/react-icons';
+import { Check, ChevronDown } from './icons';
 import React, { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
@@ -23,7 +23,7 @@ export const SelectTrigger = forwardRef<
     >
       {children}
       <BaseSelect.Icon>
-        <ChevronDown16Regular aria-hidden="true" />
+        <ChevronDown aria-hidden="true" size={16} />
       </BaseSelect.Icon>
     </BaseSelect.Trigger>
   );
@@ -56,7 +56,7 @@ export const SelectPopup = forwardRef<HTMLDivElement, SelectPopupProps>(function
       >
         <BaseSelect.Popup
           className={cn(
-            'z-[100] max-h-96 min-w-[var(--anchor-width,8rem)] overflow-y-auto rounded-[14px] border border-[#d2d2d7] bg-white p-1 text-[#1d1d1f] shadow-[var(--shadow-16)] transition-opacity duration-100 focus-visible:outline-none motion-reduce:transition-none',
+            'z-[100] max-h-96 min-w-[var(--anchor-width,8rem)] overflow-y-auto rounded-[12px] border border-[#d2d2d7] bg-white p-1 text-[#1d1d1f] shadow-[var(--shadow-16)] transition-opacity duration-100 focus-visible:outline-none motion-reduce:transition-none',
             className,
           )}
           ref={ref}
@@ -86,7 +86,7 @@ export const SelectItem = forwardRef<
     >
       <span className="absolute left-2.5 flex size-4 items-center justify-center">
         <BaseSelect.ItemIndicator>
-          <Checkmark16Regular aria-hidden="true" className="text-primary" />
+          <Check aria-hidden="true" className="text-primary" size={16} />
         </BaseSelect.ItemIndicator>
       </span>
       <BaseSelect.ItemText>{children}</BaseSelect.ItemText>
