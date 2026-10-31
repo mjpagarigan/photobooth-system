@@ -265,19 +265,23 @@ test('forced colors preserve visible focus and status', async ({ page }) => {
   });
 });
 
-test('operator settings preserve spacing, desktop upload columns, and tab scrolling', async ({
+test('operator settings keep section spacing, desktop upload columns, and jump links', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1_366, height: 768 });
   await page.goto('/?visual=admin-settings');
 
-  const overviewPanel = page.getByRole('tabpanel', { name: 'Overview' });
-  await expect(overviewPanel).toBeVisible();
+  const overview = page.getByRole('region', { name: 'Overview' });
+  await expect(overview).toBeVisible();
   expect(
-    await overviewPanel.evaluate((element) => Number.parseFloat(getComputedStyle(element).gap)),
+    await page
+      .locator('.ops-overview')
+      .evaluate((element) => Number.parseFloat(getComputedStyle(element).columnGap)),
   ).toBeGreaterThanOrEqual(16);
 
-  await page.getByRole('tab', { name: 'Upload queue' }).click();
+  const jump = page.getByRole('navigation', { name: 'Settings sections' });
+  await jump.getByRole('link', { name: 'Upload queue' }).click();
+  await expect(page.getByRole('region', { name: 'Upload queue' })).toBeInViewport();
   const uploadList = page.locator('.upload-list');
   await expect(uploadList).toBeVisible();
   const uploadLayout = await uploadList.evaluate((element) => {
@@ -294,20 +298,10 @@ test('operator settings preserve spacing, desktop upload columns, and tab scroll
     fullPage: false,
   });
 
-  for (const tabName of ['Google Photos', 'Security & Cloud'] as const) {
-    await page.getByRole('tab', { name: tabName }).click();
-    const panel = page.getByRole('tabpanel', { name: tabName });
-    await expect(panel).toBeVisible();
-    const scrollResult = await page.locator('.settings-scroll').evaluate((scrollOwner) => {
-      const style = getComputedStyle(scrollOwner);
-      const canScroll =
-        /(auto|scroll)/u.test(style.overflowY) &&
-        scrollOwner.scrollHeight > scrollOwner.clientHeight;
-      scrollOwner.scrollTop = Math.min(120, scrollOwner.scrollHeight - scrollOwner.clientHeight);
-      return { canScroll, scrollTop: scrollOwner.scrollTop };
-    });
-    expect(scrollResult.canScroll).toBe(true);
-    expect(scrollResult.scrollTop).toBeGreaterThan(0);
+  for (const section of ['Google Photos', 'Security & Cloud'] as const) {
+    await jump.getByRole('link', { name: section }).click();
+    await expect(page.getByRole('region', { name: section })).toBeInViewport();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
   }
 
   await expect(page).toHaveScreenshot('admin-security-scroll-1366x768.png', {

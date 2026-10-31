@@ -32,7 +32,7 @@ export const DialogPopup = forwardRef<HTMLDivElement, DialogPopupProps>(function
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <BaseDialog.Popup
           className={cn(
-            'pointer-events-auto relative flex w-full flex-col gap-2 rounded-[24px] bg-white p-7 text-[#1d1d1f] shadow-[var(--shadow-64)] transition-opacity duration-100 focus-visible:outline-none motion-reduce:transition-none',
+            'pointer-events-auto relative flex w-full flex-col gap-2 rounded-[28px] bg-white p-7 text-[#1d1d1f] shadow-[var(--shadow-64)] transition-opacity duration-100 focus-visible:outline-none motion-reduce:transition-none',
             maxWidthClass,
             className,
           )}

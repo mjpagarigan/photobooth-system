@@ -505,22 +505,21 @@ describe('AdminSettings', () => {
         settings={{ ...SETTINGS, lan: { ...SETTINGS.lan, enabled: true } }}
       />,
     );
-    await user.click(screen.getByRole('tab', { name: 'Network' }));
     const portInput = screen.getByLabelText('Port');
     fireEvent.change(portInput, { target: { value: '80' } });
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'LAN port must be between 1024 and 65535.',
-    );
+    expect(
+      (await screen.findAllByRole('alert')).some((alert) =>
+        alert.textContent.includes('LAN port must be between 1024 and 65535.'),
+      ),
+    ).toBe(true);
     expect(props.onSaveSettings).not.toHaveBeenCalled();
   });
 
-  it('keeps retention read-only and passcode inputs aligned to 8 to 64 characters', async () => {
-    const user = userEvent.setup();
+  it('keeps retention read-only and passcode inputs aligned to 8 to 64 characters', () => {
     render(<AdminSettingsScreen {...props} />);
     expect(screen.getByText(/Photos 60 days · Links 30 days/)).toBeVisible();
     expect(screen.queryByRole('spinbutton', { name: /retention/i })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Security & Cloud' }));
     expect(screen.getByLabelText('Current passcode')).toHaveAttribute('maxLength', '64');
     expect(screen.getByLabelText('New passcode')).toHaveAttribute('maxLength', '64');
     expect(screen.getByLabelText('Confirm passcode')).toHaveAttribute('maxLength', '64');
@@ -530,12 +529,15 @@ describe('AdminSettings', () => {
     const user = userEvent.setup();
     const onSaveSettings = vi.fn();
     render(<AdminSettingsScreen {...props} onSaveSettings={onSaveSettings} />);
-    await user.click(screen.getByRole('tab', { name: 'Network' }));
     const input = screen.getByLabelText('Recruitment button text');
 
     fireEvent.change(input, { target: { value: '   ' } });
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('1–80 characters');
+    expect(
+      (await screen.findAllByRole('alert')).some((alert) =>
+        alert.textContent.includes('1–80 characters'),
+      ),
+    ).toBe(true);
     expect(onSaveSettings).not.toHaveBeenCalled();
   });
 
@@ -543,7 +545,6 @@ describe('AdminSettings', () => {
     const user = userEvent.setup();
     const onSaveSettings = vi.fn();
     render(<AdminSettingsScreen {...props} onSaveSettings={onSaveSettings} />);
-    await user.click(screen.getByRole('tab', { name: 'Network' }));
     fireEvent.change(screen.getByLabelText('Recruitment button text'), {
       target: { value: '  Sumali sa ministeryo 🙌  ' },
     });

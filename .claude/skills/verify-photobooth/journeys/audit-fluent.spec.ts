@@ -40,14 +40,19 @@ async function readPalette(): Promise<Palette> {
   };
 }
 
-async function auditPage(page: Page, screen: string, palette: Palette): Promise<ScreenAudit> {
+async function auditPage(
+  page: Page,
+  screen: string,
+  palette: Palette,
+  scopeSelector?: string,
+): Promise<ScreenAudit> {
   await page.evaluate('document.fonts.ready');
   const freeze = await page.addStyleTag({
     content: '*,*::before,*::after{transition:none!important;animation:none!important}',
   });
   await page.waitForTimeout(100);
   const result = await page.evaluate(
-    ({ screen, palette }) => {
+    ({ screen, palette, scopeSelector }) => {
       const probe = document.createElement('div');
       probe.style.position = 'absolute';
       probe.style.visibility = 'hidden';
@@ -75,13 +80,19 @@ async function auditPage(page: Page, screen: string, palette: Palette): Promise<
           : value
               .split(/,(?![^(]*\))/)
               .map((layer) => layer.trim())
-              .filter(
-                (layer) => rgbOnly((/rgba?\([^)]*\)/.exec(layer))?.[0] ?? '') !== 'transparent',
-              )
+              .filter((layer) => rgbOnly(/rgba?\([^)]*\)/.exec(layer)?.[0] ?? '') !== 'transparent')
               .join(', ');
-      const allowedColors = new Set(
-        [...palette.colors, '#ffffff', '#000000'].map((c) => rgbOnly(normalize('color', c))),
+      const allowedColors = [...palette.colors, '#ffffff', '#000000'].map((c) =>
+        rgbOnly(normalize('color', c)).split(',').map(Number),
       );
+      // Reading a translucent color back through a canvas can round a channel by 1 or 2.
+      const inPalette = (rgb: string): boolean => {
+        const [r = 0, g = 0, b = 0] = rgb.split(',').map(Number);
+        return allowedColors.some(
+          ([pr = 0, pg = 0, pb = 0]) =>
+            Math.abs(pr - r) <= 2 && Math.abs(pg - g) <= 2 && Math.abs(pb - b) <= 2,
+        );
+      };
       const allowedShadows = new Set([...palette.shadows.map((s) => normalize('box-shadow', s))]);
       const allowedRadii = new Set([
         '0px',
@@ -116,7 +127,10 @@ async function auditPage(page: Page, screen: string, palette: Palette): Promise<
       };
 
       const dialogs = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')];
-      const scope = dialogs[dialogs.length - 1] ?? document.body;
+      const scope =
+        (scopeSelector ? document.querySelector(scopeSelector) : null) ??
+        dialogs[dialogs.length - 1] ??
+        document.body;
       for (const element of scope.querySelectorAll('*')) {
         if (!(element instanceof HTMLElement || element instanceof SVGElement)) continue;
         if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
@@ -144,7 +158,7 @@ async function auditPage(page: Page, screen: string, palette: Palette): Promise<
           const value = style.getPropertyValue(property);
           const rgb = rgbOnly(value);
           if (rgb === 'transparent') continue;
-          if (!allowedColors.has(rgb)) add('colors', `rgb(${rgb})`, element);
+          if (!inPalette(rgb)) add('colors', `rgb(${rgb})`, element);
         }
         if (element.textContent.trim() && element.childElementCount === 0) {
           const family = style.fontFamily.split(',')[0]!.trim().replace(/['"]/g, '');
@@ -172,7 +186,7 @@ async function auditPage(page: Page, screen: string, palette: Palette): Promise<
         shadows: list('shadows'),
       };
     },
-    { screen, palette },
+    { screen, palette, scopeSelector },
   );
   await freeze.evaluate((node: Element) => {
     node.remove();
@@ -287,17 +301,21 @@ test('operator screens carry no Fluent components, icons, or off-palette styles'
 
     await page.getByRole('button', { name: 'Settings & health' }).click();
     await expect(page.getByTestId('admin-settings')).toBeVisible();
-    for (const [tab, name] of [
-      ['Overview', 'settings-overview'],
-      ['Network', 'settings-network'],
-      ['Displays', 'settings-displays'],
-      ['Google Photos', 'settings-google-photos'],
-      ['Security & Cloud', 'settings-security-cloud'],
-      ['Upload Queue', 'settings-upload-queue'],
+    audits.push(await auditPage(page, 'admin-shell', palette, '.admin-nav'));
+    for (const [link, id] of [
+      ['Overview', 'overview'],
+      ['Network', 'network'],
+      ['Displays', 'displays'],
+      ['Google Photos', 'google'],
+      ['Security & Cloud', 'security'],
+      ['Upload queue', 'queue'],
     ] as const) {
-      await page.getByRole('tab', { name: tab }).click();
-      await expect(page.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
-      audits.push(await auditPage(page, name, palette));
+      await page
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('link', { name: link })
+        .click();
+      await expect(page.locator(`#settings-${id}`)).toBeInViewport();
+      audits.push(await auditPage(page, `settings-${id}`, palette, `#settings-${id}`));
     }
   } finally {
     await closeKiosk(kiosk);

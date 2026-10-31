@@ -28,6 +28,16 @@
   --color-neutral-stroke1: #d2d2d7;
   --color-neutral-stroke2: #e8e8ed;
   --color-neutral-stroke-subtle: #f0f0f2;
+  --color-neutral-stroke-strong: #86868b;
+
+  --color-dark-surface1: #1c1c1e;
+  --color-dark-surface2: #2c2c2e;
+  --color-dark-surface3: #3a3a3c;
+  --color-dark-surface4: #48484a;
+  --color-dark-foreground2: #a1a1a6;
+  --color-dark-success: #30d158;
+  --color-dark-link: #2997ff;
+  --color-accent-strong: #d6e8fb;
 
   --color-background: #f5f5f7;
   --color-foreground: #1d1d1f;
@@ -86,7 +96,14 @@
   --shadow-4: 0 2px 8px rgba(0, 0, 0, 0.06);
   --shadow-8: 0 4px 16px rgba(0, 0, 0, 0.07);
   --shadow-16: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-28: 0 16px 40px rgba(0, 0, 0, 0.14);
   --shadow-64: 0 24px 60px rgba(0, 0, 0, 0.16);
+  --shadow-on-dark: 0 30px 80px rgba(0, 0, 0, 0.45);
+  --shadow-focus: 0 0 0 3px rgba(0, 102, 204, 0.25);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 @layer base {

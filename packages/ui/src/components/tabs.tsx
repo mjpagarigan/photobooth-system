@@ -18,7 +18,7 @@ export const TabsList = forwardRef<HTMLDivElement, TabsListProps>(function TabsL
       className={cn(
         'inline-flex items-center gap-0 border-b border-[#e8e8ed] bg-transparent p-0 text-[#636366]',
         variant === 'segmented' &&
-          'grid w-full grid-flow-col auto-cols-fr rounded-[10px] border-none bg-[#f5f5f7] p-1',
+          'grid w-full grid-flow-col auto-cols-fr rounded-[8px] border-none bg-[#f5f5f7] p-1',
         variant === 'default' && 'gap-2 border-b border-[#e8e8ed] bg-transparent',
         size === 'sm' && 'min-h-[32px] text-sm',
         size === 'default' && 'min-h-[44px] text-sm',
