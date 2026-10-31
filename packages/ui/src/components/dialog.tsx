@@ -1,5 +1,5 @@
 import { Dialog as BaseDialog } from '@base-ui/react';
-import { Dismiss20Regular } from '@fluentui/react-icons';
+import { X } from './icons';
 import React, { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../lib/utils';
 
@@ -46,7 +46,7 @@ export const DialogPopup = forwardRef<HTMLDivElement, DialogPopupProps>(function
               onClick={onClose}
               render={<button type="button" />}
             >
-              <Dismiss20Regular aria-hidden="true" />
+              <X aria-hidden="true" size={18} />
             </BaseDialog.Close>
           )}
           {children}

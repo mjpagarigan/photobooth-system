@@ -1,5 +1,5 @@
 import { Select as BaseSelect } from '@base-ui/react';
-import { Checkmark16Regular, ChevronDown16Regular } from '@fluentui/react-icons';
+import { Check, ChevronDown } from './icons';
 import React, { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
@@ -23,7 +23,7 @@ export const SelectTrigger = forwardRef<
     >
       {children}
       <BaseSelect.Icon>
-        <ChevronDown16Regular aria-hidden="true" />
+        <ChevronDown aria-hidden="true" size={16} />
       </BaseSelect.Icon>
     </BaseSelect.Trigger>
   );
@@ -86,7 +86,7 @@ export const SelectItem = forwardRef<
     >
       <span className="absolute left-2.5 flex size-4 items-center justify-center">
         <BaseSelect.ItemIndicator>
-          <Checkmark16Regular aria-hidden="true" className="text-primary" />
+          <Check aria-hidden="true" className="text-primary" size={16} />
         </BaseSelect.ItemIndicator>
       </span>
       <BaseSelect.ItemText>{children}</BaseSelect.ItemText>

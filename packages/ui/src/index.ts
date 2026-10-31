@@ -1,4 +1,3 @@
-export * from './theme/fluent-theme';
 export * from './components/alert-dialog';
 export * from './components/alert';
 export * from './components/badge';

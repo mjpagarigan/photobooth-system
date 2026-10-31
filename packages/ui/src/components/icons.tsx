@@ -1,121 +1,125 @@
 import {
-  ArrowClockwise20Regular,
-  ArrowCounterclockwise20Regular,
-  ArrowDown20Regular,
-  ArrowDownload20Regular,
-  ArrowExpand20Regular,
-  ArrowLeft20Regular,
-  ArrowRight20Regular,
-  ArrowSync20Regular,
-  ArrowUp20Regular,
-  Calendar20Regular,
-  Camera20Regular,
-  Checkmark20Regular,
-  CheckmarkCircle20Regular,
-  ChevronLeft20Regular,
-  ChevronRight20Regular,
-  Cloud20Regular,
-  CloudArrowUp20Regular,
-  CloudOff20Regular,
-  Copy20Regular,
-  Crop20Regular,
-  Database20Regular,
-  Delete20Regular,
-  Desktop20Regular,
-  Dismiss20Regular,
-  DocumentLock20Regular,
-  ErrorCircle20Regular,
-  Eye20Regular,
-  EyeOff20Regular,
-  Filmstrip20Regular,
-  Frame20Regular,
-  Grid20Regular,
-  Heart20Regular,
-  Image20Regular,
-  ImageMultiple20Regular,
-  Info20Regular,
-  Key20Regular,
-  Link20Regular,
-  LockClosedKey20Regular,
-  QrCode20Regular,
-  Save20Regular,
-  Search20Regular,
-  Send20Regular,
-  Settings20Regular,
-  ShieldCheckmark20Regular,
-  SignOut20Regular,
-  SpinnerIos20Regular,
-  Video20Regular,
-  VideoOff20Regular,
-  Warning20Regular,
-  Wifi120Regular,
-  type FluentIcon,
-} from '@fluentui/react-icons';
-import type { ComponentProps } from 'react';
+  Aperture as LucideAperture,
+  ArrowDown as LucideArrowDown,
+  ArrowLeft as LucideArrowLeft,
+  ArrowLeftRight as LucideArrowLeftRight,
+  ArrowRight as LucideArrowRight,
+  ArrowUp as LucideArrowUp,
+  Calendar as LucideCalendar,
+  Camera as LucideCamera,
+  Check as LucideCheck,
+  ChevronDown as LucideChevronDown,
+  ChevronLeft as LucideChevronLeft,
+  ChevronRight as LucideChevronRight,
+  CircleAlert as LucideCircleAlert,
+  CircleCheck as LucideCircleCheck,
+  Cloud as LucideCloud,
+  CloudOff as LucideCloudOff,
+  CloudUpload as LucideCloudUpload,
+  Copy as LucideCopy,
+  Crop as LucideCrop,
+  Database as LucideDatabase,
+  Download as LucideDownload,
+  ExternalLink as LucideExternalLink,
+  Eye as LucideEye,
+  EyeOff as LucideEyeOff,
+  FileImage as LucideFileImage,
+  FileLock as LucideFileLock,
+  Film as LucideFilm,
+  Frame as LucideFrame,
+  HandHeart as LucideHandHeart,
+  Images as LucideImages,
+  Info as LucideInfo,
+  Key as LucideKey,
+  LayoutGrid as LucideLayoutGrid,
+  Link as LucideLink,
+  LoaderCircle as LucideLoaderCircle,
+  LockKeyhole as LucideLockKeyhole,
+  LogOut as LucideLogOut,
+  Monitor as LucideMonitor,
+  OctagonAlert as LucideOctagonAlert,
+  QrCode as LucideQrCode,
+  RefreshCw as LucideRefreshCw,
+  RotateCcw as LucideRotateCcw,
+  RotateCw as LucideRotateCw,
+  Save as LucideSave,
+  Send as LucideSend,
+  Settings as LucideSettings,
+  ShieldCheck as LucideShieldCheck,
+  Trash2 as LucideTrash2,
+  TriangleAlert as LucideTriangleAlert,
+  Video as LucideVideo,
+  VideoOff as LucideVideoOff,
+  Wifi as LucideWifi,
+  X as LucideX,
+  ZoomIn as LucideZoomIn,
+  type LucideIcon,
+  type LucideProps,
+} from 'lucide-react';
 
-export type AppIconProps = ComponentProps<FluentIcon> & {
-  size?: number | string;
-  /** Retained for source compatibility while migrating from Phosphor icons. */
+export type AppIconProps = LucideProps & {
+  /** Phosphor-era weight name; Lucide uses one stroke for every icon. */
   weight?: string;
 };
 
-function createAppIcon(Icon: FluentIcon) {
-  return function AppIcon({ size = 20, weight, ...props }: AppIconProps) {
+function createAppIcon(Icon: LucideIcon) {
+  return function AppIcon({ size = 20, weight, strokeWidth = 1.75, ...props }: AppIconProps) {
     void weight;
-    return <Icon {...props} fontSize={size} />;
+    return <Icon {...props} size={size} strokeWidth={strokeWidth} />;
   };
 }
 
-export const Aperture = createAppIcon(Camera20Regular);
-export const ArrowClockwise = createAppIcon(ArrowClockwise20Regular);
-export const ArrowCounterClockwise = createAppIcon(ArrowCounterclockwise20Regular);
-export const ArrowDown = createAppIcon(ArrowDown20Regular);
-export const ArrowRight = createAppIcon(ArrowRight20Regular);
-export const ArrowLeft = createAppIcon(ArrowLeft20Regular);
-export const ArrowSquareOut = createAppIcon(ArrowExpand20Regular);
-export const ArrowUp = createAppIcon(ArrowUp20Regular);
-export const ArrowsClockwise = createAppIcon(ArrowSync20Regular);
-export const ArrowsLeftRight = createAppIcon(ArrowSync20Regular);
-export const CalendarBlank = createAppIcon(Calendar20Regular);
-export const Camera = createAppIcon(Camera20Regular);
-export const CaretLeft = createAppIcon(ChevronLeft20Regular);
-export const CaretRight = createAppIcon(ChevronRight20Regular);
-export const Check = createAppIcon(Checkmark20Regular);
-export const CheckCircle = createAppIcon(CheckmarkCircle20Regular);
-export const Cloud = createAppIcon(Cloud20Regular);
-export const CloudArrowUp = createAppIcon(CloudArrowUp20Regular);
-export const CloudSlash = createAppIcon(CloudOff20Regular);
-export const Copy = createAppIcon(Copy20Regular);
-export const Crop = createAppIcon(Crop20Regular);
-export const Database = createAppIcon(Database20Regular);
-export const Desktop = createAppIcon(Desktop20Regular);
-export const DownloadSimple = createAppIcon(ArrowDownload20Regular);
-export const Eye = createAppIcon(Eye20Regular);
-export const EyeSlash = createAppIcon(EyeOff20Regular);
-export const FileLock = createAppIcon(DocumentLock20Regular);
-export const FilePng = createAppIcon(Image20Regular);
-export const FilmStrip = createAppIcon(Filmstrip20Regular);
-export const FloppyDisk = createAppIcon(Save20Regular);
-export const FrameCorners = createAppIcon(Frame20Regular);
-export const Gear = createAppIcon(Settings20Regular);
-export const HandHeart = createAppIcon(Heart20Regular);
-export const Images = createAppIcon(ImageMultiple20Regular);
-export const Info = createAppIcon(Info20Regular);
-export const Key = createAppIcon(Key20Regular);
-export const LinkSimple = createAppIcon(Link20Regular);
-export const LockKey = createAppIcon(LockClosedKey20Regular);
-export const MagnifyingGlassPlus = createAppIcon(Search20Regular);
-export const PaperPlaneTilt = createAppIcon(Send20Regular);
-export const QrCode = createAppIcon(QrCode20Regular);
-export const ShieldCheck = createAppIcon(ShieldCheckmark20Regular);
-export const SignOut = createAppIcon(SignOut20Regular);
-export const SpinnerGap = createAppIcon(SpinnerIos20Regular);
-export const SquaresFour = createAppIcon(Grid20Regular);
-export const Trash = createAppIcon(Delete20Regular);
-export const VideoCamera = createAppIcon(Video20Regular);
-export const VideoCameraSlash = createAppIcon(VideoOff20Regular);
-export const Warning = createAppIcon(Warning20Regular);
-export const WarningCircle = createAppIcon(ErrorCircle20Regular);
-export const WarningOctagon = createAppIcon(Warning20Regular);
-export const WifiHigh = createAppIcon(Wifi120Regular);
-export const X = createAppIcon(Dismiss20Regular);
+export const Aperture = createAppIcon(LucideAperture);
+export const ArrowClockwise = createAppIcon(LucideRotateCw);
+export const ArrowCounterClockwise = createAppIcon(LucideRotateCcw);
+export const ArrowDown = createAppIcon(LucideArrowDown);
+export const ArrowRight = createAppIcon(LucideArrowRight);
+export const ArrowLeft = createAppIcon(LucideArrowLeft);
+export const ArrowSquareOut = createAppIcon(LucideExternalLink);
+export const ArrowUp = createAppIcon(LucideArrowUp);
+export const ArrowsClockwise = createAppIcon(LucideRefreshCw);
+export const ArrowsLeftRight = createAppIcon(LucideArrowLeftRight);
+export const CalendarBlank = createAppIcon(LucideCalendar);
+export const Camera = createAppIcon(LucideCamera);
+export const CaretLeft = createAppIcon(LucideChevronLeft);
+export const CaretRight = createAppIcon(LucideChevronRight);
+export const Check = createAppIcon(LucideCheck);
+export const ChevronDown = createAppIcon(LucideChevronDown);
+export const CheckCircle = createAppIcon(LucideCircleCheck);
+export const Cloud = createAppIcon(LucideCloud);
+export const CloudArrowUp = createAppIcon(LucideCloudUpload);
+export const CloudSlash = createAppIcon(LucideCloudOff);
+export const Copy = createAppIcon(LucideCopy);
+export const Crop = createAppIcon(LucideCrop);
+export const Database = createAppIcon(LucideDatabase);
+export const Desktop = createAppIcon(LucideMonitor);
+export const DownloadSimple = createAppIcon(LucideDownload);
+export const Eye = createAppIcon(LucideEye);
+export const EyeSlash = createAppIcon(LucideEyeOff);
+export const FileLock = createAppIcon(LucideFileLock);
+export const FilePng = createAppIcon(LucideFileImage);
+export const FilmStrip = createAppIcon(LucideFilm);
+export const FloppyDisk = createAppIcon(LucideSave);
+export const FrameCorners = createAppIcon(LucideFrame);
+export const Gear = createAppIcon(LucideSettings);
+export const HandHeart = createAppIcon(LucideHandHeart);
+export const Images = createAppIcon(LucideImages);
+export const Info = createAppIcon(LucideInfo);
+export const Key = createAppIcon(LucideKey);
+export const LinkSimple = createAppIcon(LucideLink);
+export const LockKey = createAppIcon(LucideLockKeyhole);
+export const MagnifyingGlassPlus = createAppIcon(LucideZoomIn);
+export const PaperPlaneTilt = createAppIcon(LucideSend);
+export const QrCode = createAppIcon(LucideQrCode);
+export const ShieldCheck = createAppIcon(LucideShieldCheck);
+export const SignOut = createAppIcon(LucideLogOut);
+export const SpinnerGap = createAppIcon(LucideLoaderCircle);
+export const SquaresFour = createAppIcon(LucideLayoutGrid);
+export const Trash = createAppIcon(LucideTrash2);
+export const VideoCamera = createAppIcon(LucideVideo);
+export const VideoCameraSlash = createAppIcon(LucideVideoOff);
+export const Warning = createAppIcon(LucideTriangleAlert);
+export const WarningCircle = createAppIcon(LucideCircleAlert);
+export const WarningOctagon = createAppIcon(LucideOctagonAlert);
+export const WifiHigh = createAppIcon(LucideWifi);
+export const X = createAppIcon(LucideX);

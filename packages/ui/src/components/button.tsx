@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { useRender } from '@base-ui/react/use-render';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Spinner } from '@fluentui/react-components';
+import { SpinnerGap } from './icons';
 import { cn } from '../lib/utils';
 
 export const buttonVariants = cva(
@@ -85,7 +85,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         <>
           {loading ? (
             <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center">
-              <Spinner size="tiny" />
+              <SpinnerGap aria-hidden="true" className="motion-safe:animate-spin" size={16} />
             </span>
           ) : icon ? (
             <span className="inline-flex shrink-0 items-center justify-center [&>svg]:size-5">

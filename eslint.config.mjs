@@ -66,6 +66,27 @@ export default tseslint.config(
     },
   },
   {
+    files: [
+      'apps/kiosk/src/renderer/**/*.{ts,tsx}',
+      'apps/public/**/*.{ts,tsx}',
+      'packages/ui/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@fluentui/*'],
+              message:
+                'The UI is Apple-style; use @grace-booth/ui components and its Lucide icons.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
