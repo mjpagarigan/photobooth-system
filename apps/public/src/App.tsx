@@ -1,13 +1,8 @@
 import {
-  Aperture,
   ArrowClockwise,
-  Badge,
   Button,
-  CalendarBlank,
   DownloadSimple,
   HandHeart,
-  Info,
-  ShieldCheck,
   Skeleton,
   WarningOctagon,
 } from '@grace-booth/ui';
@@ -27,34 +22,14 @@ type ViewState =
   | { kind: 'ready'; details: ResolvedPhoto; imageUrl: string }
   | { kind: 'error'; message: string; retryable: boolean };
 
-function Brand(): React.JSX.Element {
-  return (
-    <div className="brand" aria-label="M.A.T. Photobooth">
-      <span className="brand-mark" aria-hidden="true">
-        <Aperture size={24} weight="bold" />
-      </span>
-      <div className="brand-text">
-        <strong>M.A.T.</strong>
-        <span className="brand-sub">Photobooth</span>
-      </div>
-    </div>
-  );
-}
-
 function PageFrame({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="page-frame isolate relative min-h-screen">
+    <div className="page-frame">
       <header className="site-header">
-        <Brand />
-        <Badge variant="info" className="header-badge">
-          Private photo
-        </Badge>
+        <span className="site-header__brand">M.A.T. Photobooth</span>
+        <span className="site-header__note">Private photo</span>
       </header>
       {children}
-      <footer className="site-footer">
-        <p>M.A.T. Photobooth</p>
-        <p className="footer-meta">Private link · Available for 30 days</p>
-      </footer>
     </div>
   );
 }
@@ -69,28 +44,14 @@ function LoadingView(): React.JSX.Element {
       data-state="loading"
       tabIndex={0}
     >
-      <section className="detail-panel loading-panel">
-        <div className="eyebrow-wrapper">
-          <Badge variant="info" size="sm" className="eyebrow">
-            Loading your photo
-          </Badge>
-        </div>
-        <h1>Your photo is almost ready</h1>
-        <p className="lead-copy">We’re securely opening the photo connected to this QR code.</p>
-        <div className="skeleton-lines">
-          <Skeleton className="h-4 w-full max-w-sm my-1.5" />
-          <Skeleton className="h-4 w-3/4 max-w-xs my-1.5" />
-        </div>
-        <span className="sr-only">Loading photo</span>
-      </section>
-      <section className="photo-stage skeleton-stage" aria-label="Loading your photo">
-        <div className="stage-label" aria-hidden="true">
-          <span>Loading keepsake</span>
-        </div>
-        <div className="photo-mat">
-          <div className="skeleton-photo" />
-        </div>
-      </section>
+      <h1>
+        Your photo is almost ready
+        <span>Opening the photo connected to this QR code.</span>
+      </h1>
+      <div className="photo-card photo-card--loading" aria-hidden="true">
+        <Skeleton className="skeleton-photo" />
+      </div>
+      <span className="sr-only">Loading photo</span>
     </main>
   );
 }
@@ -105,25 +66,21 @@ function ErrorView({
   onRetry: () => void;
 }): React.JSX.Element {
   return (
-    <main className="error-layout" data-state="error">
+    <main className="photo-layout error-layout" data-state="error">
       <section className="error-card" aria-labelledby="error-title">
         <div className="error-symbol" aria-hidden="true">
-          <WarningOctagon size={32} weight="bold" />
+          <WarningOctagon size={30} />
         </div>
-        <Badge variant="error" size="sm" className="error-badge">
-          Photo unavailable
-        </Badge>
         <h1 id="error-title">We could not open this photo.</h1>
         <p className="error-message">{message}</p>
         <p className="muted-copy">
-          Verify the complete QR URL was opened. Tokens expire automatically after 30 days.
+          Check that the whole QR link opened. Links expire automatically after 30 days.
         </p>
         {retryable ? (
           <Button
-            className="compact-button mt-4"
+            className="secondary-pill"
             icon={<ArrowClockwise size={16} aria-hidden="true" weight="bold" />}
             onClick={onRetry}
-            size="default"
             type="button"
             variant="secondary"
           >
@@ -173,73 +130,50 @@ function ReadyView({
 
   return (
     <main className="photo-layout" data-state="ready">
-      <section className="detail-panel" aria-labelledby="photo-title">
-        <div>
-          <div className="eyebrow-wrapper">
-            <Badge variant="success" className="eyebrow success-eyebrow">
-              <ShieldCheck size={14} weight="bold" aria-hidden="true" />
-              <span>Photo ready</span>
-            </Badge>
-          </div>
-          <h1 id="photo-title">Hold on to this moment.</h1>
-          <p className="lead-copy">
-            Your finished 3-frame photobooth strip is prepared for download. Save it directly to
-            your device storage before expiration.
-          </p>
-        </div>
-
-        <div className="action-stack">
-          <Button
-            className="primary-button w-full"
-            disabled={downloadState === 'working'}
-            icon={<DownloadSimple size={20} aria-hidden="true" weight="bold" />}
-            loading={downloadState === 'working'}
-            onClick={() => void downloadPhoto()}
-            size="lg"
-            type="button"
-            variant="primary"
-          >
-            <span>{downloadState === 'working' ? 'Preparing download…' : 'Download photo'}</span>
-          </Button>
-          <a
-            className="secondary-button"
-            href={
-              details.googleFormsUrl ?? 'https://volunteer-management.ccf.org.ph/recruitment/form'
-            }
-            target="_blank"
-            rel="noopener noreferrer external"
-          >
-            <HandHeart size={20} weight="bold" aria-hidden="true" />
-            <span>{details.recruitmentButtonText}</span>
-          </a>
-          <p className="mobile-save-hint">
-            <Info aria-hidden="true" size={16} />
-            <span>On iPhone or iPad, touch and hold the photo to save it to Photos.</span>
-          </p>
-          {downloadState === 'error' ? (
-            <p className="inline-error" role="alert">
-              The download did not start. Please try again.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="availability-note">
-          <CalendarBlank className="availability-note__icon" aria-hidden="true" size={20} />
-          <p>
-            <strong>Available until {availableUntil}</strong>
-            <span>This private link and cloud copy expire automatically.</span>
-          </p>
-        </div>
+      <h1 id="photo-title">
+        You’re all set. <span>Here’s your keepsake.</span>
+      </h1>
+      <section className="photo-card" aria-label="Your finished photo">
+        <img src={imageUrl} alt="M.A.T. Photobooth finished event collage" />
       </section>
-
-      <section className="photo-stage" aria-label="Your finished photo">
-        <div className="stage-label" aria-hidden="true">
-          <span>Your finished photo</span>
-        </div>
-        <div className="photo-mat">
-          <img src={imageUrl} alt="M.A.T. Photobooth finished event collage" />
-        </div>
-        <p className="stage-caption">High-resolution photobooth keepsake</p>
+      <div className="action-stack">
+        <Button
+          className="primary-pill"
+          disabled={downloadState === 'working'}
+          icon={<DownloadSimple size={20} aria-hidden="true" weight="bold" />}
+          loading={downloadState === 'working'}
+          onClick={() => void downloadPhoto()}
+          type="button"
+          variant="primary"
+        >
+          <span>{downloadState === 'working' ? 'Preparing download…' : 'Download photo'}</span>
+        </Button>
+        <p className="mobile-save-hint">
+          On iPhone or iPad, touch and hold the photo to save it to Photos.
+        </p>
+        {downloadState === 'error' ? (
+          <p className="inline-error" role="alert">
+            The download did not start. Please try again.
+          </p>
+        ) : null}
+      </div>
+      <p className="availability-note">
+        Available until {availableUntil}. This private link and its cloud copy expire automatically.
+      </p>
+      <section className="recruit-card" aria-labelledby="recruit-title">
+        <HandHeart size={26} aria-hidden="true" />
+        <h2 id="recruit-title">Get involved</h2>
+        <p>Find a ministry where you can serve with M.A.T.</p>
+        <a
+          href={
+            details.googleFormsUrl ?? 'https://volunteer-management.ccf.org.ph/recruitment/form'
+          }
+          target="_blank"
+          rel="noopener noreferrer external"
+        >
+          {details.recruitmentButtonText}
+          <span aria-hidden="true">↗</span>
+        </a>
       </section>
     </main>
   );

@@ -23,8 +23,9 @@ describe('arbitrary frame presentation', () => {
   });
 
   it('gives landscape review cards a landscape footprint', () => {
-    const landscapeCard = ruleFor('.review-option-card.is-landscape');
-    expect(landscapeCard).toMatch(/max-width:\s*640px/);
-    expect(landscapeCard).toMatch(/height:\s*min\(440px,\s*100%\)/);
+    const landscapePreview = ruleFor('.review-option-card.is-landscape .review-option-preview');
+    expect(landscapePreview).toMatch(/width:\s*64px/);
+    expect(landscapePreview).toMatch(/height:\s*40px/);
+    expect(ruleFor('.review-layout.is-landscape .review-stage')).toMatch(/aspect-ratio:\s*4 \/ 3/);
   });
 });

@@ -21,7 +21,7 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
       {...props}
     >
       {children}
-      <BaseProgress.Track className="relative h-0.5 w-full overflow-hidden bg-[#e0e0e0]">
+      <BaseProgress.Track className="relative h-0.5 w-full overflow-hidden bg-[#e8e8ed]">
         <BaseProgress.Indicator
           className={cn(
             'h-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none',

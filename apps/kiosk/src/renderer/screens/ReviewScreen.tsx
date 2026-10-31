@@ -1,12 +1,5 @@
-import {
-  ArrowCounterClockwise,
-  ArrowRight,
-  CaretLeft,
-  CaretRight,
-  CheckCircle,
-  SquaresFour,
-} from '@grace-booth/ui';
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle, SquaresFour } from '@grace-booth/ui';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FrameSummary } from '@grace-booth/shared';
 import {
@@ -51,38 +44,12 @@ export function ReviewScreen({
     selectedRawId !== null && options.some((option) => option.id === selectedRawId)
       ? selectedRawId
       : options[0]?.id;
+  const selectedOption = options.find((option) => option.id === selectedId);
   const [layoutsModalOpen, setLayoutsModalOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const isDraggingRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
-  const hasMovedRef = useRef(false);
-
-  const updateScrollState = useCallback(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollLeft(scrollLeft > 10);
-    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
-  }, []);
-
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    updateScrollState();
-    const el = stageRef.current;
-    if (!el) return;
-    const handleResize = () => updateScrollState();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [options.length, updateScrollState]);
 
   const handleRetake = () => {
     setSelectedRawId(null);
@@ -108,58 +75,6 @@ export function ReviewScreen({
     element?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
   }, [selectedId]);
 
-  const scrollContainer = (direction: 'left' | 'right') => {
-    const el = stageRef.current;
-    if (!el) return;
-    const scrollAmount = el.clientWidth * 0.6;
-    el.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth',
-    });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const el = stageRef.current;
-    if (!el) return;
-    isDraggingRef.current = true;
-    hasMovedRef.current = false;
-    startXRef.current = e.pageX - el.offsetLeft;
-    scrollLeftRef.current = el.scrollLeft;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingRef.current) return;
-    const el = stageRef.current;
-    if (!el) return;
-    e.preventDefault();
-    const x = e.pageX - el.offsetLeft;
-    const walk = (x - startXRef.current) * 1.5;
-    if (Math.abs(walk) > 6) {
-      hasMovedRef.current = true;
-    }
-    el.scrollLeft = scrollLeftRef.current - walk;
-  };
-
-  const handleMouseUp = () => {
-    isDraggingRef.current = false;
-  };
-
-  const handleCardClick = (optionId: string) => {
-    if (hasMovedRef.current) {
-      return;
-    }
-    setSelectedRawId(optionId);
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    const el = stageRef.current;
-    if (!el) return;
-    if (Math.abs(e.deltaX) > 0) return;
-    if (el.scrollWidth > el.clientWidth) {
-      el.scrollLeft += e.deltaY;
-    }
-  };
-
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>, option: FrameSummary) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
@@ -179,136 +94,103 @@ export function ReviewScreen({
 
   return (
     <main className="screen screen--review" data-testid="review-screen">
-      <div className="review-layout">
-        <div className="review-carousel-column">
-          <div className="review-carousel-header">
-            <span className="review-carousel-heading">Choose layout</span>
-            <Button
-              icon={<SquaresFour aria-hidden="true" weight="bold" />}
-              onClick={() => setLayoutsModalOpen(true)}
-              variant="secondary"
-            >
-              All layouts ({options.length})
-            </Button>
-          </div>
+      <div
+        className={`review-layout${
+          selectedOption && selectedOption.width >= selectedOption.height ? ' is-landscape' : ''
+        }`}
+      >
+        <div className="review-stage">
+          {selectedOption ? (
+            <Photostrip
+              captureUrls={captureUrls}
+              frame={selectedOption}
+              label={`Selected collage: ${selectedOption.name}`}
+              variant="preview"
+            />
+          ) : null}
+        </div>
 
-          <div className="review-carousel-container">
-            {options.length > 2 && (
+        <section className="review-panel" aria-labelledby="review-title">
+          <p className="review-panel__eyebrow">
+            <CheckCircle aria-hidden="true" weight="fill" />
+            All {captureUrls.length} {captureUrls.length === 1 ? 'photo' : 'photos'} captured
+          </p>
+          <h1 id="review-title" data-screen-heading ref={headingRef} tabIndex={-1}>
+            Looking good. <span>Pick a layout, then use these photos.</span>
+          </h1>
+
+          <ul className="review-shots" aria-label="Your photos">
+            {captureUrls.map((url, index) => (
+              <li key={url}>
+                <img src={url} alt={`Photo ${index + 1}`} draggable="false" />
+              </li>
+            ))}
+          </ul>
+
+          <div className="review-layouts">
+            <div className="review-layouts__header">
+              <p className="review-layouts__label">Layout</p>
               <button
                 type="button"
-                className="review-carousel-arrow review-carousel-arrow--left"
-                onClick={() => scrollContainer('left')}
-                disabled={!canScrollLeft}
-                aria-label="Previous collage layouts"
+                className="review-layouts__all"
+                onClick={() => setLayoutsModalOpen(true)}
               >
-                <CaretLeft aria-hidden="true" weight="bold" />
+                All layouts ({options.length})
               </button>
-            )}
-
-            <section
-              className="review-options-stage"
-              role="radiogroup"
-              aria-label="Collage options"
-              ref={stageRef}
-              onScroll={updateScrollState}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onWheel={handleWheel}
-            >
+            </div>
+            <div className="review-options" role="radiogroup" aria-label="Collage options">
               {options.map((option, index) => (
                 <div
-                  className={`review-option-card ${option.width >= option.height ? 'is-landscape' : 'is-portrait'} ${selectedId === option.id ? 'is-selected' : ''}`}
+                  className={`review-option-card ${option.width >= option.height ? 'is-landscape' : 'is-portrait'}${
+                    selectedId === option.id ? ' is-selected' : ''
+                  }`}
                   role="radio"
                   aria-checked={selectedId === option.id}
                   tabIndex={selectedId === option.id ? 0 : -1}
                   key={option.id}
-                  onClick={() => handleCardClick(option.id)}
+                  onClick={() => setSelectedRawId(option.id)}
                   onKeyDown={(e) => handleKeyDown(e, option)}
                   data-testid={`collage-option-${index + 1}`}
                   data-collage-option={option.id}
                   aria-label={`Collage Option ${index + 1}: ${option.name}`}
                 >
-                  <div className="review-option-badge">
-                    <span className="review-option-title" title={option.name}>
-                      Collage {index + 1}
-                    </span>
-                    {selectedId === option.id && (
-                      <span className="selected-indicator" aria-hidden="true">
-                        <CheckCircle weight="fill" /> Selected
-                      </span>
-                    )}
-                  </div>
-                  <div className="review-option-preview">
+                  <span className="review-option-preview">
                     <Photostrip
                       captureUrls={captureUrls}
                       frame={option}
                       label={`Preview in Collage Option ${index + 1}`}
                       variant="preview"
                     />
-                  </div>
+                  </span>
+                  <span className="review-option-title" title={option.name}>
+                    {option.name}
+                  </span>
                 </div>
               ))}
-            </section>
-
-            {options.length > 2 && (
-              <button
-                type="button"
-                className="review-carousel-arrow review-carousel-arrow--right"
-                onClick={() => scrollContainer('right')}
-                disabled={!canScrollRight}
-                aria-label="Next collage layouts"
-              >
-                <CaretRight aria-hidden="true" weight="bold" />
-              </button>
-            )}
+            </div>
           </div>
-        </div>
 
-        <section className="review-decision-panel" aria-label="Review decisions">
-          <div className="review-decision-card">
-            <div className="capture-complete-badge">
-              <CheckCircle aria-hidden="true" weight="bold" />
-              <span>
-                All {captureUrls.length} {captureUrls.length === 1 ? 'photo' : 'photos'} captured
-              </span>
-            </div>
-            <h1 id="review-title" data-screen-heading ref={headingRef} tabIndex={-1}>
-              Choose your collage
-            </h1>
-            <p className="review-copy">
-              Check your {captureUrls.length}-photo collage. Retake if you want another try, or
-              continue to finish your collage.
-            </p>
-            <div className="review-actions">
-              <Button
-                aria-label="Retake all photos"
-                disabled={!canRetake || busy}
-                icon={<ArrowCounterClockwise aria-hidden="true" weight="bold" />}
-                onClick={handleRetake}
-                variant="secondary"
-              >
-                <span className="button__two-line">
-                  <span className="button__line">Retake all</span>
-                  <span className="button__line">photos</span>
-                </span>
-              </Button>
-              <Button
-                aria-label="Use these photos"
-                disabled={!canAccept}
-                iconAfter={<ArrowRight aria-hidden="true" weight="bold" />}
-                loading={busy}
-                onClick={() => {
-                  if (selectedId !== undefined) onAccept(selectedId);
-                }}
-              >
-                <span className="button__two-line">
-                  <span className="button__line">Use these</span>
-                  <span className="button__line">photos</span>
-                </span>
-              </Button>
-            </div>
+          <div className="review-actions">
+            <Button
+              className="button--review-retake"
+              aria-label="Retake all photos"
+              disabled={!canRetake || busy}
+              onClick={handleRetake}
+              variant="secondary"
+            >
+              Retake all photos
+            </Button>
+            <Button
+              className="button--review-accept"
+              aria-label="Use these photos"
+              disabled={!canAccept}
+              loading={busy}
+              onClick={() => {
+                if (selectedId !== undefined) onAccept(selectedId);
+              }}
+            >
+              Use these photos
+            </Button>
           </div>
         </section>
       </div>

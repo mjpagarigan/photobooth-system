@@ -1,9 +1,8 @@
-import { Images } from '@grace-booth/ui';
-import { useEffect, useRef } from 'react';
+import { LockKey } from '@grace-booth/ui';
+import { useEffect } from 'react';
 
+import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
-import { QrPanel } from '../components/QrPanel';
-import { LOCAL_FIXTURES } from '../local-fixtures';
 
 type FinalQrScreenProps = {
   busy?: boolean;
@@ -20,42 +19,55 @@ export function FinalQrScreen({
   onOpenRecent,
   qrImageUrl,
 }: FinalQrScreenProps) {
-  const resultRef = useRef<HTMLElement>(null);
-
   useEffect(() => {
     const heading = document.querySelector<HTMLElement>('[data-screen-heading]');
     heading?.focus();
   }, []);
 
   return (
-    <main className="screen screen--final" data-testid="final-screen">
-      <img
-        className="final-background"
-        src={LOCAL_FIXTURES.finalBackground}
-        alt=""
-        aria-hidden="true"
-        draggable="false"
-      />
-      <div className="final-scrim" aria-hidden="true" />
-      {onOpenRecent && (
-        <div className="final-top-controls">
+    <main className="screen screen--done" data-testid="final-screen">
+      <header className="final-hero">
+        <h1 id="final-title" data-screen-heading tabIndex={-1}>
+          You’re all set.
+        </h1>
+        <p>Scan the code with your phone camera to save your keepsake.</p>
+        {onOpenRecent && (
           <button
-            className="operator-access recent-access"
+            className="operator-access recent-access final-recent"
             onClick={onOpenRecent}
             disabled={busy}
             aria-label="Recent Photos"
             title="Recent Photos"
+            type="button"
           >
-            <Images aria-hidden="true" weight="bold" />
             <span className="operator-access__text">Recent</span>
           </button>
+        )}
+      </header>
+
+      <div className="final-body">
+        <div className="final-keepsake">
+          <section className="final-result" aria-label="Your finished photo">
+            <Photostrip collageUrl={collageUrl} label="Your finished photo" variant="collage" />
+          </section>
+          <div className="final-keepsake__copy">
+            <p className="final-keepsake__eyebrow">Ready to download</p>
+            <h2>Available for 30 days</h2>
+            <p className="final-keepsake__private">
+              <LockKey aria-hidden="true" />
+              Private link, just for you
+            </p>
+          </div>
         </div>
-      )}
-      <div className="final-composition">
-        <section className="final-result" aria-label="Your finished photo" ref={resultRef}>
-          <Photostrip collageUrl={collageUrl} label="Your finished photo" variant="collage" />
-        </section>
-        <QrPanel busy={busy} onDone={onDone} qrImageUrl={qrImageUrl} />
+
+        <div className="final-qr">
+          <div className="final-qr__code">
+            <img src={qrImageUrl} alt="QR code for your private photo download" draggable="false" />
+          </div>
+          <Button className="button--final-done" loading={busy} onClick={onDone}>
+            Done
+          </Button>
+        </div>
       </div>
     </main>
   );

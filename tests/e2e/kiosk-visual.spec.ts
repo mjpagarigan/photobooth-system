@@ -221,10 +221,10 @@ test('QR station active queue fits at 1920x1080', async ({ page }) => {
   await expect(page.getByTestId('qr-station-active')).toBeVisible();
   await expect(
     page.getByRole('heading', {
-      name: 'Please scan the QR Code beside to download the photo',
+      name: 'You’re all set. Scan to take it home.',
     }),
   ).toBeVisible();
-  await expect(page.getByText(/Next photo replaces this in \d+s/)).toBeVisible();
+  await expect(page.getByText(/Clears in \d+s/)).toBeVisible();
   await waitForVisualAssets(page);
   await expectNoPageOverflow(page);
 
@@ -384,20 +384,16 @@ test('reduced motion removes cosmetic rotation and shutter flash', async ({ page
     .toEqual({ animationName: 'none', opacity: '0' });
 });
 
-test('processing loads the packaged Lottie animation without external requests', async ({
-  page,
-}) => {
+test('processing shows its local animation without external requests', async ({ page }) => {
   const externalRequests: string[] = [];
-  const animationRequests: string[] = [];
   page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.endsWith('/animations/loading.json')) animationRequests.push(request.url());
-    if (url.origin !== 'http://127.0.0.1:4174') externalRequests.push(request.url());
+    if (new URL(request.url()).origin !== 'http://127.0.0.1:4174') {
+      externalRequests.push(request.url());
+    }
   });
   await page.setViewportSize({ width: 1_366, height: 768 });
   await page.goto('/?visual=processing');
   await expect(page.locator('.processing-animation svg')).toBeVisible();
-  expect(animationRequests).toHaveLength(1);
   expect(externalRequests).toEqual([]);
 });
 

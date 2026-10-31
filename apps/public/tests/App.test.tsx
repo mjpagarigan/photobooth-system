@@ -36,22 +36,19 @@ describe('public photo page', () => {
     expect(screen.getByRole('main', { name: 'Loading photo' })).toHaveAttribute('tabindex', '0');
   });
 
-  it('shows loading, the action panel before the photostrip in DOM, and the Join a Ministry link', async () => {
-    const { container } = render(<App />);
+  it('shows loading, then the heading, photo, and download action in reading order, and the Join a Ministry link', async () => {
+    render(<App />);
     expect(screen.getByText('Your photo is almost ready')).toBeInTheDocument();
     expect(await screen.findByRole('img', { name: /finished event collage/i })).toHaveAttribute(
       'src',
       expect.stringContaining('blob:'),
     );
 
-    const detailPanel = container.querySelector('.detail-panel');
-    const photoStage = container.querySelector('.photo-stage');
-    expect(detailPanel).toBeInTheDocument();
-    expect(photoStage).toBeInTheDocument();
-    // detailPanel is rendered before photoStage in DOM
-    expect(detailPanel?.compareDocumentPosition(photoStage!)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    const heading = screen.getByRole('heading', { level: 1 });
+    const photo = screen.getByRole('region', { name: 'Your finished photo' });
+    const download = screen.getByRole('button', { name: 'Download photo' });
+    expect(heading.compareDocumentPosition(photo)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(photo.compareDocumentPosition(download)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     const ministryLink = screen.getByRole('link', { name: /join a ministry/i });
     expect(ministryLink).toHaveAttribute(

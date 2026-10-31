@@ -21,7 +21,7 @@ test('upload failure keeps the photo and Finish offline delivers it', async () =
     await capture(page, 'upload-failed', '01-retrying');
 
     await expect(page.getByTestId('recovery-upload')).toBeVisible({ timeout: 40_000 });
-    await expect(page.getByRole('heading', { name: 'Upload did not finish' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your upload didn’t finish.' })).toBeVisible();
     await capture(page, 'upload-failed', '02-upload-failed');
 
     const finishOffline = page.getByRole('button', { name: 'Finish offline' });

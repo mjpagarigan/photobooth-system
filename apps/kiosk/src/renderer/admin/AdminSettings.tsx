@@ -560,6 +560,12 @@ export function AdminSettings({
     setCertificatePassphrase('');
   };
 
+  const healthStates = (Object.keys(HEALTH_ICONS) as (keyof typeof HEALTH_ICONS)[]).map(
+    (key) => health?.[key].state ?? 'unavailable',
+  );
+  const attentionCount = healthStates.filter((state) => state !== 'healthy').length;
+  const allHealthy = attentionCount === 0;
+
   return (
     <div className="admin-settings" data-testid="admin-settings">
       <header className="admin-page-header admin-page-header--settings">
@@ -610,96 +616,77 @@ export function AdminSettings({
           </TabsList>
 
           <TabsPanel className="settings-tabs__panel" value="overview">
-            <section className="settings-section" aria-labelledby="health-title">
-              <div className="settings-section__heading">
-                <h2 id="health-title">System health</h2>
-                <p>
-                  Live diagnostics across optical hardware, database, encrypted storage, and cloud
-                  gateway.
+            <div className="ops-overview">
+              <section className="ops-overview__summary" aria-labelledby="ops-greeting">
+                <span
+                  className={`ops-overview__badge${allHealthy ? ' is-healthy' : ''}`}
+                  aria-hidden="true"
+                >
+                  <Camera />
+                </span>
+                <h2 id="ops-greeting">
+                  Hi, operator. <span>Here’s how the booth is doing.</span>
+                </h2>
+                <p className={`ops-overview__verdict${allHealthy ? ' is-healthy' : ''}`}>
+                  {allHealthy
+                    ? 'All systems working'
+                    : `${attentionCount} ${attentionCount === 1 ? 'system needs' : 'systems need'} attention`}
                 </p>
-              </div>
-              <div className="health-grid">
-                {(Object.keys(HEALTH_ICONS) as (keyof typeof HEALTH_ICONS)[]).map((key) => {
-                  const Icon = HEALTH_ICONS[key];
-                  const service = health?.[key];
-                  const state = service?.state ?? 'unavailable';
-                  return (
-                    <article className="health-card" key={key}>
-                      <Icon aria-hidden="true" weight="bold" />
-                      <div>
-                        <strong>{sentenceCase(key)}</strong>
-                        <span className={`health-state health-state--${state}`}>
-                          {sentenceCase(state)}
-                        </span>
-                      </div>
-                      <p>{service?.message ?? 'Subsystem telemetry offline.'}</p>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="settings-section" aria-labelledby="camera-settings-title">
-              <div className="settings-section__heading">
-                <h2 id="camera-settings-title">Capture hardware</h2>
-                <p>Active optical device configuration and diagnostic test pattern feed.</p>
-              </div>
-              <div className="settings-card camera-settings-card">
-                <div className="camera-settings-card__info">
+                <dl className="ops-facts">
                   <div>
-                    <strong>Active source: </strong>
-                    <span className="camera-adapter-tag">
+                    <dt>Camera</dt>
+                    <dd>
                       {settings.cameraAdapter === 'sony'
                         ? 'Sony A7 Mirrorless'
                         : settings.cameraAdapter === 'mock'
                           ? 'Mock Camera'
-                          : 'Laptop / Internal Webcam'}
-                    </span>
+                          : 'Laptop / Internal Webcam'}{' '}
+                      · {settings.cameraResolution}
+                      {onOpenCameras ? (
+                        <button className="ops-link" onClick={onOpenCameras} type="button">
+                          Configure camera and test feed
+                        </button>
+                      ) : null}
+                    </dd>
                   </div>
-                  {settings.cameraDeviceId && (
-                    <div className="camera-device-id-text">
-                      <small>Device ID: {settings.cameraDeviceId}</small>
-                    </div>
-                  )}
-                  <div className="camera-device-id-text">
-                    <small>Resolution: {settings.cameraResolution}</small>
+                  <div>
+                    <dt>Retention</dt>
+                    <dd>
+                      Photos {settings.localRetentionDays} days · Links{' '}
+                      {settings.cloudRetentionDays} days
+                      <small>Fixed for every event</small>
+                    </dd>
                   </div>
-                </div>
-                {onOpenCameras && (
-                  <Button
-                    icon={<Camera aria-hidden="true" weight="bold" />}
-                    onClick={onOpenCameras}
-                    variant="secondary"
-                  >
-                    Configure camera and test feed
-                  </Button>
-                )}
-              </div>
-            </section>
+                </dl>
+              </section>
 
-            <article className="settings-card retention-card">
-              <div className="settings-card__title">
-                <FileLock aria-hidden="true" weight="bold" />
-                <div>
-                  <h2>Retention</h2>
-                  <p>Locked privacy windows for every guest photo.</p>
-                </div>
-              </div>
-              <div className="retention-values">
-                <div>
-                  <strong>{settings.cloudRetentionDays}</strong>
-                  <span>days in cloud storage</span>
-                </div>
-                <div>
-                  <strong>{settings.localRetentionDays}</strong>
-                  <span>days on this booth</span>
-                </div>
-              </div>
-              <p>
-                <LockKey aria-hidden="true" weight="bold" /> Retention periods cannot be changed
-                from the booth.
-              </p>
-            </article>
+              <section className="ops-status" aria-labelledby="health-title">
+                <h2 id="health-title">
+                  Status. <span>Everything this booth relies on.</span>
+                </h2>
+                <ul className="ops-status__list">
+                  {(Object.keys(HEALTH_ICONS) as (keyof typeof HEALTH_ICONS)[]).map((key) => {
+                    const Icon = HEALTH_ICONS[key];
+                    const service = health?.[key];
+                    const state = service?.state ?? 'unavailable';
+                    return (
+                      <li className="ops-status__row" key={key}>
+                        <span className="ops-status__icon" aria-hidden="true">
+                          <Icon />
+                        </span>
+                        <span className="ops-status__text">
+                          <strong>{sentenceCase(key)}</strong>
+                          <span>{service?.message ?? 'Subsystem telemetry offline.'}</span>
+                        </span>
+                        <span className={`health-state health-state--${state}`}>
+                          {sentenceCase(state)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            </div>
           </TabsPanel>
 
           <TabsPanel className="settings-tabs__panel" value="network">

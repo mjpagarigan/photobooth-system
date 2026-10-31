@@ -7,81 +7,79 @@ import {
 import React, { type ReactNode } from 'react';
 
 /**
- * Microsoft Fluent 2 Web Brand Ramp anchored to #0F6CBD
+ * Brand ramp anchored to the Apple-style action blue #0066CC
  */
 export const fluentBrandRamp: BrandVariants = {
-  10: '#061724',
-  20: '#082338',
-  30: '#0a2e4a',
-  40: '#0C3B5E', // pressed
-  50: '#0E4775',
-  60: '#0F548C',
-  70: '#115EA3', // hover
-  80: '#0F6CBD', // primary / fill
-  90: '#2886de',
-  100: '#479ef5',
-  110: '#62abf5',
-  120: '#77b7f7',
-  130: '#96c6fa',
-  140: '#b4d6fa',
-  150: '#cfe4fa',
-  160: '#EBF3FC', // tint / light
+  10: '#001a33',
+  20: '#00264d',
+  30: '#003366',
+  40: '#004c99',
+  50: '#005bb8',
+  60: '#0066cc',
+  70: '#00539f',
+  80: '#0066cc',
+  90: '#0071e3',
+  100: '#2b8cf0',
+  110: '#4d9ff2',
+  120: '#70b2f5',
+  130: '#94c6f7',
+  140: '#b8d9fa',
+  150: '#d6e8fb',
+  160: '#e8f2fd',
 };
 
 const baseTheme = createLightTheme(fluentBrandRamp);
 
-/**
- * Customized Microsoft Fluent 2 Web theme for Grace Booth
- */
+const appleFontStack =
+  "'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+
 export const graceBoothFluentTheme: Theme = {
   ...baseTheme,
 
-  // Brand Ramp
-  colorBrandBackground: '#0F6CBD',
-  colorBrandBackgroundHover: '#115EA3',
-  colorBrandBackgroundPressed: '#0C3B5E',
-  colorBrandBackground2: '#EBF3FC',
-  colorBrandForeground1: '#0F6CBD',
-  colorBrandForeground2: '#115EA3',
+  colorBrandBackground: '#0066CC',
+  colorBrandBackgroundHover: '#0071E3',
+  colorBrandBackgroundPressed: '#00539F',
+  colorBrandBackground2: '#E8F2FD',
+  colorBrandForeground1: '#0066CC',
+  colorBrandForeground2: '#004C99',
 
-  // Neutral Foregrounds
-  colorNeutralForeground1: '#242424',
-  colorNeutralForeground2: '#424242',
-  colorNeutralForeground3: '#616161',
-  colorNeutralForeground4: '#707070',
-  colorNeutralForegroundDisabled: '#BDBDBD',
+  colorNeutralForeground1: '#1D1D1F',
+  colorNeutralForeground2: '#424245',
+  colorNeutralForeground3: '#636366',
+  colorNeutralForeground4: '#86868B',
+  colorNeutralForegroundDisabled: '#AEAEB2',
   colorNeutralForegroundOnBrand: '#FFFFFF',
 
-  // Neutral Backgrounds & Surfaces
   colorNeutralBackground1: '#FFFFFF',
-  colorNeutralBackground2: '#FAFAFA',
-  colorNeutralBackground3: '#F5F5F5',
-  colorNeutralBackground4: '#F0F0F0',
-  colorNeutralBackground1Hover: '#F5F5F5',
-  colorNeutralBackground1Pressed: '#E0E0E0',
-  colorNeutralBackground1Selected: '#EBEBEB',
+  colorNeutralBackground2: '#FBFBFD',
+  colorNeutralBackground3: '#F5F5F7',
+  colorNeutralBackground4: '#E8E8ED',
+  colorNeutralBackground1Hover: '#F5F5F7',
+  colorNeutralBackground1Pressed: '#E8E8ED',
+  colorNeutralBackground1Selected: '#E8E8ED',
   colorSubtleBackground: 'transparent',
-  colorSubtleBackgroundHover: '#F5F5F5',
-  colorSubtleBackgroundPressed: '#E0E0E0',
+  colorSubtleBackgroundHover: '#F5F5F7',
+  colorSubtleBackgroundPressed: '#E8E8ED',
 
-  // Strokes & Dividers
-  colorNeutralStroke1: '#D1D1D1',
-  colorNeutralStroke2: '#E0E0E0',
-  colorNeutralStroke3: '#EDEBE9',
-  colorNeutralStrokeSubtle: '#EBEBEB',
+  colorNeutralStroke1: '#D2D2D7',
+  colorNeutralStroke2: '#E8E8ED',
+  colorNeutralStroke3: '#F0F0F2',
+  colorNeutralStrokeSubtle: '#F0F0F2',
 
-  // Shadows
-  shadow2: '0px 0px 2px 0px rgba(0,0,0,0.12), 0px 1px 2px 0px rgba(0,0,0,0.14)',
-  shadow4: '0px 0px 2px 0px rgba(0,0,0,0.12), 0px 2px 4px 0px rgba(0,0,0,0.14)',
-  shadow8: '0px 0px 2px 0px rgba(0,0,0,0.12), 0px 4px 8px 0px rgba(0,0,0,0.14)',
-  shadow16: '0px 0px 2px 0px rgba(0,0,0,0.12), 0px 8px 16px 0px rgba(0,0,0,0.14)',
-  shadow28: '0px 0px 8px 0px rgba(0,0,0,0.12), 0px 14px 28px 0px rgba(0,0,0,0.14)',
-  shadow64: '0px 0px 8px 0px rgba(0,0,0,0.12), 0px 32px 64px 0px rgba(0,0,0,0.14)',
+  shadow2: '0px 1px 2px rgba(0,0,0,0.04), 0px 1px 1px rgba(0,0,0,0.03)',
+  shadow4: '0px 2px 8px rgba(0,0,0,0.06)',
+  shadow8: '0px 4px 16px rgba(0,0,0,0.07)',
+  shadow16: '0px 10px 30px rgba(0,0,0,0.08)',
+  shadow28: '0px 16px 40px rgba(0,0,0,0.12)',
+  shadow64: '0px 24px 60px rgba(0,0,0,0.16)',
 
-  // Typography
-  fontFamilyBase:
-    "'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif",
-  fontFamilyMonospace: "Consolas, 'Courier New', monospace",
+  borderRadiusSmall: '6px',
+  borderRadiusMedium: '12px',
+  borderRadiusLarge: '18px',
+  borderRadiusXLarge: '28px',
+
+  fontFamilyBase: appleFontStack,
+  fontFamilyMonospace: "ui-monospace, 'SF Mono', Consolas, monospace",
 };
 
 export type GraceBoothFluentProviderProps = {

@@ -1,97 +1,92 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import '@fontsource-variable/inter/opsz.css';
 @source "../components";
 
 @theme {
-  /* Microsoft Fluent 2 Web - Brand Ramp */
-  --color-brand-background: #0f6cbd;
-  --color-brand-background-hover: #115ea3;
-  --color-brand-background-pressed: #0c3b5e;
-  --color-brand-background2: #ebf3fc;
-  --color-brand-foreground1: #0f6cbd;
-  --color-brand-foreground2: #115ea3;
+  /* Apple-style palette: blue action, near-black ink, soft gray canvas */
+  --color-brand-background: #0066cc;
+  --color-brand-background-hover: #0071e3;
+  --color-brand-background-pressed: #00539f;
+  --color-brand-background2: #e8f2fd;
+  --color-brand-foreground1: #0066cc;
+  --color-brand-foreground2: #004c99;
 
-  /* Microsoft Fluent 2 Web - Neutral Foregrounds */
-  --color-neutral-foreground1: #242424;
-  --color-neutral-foreground2: #424242;
-  --color-neutral-foreground3: #616161;
-  --color-neutral-foreground-disabled: #bdbdbd;
+  --color-neutral-foreground1: #1d1d1f;
+  --color-neutral-foreground2: #424245;
+  --color-neutral-foreground3: #636366;
+  --color-neutral-foreground-disabled: #aeaeb2;
   --color-neutral-foreground-on-brand: #ffffff;
 
-  /* Microsoft Fluent 2 Web - Neutral Backgrounds & Surfaces */
   --color-neutral-background1: #ffffff;
-  --color-neutral-background2: #fafafa;
-  --color-neutral-background3: #f5f5f5;
-  --color-neutral-background4: #f0f0f0;
-  --color-neutral-background1-hover: #f5f5f5;
-  --color-neutral-background1-pressed: #e0e0e0;
-  --color-neutral-background1-selected: #ebebeb;
+  --color-neutral-background2: #fbfbfd;
+  --color-neutral-background3: #f5f5f7;
+  --color-neutral-background4: #e8e8ed;
+  --color-neutral-background1-hover: #f5f5f7;
+  --color-neutral-background1-pressed: #e8e8ed;
+  --color-neutral-background1-selected: #e8e8ed;
 
-  /* Microsoft Fluent 2 Web - Strokes & Dividers */
-  --color-neutral-stroke1: #d1d1d1;
-  --color-neutral-stroke2: #e0e0e0;
-  --color-neutral-stroke-subtle: #ebebeb;
+  --color-neutral-stroke1: #d2d2d7;
+  --color-neutral-stroke2: #e8e8ed;
+  --color-neutral-stroke-subtle: #f0f0f2;
 
-  /* Semantic token mappings */
-  --color-background: #f5f5f5;
-  --color-foreground: #242424;
+  --color-background: #f5f5f7;
+  --color-foreground: #1d1d1f;
 
   --color-card: #ffffff;
-  --color-card-foreground: #242424;
+  --color-card-foreground: #1d1d1f;
 
   --color-popover: #ffffff;
-  --color-popover-foreground: #242424;
+  --color-popover-foreground: #1d1d1f;
 
-  --color-primary: #0f6cbd;
-  --color-primary-hover: #115ea3;
+  --color-primary: #0066cc;
+  --color-primary-hover: #0071e3;
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: #fafafa;
-  --color-secondary-foreground: #242424;
+  --color-secondary: #fbfbfd;
+  --color-secondary-foreground: #1d1d1f;
 
-  --color-muted: #f0f0f0;
-  --color-muted-foreground: #616161;
+  --color-muted: #e8e8ed;
+  --color-muted-foreground: #636366;
 
-  --color-accent: #ebf3fc;
-  --color-accent-foreground: #0f6cbd;
+  --color-accent: #e8f2fd;
+  --color-accent-foreground: #0066cc;
 
-  --color-destructive: #c50f1f;
+  --color-destructive: #d70015;
   --color-destructive-foreground: #ffffff;
 
-  --color-success: #107c41;
+  --color-success: #1b6f30;
   --color-success-foreground: #ffffff;
 
-  --color-border: #d1d1d1;
-  --color-input: #d1d1d1;
+  --color-border: #d2d2d7;
+  --color-input: #d2d2d7;
   --color-ring-inner: #ffffff;
-  --color-ring-outer: #000000;
+  --color-ring-outer: #0066cc;
 
-  /* Fluent 2 Radius tokens */
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
-  --radius-xl: 8px;
-  --radius-full: 9999px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 28px;
+  --radius-full: 980px;
 
-  /* Fluent 2 Typography contracts */
-  --font-heading: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-sans: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: Consolas, 'Courier New', monospace;
+  --font-heading:
+    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-sans:
+    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Consolas, monospace;
 
-  /* Microsoft Fluent 2 Web type ramp */
   --font-size-caption: 12px;
   --line-height-caption: 16px;
-  --font-size-body: 14px;
-  --line-height-body: 20px;
-  --font-size-subtitle: 20px;
+  --font-size-body: 15px;
+  --line-height-body: 22px;
+  --font-size-subtitle: 21px;
   --line-height-subtitle: 28px;
 
-  /* Fluent elevation */
-  --shadow-2: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
-  --shadow-4: 0 0 2px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.14);
-  --shadow-8: 0 0 2px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.14);
-  --shadow-16: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
-  --shadow-64: 0 0 8px rgba(0, 0, 0, 0.2), 0 32px 64px rgba(0, 0, 0, 0.24);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-4: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-8: 0 4px 16px rgba(0, 0, 0, 0.07);
+  --shadow-16: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-64: 0 24px 60px rgba(0, 0, 0, 0.16);
 }
 
 @layer base {

@@ -5,24 +5,26 @@ import { Spinner } from '@fluentui/react-components';
 import { cn } from '../lib/utils';
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 rounded-[4px] border font-sans text-sm font-semibold leading-5 tracking-normal transition-[background-color,border-color,color,box-shadow] duration-100 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-0 focus-visible:shadow-[0_0_0_2px_#000] disabled:pointer-events-none disabled:shadow-none select-none cursor-pointer',
+  'inline-flex items-center justify-center gap-1.5 rounded-full border font-sans text-sm font-semibold leading-5 tracking-normal transition-[background-color,border-color,color,box-shadow] duration-100 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-0 focus-visible:shadow-[0_0_0_3px_#0066cc] disabled:pointer-events-none disabled:shadow-none select-none cursor-pointer',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#115ea3] active:bg-[#0c3b5e] active:shadow-none disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
+          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#0071e3] active:bg-[#00539f] active:shadow-none disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         primary:
-          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#115ea3] active:bg-[#0c3b5e] active:shadow-none disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
+          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#0071e3] active:bg-[#00539f] active:shadow-none disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         secondary:
-          'border-[#d1d1d1] bg-white text-[#242424] shadow-[var(--shadow-2)] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] active:shadow-none disabled:border-[#e0e0e0] disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
+          'border-[#d2d2d7] bg-white text-[#1d1d1f] shadow-[var(--shadow-2)] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] active:shadow-none disabled:border-[#e8e8ed] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         outline:
-          'border-[#d1d1d1] bg-white text-[#242424] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] disabled:border-[#e0e0e0] disabled:bg-transparent disabled:text-[#bdbdbd]',
+          'border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] disabled:border-[#e8e8ed] disabled:bg-transparent disabled:text-[#aeaeb2]',
         destructive:
-          'border-transparent bg-[#c50f1f] text-white shadow-[var(--shadow-2)] hover:bg-[#b10e1c] active:bg-[#960b18] disabled:bg-[#f0f0f0] disabled:text-[#bdbdbd]',
+          'border-transparent bg-[#d70015] text-white shadow-[var(--shadow-2)] hover:bg-[#b80012] active:bg-[#9c0010] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         'destructive-outline':
-          'border-[#c50f1f] text-[#c50f1f] bg-transparent hover:bg-[#fdf3f4] active:bg-[#f9d9dc] disabled:border-[#e0e0e0] disabled:text-[#bdbdbd]',
-        ghost: 'border-transparent text-[#242424] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] disabled:text-[#bdbdbd]',
-        subtle: 'border-transparent text-[#242424] hover:bg-[#f5f5f5] active:bg-[#e0e0e0] disabled:text-[#bdbdbd]',
+          'border-[#d70015] text-[#d70015] bg-transparent hover:bg-[#fdf3f4] active:bg-[#f9d9dc] disabled:border-[#e8e8ed] disabled:text-[#aeaeb2]',
+        ghost:
+          'border-transparent text-[#1d1d1f] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
+        subtle:
+          'border-transparent text-[#1d1d1f] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         link: 'h-auto border-transparent p-0 font-normal text-primary underline-offset-4 hover:underline',
       },
       size: {

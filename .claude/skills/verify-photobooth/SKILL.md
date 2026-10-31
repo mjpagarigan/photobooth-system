@@ -58,6 +58,11 @@ Evidence goes to `artifacts/verify/<ISO timestamp>/` by default. Set `VERIFY_OUT
 
 The Fluent design baseline captured before the Apple-style redesign lives in `artifacts/verify/baseline-fluent/`. Never overwrite it. Compare a later run against it screen by screen.
 
+Two scripts compare against the Apple-style prototype, whose artboards live in `artifacts/verify/prototype-apple/` (local, not committed):
+
+- `node .claude/skills/verify-photobooth/scripts/compare.mjs <visual-state>=<Artboard> ...` puts a prototype artboard beside a renderer fixture, for example `review=Review` or `qr-station-active=Screen2Qr`. It needs the kiosk renderer on 4174 (`pnpm --filter @grace-booth/kiosk dev:renderer`) and writes `artifacts/verify/compare/<state>.png`. Stop that server before running journeys, which need the port free.
+- `node .claude/skills/verify-photobooth/scripts/triptych.mjs [after-dir]` writes one sheet per screen to `artifacts/verify/compare/final/`: baseline, journey capture, and prototype. It needs no server. Journey captures are 1920x1080 while artboards are 1366x768, so judge layout and hierarchy, not pixel size.
+
 Proof standards:
 
 - Drive the real user path: click the button a guest or operator would click. Do not call IPC or set React state.
