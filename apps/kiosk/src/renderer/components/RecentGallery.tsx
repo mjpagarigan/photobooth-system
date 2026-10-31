@@ -74,11 +74,10 @@ export function RecentGallery({
     >
       {!operator ? (
         <header className="recent-gallery__header">
-          <h2>
-            <Images aria-hidden="true" weight="bold" /> Recent photos
-          </h2>
+          <h2>Recent photos</h2>
           <CossButton
             aria-label="Close recent photos"
+            className="recent-gallery__close"
             onClick={onClose}
             size="icon"
             type="button"
@@ -102,7 +101,10 @@ export function RecentGallery({
         </p>
       ) : null}
       {!busy && !error && items.length === 0 ? (
-        <p className="recent-gallery__status">No finished photos yet.</p>
+        <div className="recent-gallery__empty">
+          <p className="recent-gallery__empty-title">No photos yet.</p>
+          <p>Finished photos from this booth appear here.</p>
+        </div>
       ) : null}
 
       <div className="recent-gallery__grid" data-testid="recent-gallery-grid">
@@ -120,17 +122,17 @@ export function RecentGallery({
                 onClick={() => setDetailItem(item)}
                 type="button"
               >
-              <div className="gallery-tile__preview-container">
-                <img
-                  alt={`Photostrip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
-                  className="gallery-tile__preview"
-                  draggable="false"
-                  src={item.previewDataUrl}
-                />
-                <span className="gallery-tile__zoom-badge" aria-hidden="true">
-                  <MagnifyingGlassPlus weight="bold" />
-                </span>
-              </div>
+                <div className="gallery-tile__preview-container">
+                  <img
+                    alt={`Photostrip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
+                    className="gallery-tile__preview"
+                    draggable="false"
+                    src={item.previewDataUrl}
+                  />
+                  <span className="gallery-tile__zoom-badge" aria-hidden="true">
+                    <MagnifyingGlassPlus weight="bold" />
+                  </span>
+                </div>
               </button>
 
               <div className="gallery-tile__summary">
@@ -211,17 +213,13 @@ export function RecentGallery({
         })}
       </div>
 
-      {!operator ? (
-        <footer className="recent-gallery__footer">
-          <Button onClick={onClose} variant="secondary">
-            Back
-          </Button>
-        </footer>
-      ) : null}
-
       <Dialog onOpenChange={(open) => !open && setDetailItem(null)} open={Boolean(detailItem)}>
         {detailItem ? (
-          <DialogPopup className="recent-detail-modal" maxWidthClass="max-w-4xl" showCloseButton={false}>
+          <DialogPopup
+            className="recent-detail-modal"
+            maxWidthClass="max-w-4xl"
+            showCloseButton={false}
+          >
             <DialogHeader className="recent-detail-modal__header">
               <div className="recent-detail-modal__title-group">
                 <DialogTitle>
@@ -232,7 +230,14 @@ export function RecentGallery({
                 </DialogDescription>
               </div>
               <DialogClose
-                render={<CossButton aria-label="Close photo details" size="icon" type="button" variant="ghost" />}
+                render={
+                  <CossButton
+                    aria-label="Close photo details"
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  />
+                }
               >
                 <X aria-hidden="true" weight="bold" />
               </DialogClose>
@@ -363,10 +368,16 @@ export function RecentGallery({
 
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open>
-      <DialogPopup className="recent-gallery-shell" maxWidthClass="max-w-6xl" showCloseButton={false}>
+      <DialogPopup
+        className="recent-gallery-shell"
+        maxWidthClass="max-w-6xl"
+        showCloseButton={false}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Recent photos</DialogTitle>
-          <DialogDescription>Recently captured photostrips available on this booth.</DialogDescription>
+          <DialogDescription>
+            Recently captured photostrips available on this booth.
+          </DialogDescription>
         </DialogHeader>
         <DialogPanel className="p-0">{content}</DialogPanel>
       </DialogPopup>

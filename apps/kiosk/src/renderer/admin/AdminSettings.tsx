@@ -1209,7 +1209,7 @@ export function AdminSettings({
               Upload queue
             </h2>
             <div className="account-section__body">
-              <section className="settings-section" aria-labelledby="queue-title">
+              <div className="settings-section">
                 <div className="settings-section__heading settings-section__heading--inline">
                   <div>
                     <h3 id="queue-title">Upload queue</h3>
@@ -1262,7 +1262,7 @@ export function AdminSettings({
                     ))
                   )}
                 </div>
-              </section>
+              </div>
             </div>
           </section>
 

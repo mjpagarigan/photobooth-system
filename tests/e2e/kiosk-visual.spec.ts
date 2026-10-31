@@ -34,8 +34,18 @@ test('recent photos preserve mixed frame aspect ratios in tiles and details', as
     }, source);
     const bounds = await preview.boundingBox();
     expect(bounds!.width / bounds!.height).toBeCloseTo(width! / height!, 2);
-    const container = await page.locator('.gallery-tile__preview-container').first().boundingBox();
-    expect(Math.abs(container!.height - bounds!.height)).toBeLessThanOrEqual(2);
+    const contentHeight = await page
+      .locator('.gallery-tile__preview-container')
+      .first()
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return (
+          element.getBoundingClientRect().height -
+          Number.parseFloat(style.paddingTop) -
+          Number.parseFloat(style.paddingBottom)
+        );
+      });
+    expect(Math.abs(contentHeight - bounds!.height)).toBeLessThanOrEqual(2);
   }
   await page.locator('.gallery-tile__open').first().click();
   const detail = page.locator('.recent-detail-modal__image');
