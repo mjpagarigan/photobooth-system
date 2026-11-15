@@ -10,6 +10,10 @@ export type AppPaths = {
   secrets: string;
   logs: string;
   staging: string;
+  /** Short-lived print bitmaps handed to the Windows spooler, deleted after submission. */
+  printStaging: string;
+  /** Operator-supplied ICC printer profiles. */
+  printProfiles: string;
 };
 
 export function createAppPaths(userDataDirectory: string): AppPaths {
@@ -23,6 +27,8 @@ export function createAppPaths(userDataDirectory: string): AppPaths {
     secrets: resolve(root, 'secrets'),
     logs: resolve(root, 'logs'),
     staging: resolve(root, 'staging'),
+    printStaging: resolve(root, 'print-staging'),
+    printProfiles: resolve(root, 'print-profiles'),
   };
   for (const directory of [
     paths.root,
@@ -32,6 +38,8 @@ export function createAppPaths(userDataDirectory: string): AppPaths {
     paths.secrets,
     paths.logs,
     paths.staging,
+    paths.printStaging,
+    paths.printProfiles,
   ]) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
   }

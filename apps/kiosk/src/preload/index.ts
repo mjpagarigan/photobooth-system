@@ -3,6 +3,8 @@ import {
   BoothSnapshotEventSchema,
   CAMERA_FRAME_REQUEST_EVENT,
   CameraFrameRequestEventSchema,
+  PRINTER_HEALTH_EVENT,
+  PrinterHealthEventSchema,
   QR_STATION_EVENT,
   QrStationEventSchema,
   IpcContracts,
@@ -78,6 +80,21 @@ const bridge: GraceBoothBridge = {
     getRecent: (limit = 20) => invoke('gallery:get-recent', { limit }),
     repairCloudPhoto: (sessionId) => invoke('gallery:repair-cloud-photo', { sessionId }),
   },
+  print: {
+    getHealth: () => invoke('print:get-health', {}),
+    listJobs: () => invoke('print:list-jobs', {}),
+    cancelJob: (jobId) => invoke('print:cancel-job', { jobId }),
+    resolveJob: (jobId, resolution) => invoke('print:resolve-job', { jobId, resolution }),
+    reprint: (sessionId, copies) => invoke('print:reprint', { sessionId, copies }),
+    subscribe: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
+        const parsed = PrinterHealthEventSchema.safeParse(value);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(PRINTER_HEALTH_EVENT, handler);
+      return () => ipcRenderer.removeListener(PRINTER_HEALTH_EVENT, handler);
+    },
+  },
   admin: {
     getAuthStatus: () => invoke('admin:get-auth-status', {}),
     login: (passcode) => invoke('admin:login', { passcode }),
@@ -91,7 +108,8 @@ const bridge: GraceBoothBridge = {
     saveGooglePhotosConfig: (config) => invoke('admin:google-photos:save-config', config),
     createGooglePhotosAlbum: (title) => invoke('admin:google-photos:create-album', { title }),
     listGooglePhotosAlbums: () => invoke('admin:google-photos:list-albums', {}),
-    resolveGooglePhotosAlbum: (shareUrl) => invoke('admin:google-photos:resolve-album', { shareUrl }),
+    resolveGooglePhotosAlbum: (shareUrl) =>
+      invoke('admin:google-photos:resolve-album', { shareUrl }),
     syncGooglePhotosNow: () => invoke('admin:google-photos:sync-now', {}),
     testGooglePhotosUpload: () => invoke('admin:google-photos:test-upload', {}),
     disconnectGooglePhotos: () => invoke('admin:google-photos:disconnect', {}),
@@ -114,6 +132,14 @@ const bridge: GraceBoothBridge = {
     connectCloud: (email, password, supabaseUrl, supabasePublishableKey) =>
       invoke('admin:connect-cloud', { email, password, supabaseUrl, supabasePublishableKey }),
     openExternalUrl: (url) => invoke('admin:open-external-url', { url }),
+    listPrinters: () => invoke('admin:printer:list', {}),
+    getPrinterSettings: () => invoke('admin:printer:get-settings', {}),
+    getPrinterCapabilities: (printerName) =>
+      invoke('admin:printer:get-capabilities', { printerName }),
+    savePrinterSettings: (input) => invoke('admin:printer:save-settings', input),
+    chooseIccProfile: () => invoke('admin:printer:choose-icc-profile', {}),
+    clearIccProfile: () => invoke('admin:printer:clear-icc-profile', {}),
+    printTestPage: (kind) => invoke('admin:printer:print-test-page', { kind }),
   },
 };
 

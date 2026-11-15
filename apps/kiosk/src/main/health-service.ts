@@ -1,4 +1,4 @@
-import type { AdminHealth, CameraAdapter } from '@grace-booth/shared';
+import type { AdminHealth, CameraAdapter, PrinterHealth } from '@grace-booth/shared';
 
 import type { DeliveryClient } from './cloud/delivery-client.js';
 import type { LocalRepository } from './database/repositories.js';
@@ -11,6 +11,7 @@ export class HealthService {
     private readonly repository: LocalRepository,
     private readonly protection: PlatformSecretProtection,
     private readonly now: () => number = Date.now,
+    private readonly printer: (() => PrinterHealth) | null = null,
   ) {}
 
   async getHealth(): Promise<AdminHealth> {
@@ -63,6 +64,22 @@ export class HealthService {
           : 'Windows secure storage is unavailable.',
         checkedAt,
       },
+      ...(this.printer ? { printer: printerServiceHealth(this.printer()) } : {}),
     };
   }
+}
+
+function printerServiceHealth(health: PrinterHealth): AdminHealth['camera'] {
+  return {
+    state:
+      health.status === 'ready' || health.status === 'printing'
+        ? 'healthy'
+        : health.status === 'unconfigured'
+          ? 'unconfigured'
+          : 'degraded',
+    code:
+      health.status === 'ready' || health.status === 'printing' ? null : `printer_${health.status}`,
+    message: health.message,
+    checkedAt: health.checkedAt,
+  };
 }

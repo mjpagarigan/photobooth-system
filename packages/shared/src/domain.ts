@@ -336,6 +336,8 @@ export const GalleryItemMetadataSchema = z
     frameName: z.string().max(120).nullable(),
     uploadStatus: GalleryUploadStatusSchema,
     cloudExpiresAt: UtcMillisSchema.nullable(),
+    /** True when the photo was made with a landscape 4R Frame and can be reprinted. */
+    printable: z.boolean().default(false),
   })
   .strict();
 export type GalleryItemMetadata = z.infer<typeof GalleryItemMetadataSchema>;
@@ -389,6 +391,7 @@ export const AdminHealthSchema = z
     cloud: ServiceHealthSchema,
     database: ServiceHealthSchema,
     encryption: ServiceHealthSchema,
+    printer: ServiceHealthSchema.optional(),
   })
   .strict();
 export type AdminHealth = z.infer<typeof AdminHealthSchema>;

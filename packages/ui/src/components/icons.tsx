@@ -36,8 +36,11 @@ import {
   LoaderCircle as LucideLoaderCircle,
   LockKeyhole as LucideLockKeyhole,
   LogOut as LucideLogOut,
+  Minus as LucideMinus,
   Monitor as LucideMonitor,
   OctagonAlert as LucideOctagonAlert,
+  Plus as LucidePlus,
+  Printer as LucidePrinter,
   QrCode as LucideQrCode,
   RefreshCw as LucideRefreshCw,
   RotateCcw as LucideRotateCcw,
@@ -109,7 +112,10 @@ export const Key = createAppIcon(LucideKey);
 export const LinkSimple = createAppIcon(LucideLink);
 export const LockKey = createAppIcon(LucideLockKeyhole);
 export const MagnifyingGlassPlus = createAppIcon(LucideZoomIn);
+export const Minus = createAppIcon(LucideMinus);
 export const PaperPlaneTilt = createAppIcon(LucideSend);
+export const Plus = createAppIcon(LucidePlus);
+export const Printer = createAppIcon(LucidePrinter);
 export const QrCode = createAppIcon(LucideQrCode);
 export const ShieldCheck = createAppIcon(LucideShieldCheck);
 export const SignOut = createAppIcon(LucideLogOut);

@@ -22,6 +22,8 @@ import { Button } from './components/Button';
 import { CameraSetupModal } from './components/CameraSetupModal';
 import { FrameImportDialog } from './components/FrameImportDialog';
 import { PasscodeDialog } from './components/PasscodeDialog';
+import { PrinterIndicator, PrintQueuePanel } from './components/Printing';
+import { usePrinterHealth } from './hooks/usePrinterHealth';
 import { RecentGallery } from './components/RecentGallery';
 import { useCameraStream } from './hooks/useCameraStream';
 import { LOCAL_FIXTURES } from './local-fixtures';
@@ -138,6 +140,8 @@ export function App() {
     error: string | null;
   }>({ open: false, busy: false, items: [], error: null });
   const [visualSeed, setVisualSeed] = useState<VisualSeedPayload | null>(null);
+  const livePrinterHealth = usePrinterHealth();
+  const printerHealth = visualSeed?.printerHealth ?? livePrinterHealth;
   const countdownAudioRef = useRef<HTMLAudioElement | null>(null);
   const shutterAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioArmedRef = useRef(false);
@@ -1050,8 +1054,9 @@ export function App() {
           canRetake={snapshot.controls.canRetakeAll}
           captureUrls={snapshot.media.captureUrls}
           frames={snapshot.media.frames}
-          onAccept={(frameId) =>
-            void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ frameId }))
+          printerHealth={printerHealth}
+          onAccept={(frameId, print) =>
+            void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ frameId, print }))
           }
           onRetake={() => void runGuestCommand((bridge) => bridge.booth.retakeAll())}
         />
@@ -1118,6 +1123,7 @@ export function App() {
     liveCameraEnabled,
     loading,
     openRecentGallery,
+    printerHealth,
     runGuestCommand,
     startGuestSession,
     snapshot,
@@ -1167,6 +1173,7 @@ export function App() {
                       </Button>
                     </div>
                   </header>
+                  <PrintQueuePanel health={printerHealth} />
                   <RecentGallery
                     busy={recent.busy}
                     error={recent.error}
@@ -1175,6 +1182,7 @@ export function App() {
                     onClose={() => setAdminView('settings')}
                     onRetryJob={(jobId) => void retryJob(jobId)}
                     operator={true}
+                    printing={printerHealth !== null}
                   />
                 </section>
               ) : (
@@ -1234,6 +1242,7 @@ export function App() {
             inert={dialog || cameraSetupOpen || recent.open ? true : undefined}
           >
             {guestContent}
+            <PrinterIndicator health={printerHealth} />
             {cancelArmed ? (
               <div className="cancel-session-hint" data-testid="cancel-hint" role="status">
                 Press ESC again to cancel
@@ -1273,6 +1282,7 @@ export function App() {
               items={recent.items}
               onClose={closeRecentGallery}
               operator={false}
+              printing={printerHealth !== null}
             />
           ) : null}
         </>

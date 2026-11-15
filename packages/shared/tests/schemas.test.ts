@@ -119,7 +119,17 @@ describe('shared boundary schemas', () => {
 
   it('validates frame identifiers for accept-photos and the admin frame library', () => {
     const frameId = 'cda39163-9036-4acd-ae10-0c08fdb39022';
-    expect(IpcContracts['booth:accept-photos'].request.parse({ frameId })).toEqual({ frameId });
+    // Printing is off unless the operator asks for it.
+    expect(IpcContracts['booth:accept-photos'].request.parse({ frameId })).toEqual({
+      frameId,
+      print: null,
+    });
+    expect(
+      IpcContracts['booth:accept-photos'].request.parse({ frameId, print: { copies: 4 } }),
+    ).toEqual({ frameId, print: { copies: 4 } });
+    expect(() =>
+      IpcContracts['booth:accept-photos'].request.parse({ frameId, print: { copies: 0 } }),
+    ).toThrow();
     expect(() => IpcContracts['booth:accept-photos'].request.parse({})).toThrow();
     expect(() =>
       IpcContracts['booth:accept-photos'].request.parse({ frameId: 'not-a-uuid' }),

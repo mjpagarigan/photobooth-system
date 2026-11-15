@@ -41,6 +41,8 @@ import type { HealthService } from '../health-service.js';
 import { assertPrivateIpv4 } from '../server/network-boundary.js';
 import type { BoothWorkflow } from '../workflow/booth-workflow.js';
 import type { DisplayManager } from '../security/display-manager.js';
+import type { PrintService } from '../print/print-service.js';
+import { registerPrintHandlers } from './print-ipc.js';
 import { assertTrustedIpcSender } from './sender-trust.js';
 
 export type IpcDependencies = {
@@ -57,6 +59,7 @@ export type IpcDependencies = {
   cameraFrames: RendererFrameBroker;
   recentGallery: RecentGalleryService;
   displayManager?: DisplayManager;
+  print?: PrintService;
   rendererOrigin: string;
   onNetworkSettingsChanged(): void;
 };
@@ -305,7 +308,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   });
   register('booth:retake-all', () => dependencies.workflow.retakeAll());
   register('booth:accept-photos', (_event, input) =>
-    dependencies.workflow.acceptPhotos(input.frameId),
+    dependencies.workflow.acceptPhotos(input.frameId, input.print ?? null),
   );
   register('booth:retry-upload', () => dependencies.workflow.retryUpload());
   register('booth:finish-offline', () => dependencies.workflow.finishOffline());
@@ -558,10 +561,12 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       if (!window.isDestroyed()) window.webContents.send(QR_STATION_EVENT, state);
     }
   });
+  const unsubscribePrint = registerPrintHandlers(register, requireAdmin, dependencies.print);
   return () => {
     pendingFrames.clear();
     unsubscribeSnapshot();
     unsubscribeQr();
+    unsubscribePrint();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
 }

@@ -186,6 +186,135 @@ for (const phase of ['create', 'upload', 'confirm'] as const) {
   });
 }
 
+type E2ePrintHandle = {
+  printer: {
+    setStatus(status: string): void;
+    printed: string[];
+    pendingDocumentKeys(): string[];
+  };
+  addLandscape4rFrame(): Promise<string>;
+};
+
+async function printHandle<T>(
+  app: ElectronApplication,
+  action: (handle: E2ePrintHandle, argument: string) => T | Promise<T>,
+  argument = '',
+): Promise<T> {
+  return app.evaluate(
+    (_electron, [source, value]) => {
+      const handle = (globalThis as unknown as { __graceBoothE2e: E2ePrintHandle }).__graceBoothE2e;
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      const run = new Function('handle', 'argument', `return (${source})(handle, argument);`) as (
+        handle: E2ePrintHandle,
+        argument: string,
+      ) => T | Promise<T>;
+      return run(handle, value);
+    },
+    [action.toString(), argument] as const,
+  );
+}
+
+test('4R print with the printer offline: Proceed, queue, then print once when it is back', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData);
+    await bootstrap(kiosk.page);
+    await printHandle(kiosk.app, (handle) => handle.addLandscape4rFrame());
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('offline'));
+    await expect(kiosk.page.getByTestId('printer-indicator')).toContainText('Printer offline', {
+      timeout: 10_000,
+    });
+
+    await startAndWaitForReview(kiosk.page);
+    // A 1:3 Frame never offers printing.
+    await kiosk.page.getByTestId('collage-option-1').click();
+    await expect(kiosk.page.getByTestId('review-print')).toHaveCount(0);
+
+    await kiosk.page.getByRole('radio', { name: /Landscape 4R/ }).click();
+    const toggle = kiosk.page.getByRole('switch', { name: 'Print this photo' });
+    await expect(toggle).not.toBeChecked();
+    await toggle.click();
+    await kiosk.page.getByRole('button', { name: 'More copies' }).click();
+    await expect(kiosk.page.getByTestId('copy-count')).toHaveValue('2');
+
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+    await expect(kiosk.page.getByTestId('review-printer-warning')).toContainText('offline');
+    await kiosk.page.screenshot({ path: 'test-results/electron-print-proceed.png' });
+    await kiosk.page.getByTestId('print-proceed').click();
+
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await expect(kiosk.page.getByTestId('printer-indicator')).toContainText('2 copies waiting', {
+      timeout: 15_000,
+    });
+    expect(await printHandle(kiosk.app, (handle) => handle.printer.printed.length)).toBe(0);
+
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('ready'));
+    await expect
+      .poll(() => printHandle(kiosk!.app, (handle) => handle.printer.printed.length), {
+        timeout: 20_000,
+      })
+      .toBe(2);
+    await expect(kiosk.page.getByTestId('printer-indicator')).toHaveCount(0, { timeout: 10_000 });
+    const printed = await printHandle(kiosk.app, (handle) => [...handle.printer.printed]);
+    expect(new Set(printed).size).toBe(2);
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
+test('operator cancels a queued copy and reprints from Recent photos', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData);
+    await bootstrap(kiosk.page);
+    await printHandle(kiosk.app, (handle) => handle.addLandscape4rFrame());
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('paper_out'));
+
+    await startAndWaitForReview(kiosk.page);
+    await kiosk.page.getByRole('radio', { name: /Landscape 4R/ }).click();
+    await kiosk.page.getByRole('switch', { name: 'Print this photo' }).click();
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+    await kiosk.page.getByTestId('print-proceed').click();
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await kiosk.page.getByRole('button', { name: 'Done' }).click();
+
+    // Reprint from Recent photos on the booth.
+    await kiosk.page.getByRole('button', { name: 'Recent Photos' }).click();
+    await kiosk.page.getByTestId('gallery-item-1').getByRole('button').first().click();
+    const reprint = kiosk.page.getByTestId('reprint-control');
+    await expect(reprint).toBeVisible();
+    await reprint.getByRole('button', { name: 'Reprint' }).click();
+    await expect(reprint).toContainText('1 copy added to the print queue.');
+    await kiosk.page.keyboard.press('Escape');
+    await kiosk.page.keyboard.press('Escape');
+
+    // Cancel the session copy from the operator's print queue before paper is loaded.
+    await kiosk.page.getByRole('button', { name: 'Admin' }).click();
+    await kiosk.page.locator('#operator-passcode').fill(PASSCODE);
+    await kiosk.page.locator('#operator-passcode').press('Enter');
+    await kiosk.page.getByRole('button', { name: 'Recent photos' }).click();
+    const queue = kiosk.page.getByTestId('print-queue');
+    await expect(queue.getByTestId('print-queue-item')).toHaveCount(2, { timeout: 15_000 });
+    await queue.getByRole('button', { name: /Cancel session copy 1/ }).click();
+    await expect(queue.getByTestId('print-queue-item')).toHaveCount(1);
+    await kiosk.page.screenshot({ path: 'test-results/electron-print-queue.png' });
+
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('ready'));
+    await expect
+      .poll(() => printHandle(kiosk!.app, (handle) => handle.printer.printed.length), {
+        timeout: 20_000,
+      })
+      .toBe(1);
+    await expect(queue.getByText('Nothing is waiting to print.')).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
 async function launchKiosk(
   userDataDirectory: string,
   overrides: TestEnvironment = {},

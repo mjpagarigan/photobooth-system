@@ -1253,7 +1253,12 @@ export class LocalRepository {
       .prepare(
         `${SESSION_SELECT}
         WHERE retention_anchor_at IS NOT NULL AND retention_anchor_at <= ?
-          AND cleanup_state IN ('active', 'tombstoning')`,
+          AND cleanup_state IN ('active', 'tombstoning')
+          AND (cleanup_state = 'tombstoning' OR NOT EXISTS (
+            SELECT 1 FROM print_jobs
+            WHERE print_jobs.session_id = sessions.id
+              AND print_jobs.state NOT IN ('printed', 'failed', 'cancelled')
+          ))`,
       )
       .all(cutoff)
       .map((row) => mapSession(row as Record<string, unknown>));
@@ -1330,7 +1335,12 @@ export class LocalRepository {
       | 'settings_change'
       | 'frame_change'
       | 'upload_retry'
-      | 'cleanup',
+      | 'cleanup'
+      | 'printer_settings_change'
+      | 'print_cancel'
+      | 'print_resolve'
+      | 'reprint'
+      | 'print_test',
     outcome: 'success' | 'failure',
     detailCode: string | null,
     now = Date.now(),

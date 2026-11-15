@@ -46,6 +46,21 @@ import {
   type RpcResult,
   type UploadJobSummary,
 } from './domain.js';
+import {
+  PrintCopiesSchema,
+  PrinterCapabilitiesSchema,
+  PrinterHealthSchema,
+  PrinterSettingsSchema,
+  PrinterSummarySchema,
+  PrintJobSummarySchema,
+  SessionPrintRequestSchema,
+  type PrinterCapabilities,
+  type PrinterHealth,
+  type PrinterSettings,
+  type PrinterSummary,
+  type PrintJobSummary,
+  type SessionPrintRequest,
+} from './print.js';
 
 export const EmptyRequestSchema = z.object({}).strict();
 export const PasscodeSchema = z.string().min(8).max(64);
@@ -72,6 +87,7 @@ export const IpcContracts = {
     request: z
       .object({
         frameId: OpaqueIdSchema,
+        print: SessionPrintRequestSchema.nullable().default(null),
       })
       .strict(),
     response: rpcResultSchema(BoothSnapshotSchema),
@@ -144,6 +160,71 @@ export const IpcContracts = {
   'gallery:repair-cloud-photo': {
     request: z.object({ sessionId: OpaqueIdSchema }).strict(),
     response: rpcResultSchema(GalleryCloudRepairResultSchema),
+  },
+  'print:get-health': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(PrinterHealthSchema),
+  },
+  'print:list-jobs': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(z.array(PrintJobSummarySchema)),
+  },
+  'print:cancel-job': {
+    request: z.object({ jobId: OpaqueIdSchema }).strict(),
+    response: rpcResultSchema(PrintJobSummarySchema),
+  },
+  'print:resolve-job': {
+    request: z
+      .object({ jobId: OpaqueIdSchema, resolution: z.enum(['print_again', 'printed']) })
+      .strict(),
+    response: rpcResultSchema(PrintJobSummarySchema),
+  },
+  'print:reprint': {
+    request: z.object({ sessionId: OpaqueIdSchema, copies: PrintCopiesSchema }).strict(),
+    response: rpcResultSchema(z.array(PrintJobSummarySchema)),
+  },
+  'admin:printer:list': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(z.array(PrinterSummarySchema)),
+  },
+  'admin:printer:get-settings': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(
+      z
+        .object({
+          settings: PrinterSettingsSchema,
+          capabilities: PrinterCapabilitiesSchema.nullable(),
+        })
+        .strict(),
+    ),
+  },
+  'admin:printer:get-capabilities': {
+    request: z.object({ printerName: z.string().min(1).max(260) }).strict(),
+    response: rpcResultSchema(PrinterCapabilitiesSchema),
+  },
+  'admin:printer:save-settings': {
+    request: z
+      .object({
+        printerName: z.string().min(1).max(260).nullable(),
+        paperRawKind: z.number().int().nullable(),
+        paperName: z.string().max(260).nullable(),
+        timeoutSeconds: z.number().int().min(30).max(1_800),
+        expectedRevision: z.number().int().nonnegative(),
+      })
+      .strict(),
+    response: rpcResultSchema(PrinterSettingsSchema),
+  },
+  'admin:printer:choose-icc-profile': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(PrinterSettingsSchema),
+  },
+  'admin:printer:clear-icc-profile': {
+    request: EmptyRequestSchema,
+    response: rpcResultSchema(PrinterSettingsSchema),
+  },
+  'admin:printer:print-test-page': {
+    request: z.object({ kind: z.enum(['calibration', 'color_test']) }).strict(),
+    response: rpcResultSchema(PrintJobSummarySchema),
   },
   'admin:get-auth-status': {
     request: EmptyRequestSchema,
@@ -372,6 +453,9 @@ export const CameraFrameRequestEventSchema = z
   .strict();
 export type CameraFrameRequestEvent = z.infer<typeof CameraFrameRequestEventSchema>;
 
+export const PRINTER_HEALTH_EVENT = 'print:health-changed' as const;
+export const PrinterHealthEventSchema = PrinterHealthSchema;
+
 export type IpcChannel = keyof typeof IpcContracts;
 export type IpcRequest<C extends IpcChannel> = z.input<(typeof IpcContracts)[C]['request']>;
 export type IpcResponse<C extends IpcChannel> = z.output<(typeof IpcContracts)[C]['response']>;
@@ -381,7 +465,10 @@ export type GraceBoothBridge = {
     getSnapshot(): Promise<RpcResult<BoothSnapshot>>;
     start(): Promise<RpcResult<BoothSnapshot>>;
     retakeAll(): Promise<RpcResult<BoothSnapshot>>;
-    acceptPhotos(input: { frameId: string }): Promise<RpcResult<BoothSnapshot>>;
+    acceptPhotos(input: {
+      frameId: string;
+      print?: SessionPrintRequest | null;
+    }): Promise<RpcResult<BoothSnapshot>>;
     retryUpload(): Promise<RpcResult<BoothSnapshot>>;
     finishOffline(): Promise<RpcResult<BoothSnapshot>>;
     done(): Promise<RpcResult<BoothSnapshot>>;
@@ -405,6 +492,17 @@ export type GraceBoothBridge = {
   gallery: {
     getRecent(limit?: number): Promise<RpcResult<GalleryItem[]>>;
     repairCloudPhoto(sessionId: string): Promise<RpcResult<GalleryCloudRepairResult>>;
+  };
+  print: {
+    getHealth(): Promise<RpcResult<PrinterHealth>>;
+    listJobs(): Promise<RpcResult<PrintJobSummary[]>>;
+    cancelJob(jobId: string): Promise<RpcResult<PrintJobSummary>>;
+    resolveJob(
+      jobId: string,
+      resolution: 'print_again' | 'printed',
+    ): Promise<RpcResult<PrintJobSummary>>;
+    reprint(sessionId: string, copies: number): Promise<RpcResult<PrintJobSummary[]>>;
+    subscribe(listener: (health: PrinterHealth) => void): () => void;
   };
   admin: {
     getAuthStatus(): Promise<RpcResult<AdminAuthStatus>>;
@@ -475,5 +573,20 @@ export type GraceBoothBridge = {
       supabasePublishableKey?: string | null,
     ): Promise<RpcResult<{ message: string }>>;
     openExternalUrl(url: string): Promise<RpcResult<EmptyResponse>>;
+    listPrinters(): Promise<RpcResult<PrinterSummary[]>>;
+    getPrinterSettings(): Promise<
+      RpcResult<{ settings: PrinterSettings; capabilities: PrinterCapabilities | null }>
+    >;
+    getPrinterCapabilities(printerName: string): Promise<RpcResult<PrinterCapabilities>>;
+    savePrinterSettings(input: {
+      printerName: string | null;
+      paperRawKind: number | null;
+      paperName: string | null;
+      timeoutSeconds: number;
+      expectedRevision: number;
+    }): Promise<RpcResult<PrinterSettings>>;
+    chooseIccProfile(): Promise<RpcResult<PrinterSettings>>;
+    clearIccProfile(): Promise<RpcResult<PrinterSettings>>;
+    printTestPage(kind: 'calibration' | 'color_test'): Promise<RpcResult<PrintJobSummary>>;
   };
 };

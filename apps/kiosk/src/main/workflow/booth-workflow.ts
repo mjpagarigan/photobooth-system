@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import type {
-  BoothSnapshot,
-  CameraAdapter,
-  CaptureResult,
-  GuestErrorCode,
-  QrStationState,
-  SessionState,
+import {
+  isPrintableFrameSize,
+  type BoothSnapshot,
+  type CameraAdapter,
+  type CaptureResult,
+  type GuestErrorCode,
+  type QrStationState,
+  type SessionPrintRequest,
+  type SessionState,
 } from '@grace-booth/shared';
 
 import type { UploadQueue } from '../cloud/upload-queue.js';
@@ -28,6 +30,11 @@ export type BoothWorkflowOptions = {
   cameraPreviewEnabled?: boolean;
   isDualDisplayActive: () => boolean;
   now?: () => number;
+  /** The print queue. Absent in builds or tests without printing. */
+  print?: {
+    requestSessionPrint(sessionId: string, copies: number): unknown;
+    attachSessionPhoto(sessionId: string, assetId: string): void;
+  };
 };
 
 export class BoothWorkflow {
@@ -314,7 +321,7 @@ export class BoothWorkflow {
     return this.getSnapshot();
   }
 
-  acceptPhotos(frameId: string): BoothSnapshot {
+  acceptPhotos(frameId: string, print: SessionPrintRequest | null = null): BoothSnapshot {
     const session = this.requireActive();
     const lockedShotCount = requiredShotCount(session);
     if (session.state !== 'review' || session.captureCount !== lockedShotCount)
@@ -332,6 +339,17 @@ export class BoothWorkflow {
         'Choose a visible frame with the same number of slots.',
       );
     }
+    if (print) {
+      if (!this.options.print) {
+        throw new AppError('print_unavailable', 'Printing is not available on this booth.');
+      }
+      if (!isPrintableFrameSize(chosenFrame.width, chosenFrame.height)) {
+        throw new AppError(
+          'print_frame_unsupported',
+          'Only landscape 4R frames can be printed. Turn printing off or pick a 4R frame.',
+        );
+      }
+    }
     this.transition(
       session,
       'accept_photos',
@@ -341,6 +359,7 @@ export class BoothWorkflow {
       },
       this.now(),
     );
+    if (print) this.options.print?.requestSessionPrint(session.id, print.copies);
     const dualActive = this.isDualDisplayActive();
     if (dualActive) {
       this.activeSessionId = null;
@@ -575,6 +594,13 @@ export class BoothWorkflow {
       } catch (error) {
         this.vault.delete(stored.relativePath);
         throw error;
+      }
+      // Printing never waits on delivery and delivery never waits on printing. A failure here
+      // leaves the copies waiting; the print queue re-attaches them on its next start.
+      try {
+        this.options.print?.attachSessionPhoto(sessionId, assetId);
+      } catch {
+        // Recovered by PrintService.recover().
       }
       this.uploadQueue.wake();
       this.emit();

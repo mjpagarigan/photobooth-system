@@ -1,7 +1,8 @@
-import { CheckCircle, SquaresFour } from '@grace-booth/ui';
+import { CheckCircle, Printer, SquaresFour, Switch, Warning } from '@grace-booth/ui';
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FrameSummary } from '@grace-booth/shared';
+import type { FrameSummary, PrinterHealth, SessionPrintRequest } from '@grace-booth/shared';
+import { isPrintableFrameSize } from '@grace-booth/shared';
 import {
   Button as CossButton,
   Dialog,
@@ -16,6 +17,8 @@ import {
 
 import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
+import { CopyStepper } from '../components/Printing';
+import { isPrinterReady } from '../hooks/usePrinterHealth';
 import { DEFAULT_FRAME_PREVIEW } from '../local-fixtures';
 
 type ReviewScreenProps = {
@@ -24,7 +27,9 @@ type ReviewScreenProps = {
   canRetake: boolean;
   captureUrls: string[];
   frames?: FrameSummary[] | undefined;
-  onAccept: (frameId: string) => void;
+  /** Null hides the print controls (no print support in this build). */
+  printerHealth?: PrinterHealth | null | undefined;
+  onAccept: (frameId: string, print: SessionPrintRequest | null) => void;
   onRetake: () => void;
 };
 
@@ -34,9 +39,14 @@ export function ReviewScreen({
   canRetake,
   captureUrls,
   frames,
+  printerHealth = null,
   onAccept,
   onRetake,
 }: ReviewScreenProps) {
+  // Printing is off by default for every session; the operator turns it on per session.
+  const [printOn, setPrintOn] = useState(false);
+  const [copies, setCopies] = useState(1);
+  const [printerWarningOpen, setPrinterWarningOpen] = useState(false);
   const fallbackFrames = useMemo(() => [DEFAULT_FRAME_PREVIEW], []);
   const options = frames && frames.length > 0 ? frames : fallbackFrames;
   const [selectedRawId, setSelectedRawId] = useState<string | null>(null);
@@ -45,7 +55,23 @@ export function ReviewScreen({
       ? selectedRawId
       : options[0]?.id;
   const selectedOption = options.find((option) => option.id === selectedId);
+  const printable =
+    printerHealth !== null &&
+    selectedOption !== undefined &&
+    isPrintableFrameSize(selectedOption.width, selectedOption.height);
+  // Switching to a 1:3 frame hides the controls and turns printing off.
+  const printRequested = printable && printOn;
   const [layoutsModalOpen, setLayoutsModalOpen] = useState(false);
+
+  const accept = (force: boolean) => {
+    if (selectedId === undefined) return;
+    if (printRequested && !force && !isPrinterReady(printerHealth)) {
+      setPrinterWarningOpen(true);
+      return;
+    }
+    setPrinterWarningOpen(false);
+    onAccept(selectedId, printRequested ? { copies } : null);
+  };
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -170,6 +196,56 @@ export function ReviewScreen({
             </div>
           </div>
 
+          {printable ? (
+            <div className="review-print" data-testid="review-print">
+              <label className="review-print__toggle">
+                <Switch
+                  aria-label="Print this photo"
+                  checked={printOn}
+                  data-testid="print-toggle"
+                  onCheckedChange={(checked) => {
+                    setPrintOn(checked);
+                    setPrinterWarningOpen(false);
+                  }}
+                />
+                <span>
+                  <Printer aria-hidden="true" /> Print on 4R
+                </span>
+              </label>
+              {printOn ? <CopyStepper value={copies} onChange={setCopies} disabled={busy} /> : null}
+            </div>
+          ) : null}
+
+          {printerWarningOpen && printRequested ? (
+            <div
+              className="review-printer-warning"
+              data-testid="review-printer-warning"
+              role="alert"
+            >
+              <p className="review-printer-warning__title">
+                <Warning aria-hidden="true" weight="bold" />
+                {printerHealth.status === 'paper_out'
+                  ? 'The printer is out of paper.'
+                  : printerHealth.status === 'offline'
+                    ? 'The printer is offline.'
+                    : 'The printer is not ready.'}
+              </p>
+              <p>
+                {printerHealth.message} Proceed to finish this session now; the{' '}
+                {copies === 1 ? 'copy' : `${copies} copies`} will wait in the print queue and print
+                when the printer is back.
+              </p>
+              <Button
+                data-testid="print-proceed"
+                disabled={!canAccept}
+                loading={busy}
+                onClick={() => accept(true)}
+              >
+                Proceed
+              </Button>
+            </div>
+          ) : null}
+
           <div className="review-actions">
             <Button
               className="button--review-retake"
@@ -185,9 +261,7 @@ export function ReviewScreen({
               aria-label="Use these photos"
               disabled={!canAccept}
               loading={busy}
-              onClick={() => {
-                if (selectedId !== undefined) onAccept(selectedId);
-              }}
+              onClick={() => accept(false)}
             >
               Use these photos
             </Button>
