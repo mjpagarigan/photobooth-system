@@ -321,18 +321,20 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       adapter: dependencies.camera.getActiveAdapterKind(),
       deviceId: dependencies.camera.getDeviceId(),
       resolution: settings.cameraResolution,
+      zoomPercent: settings.cameraZoomPercent,
       alwaysActive: settings.webcamAlwaysActive,
       status,
     };
   });
   register('booth:set-camera', async (_event, input) => {
     const status = await dependencies.camera.switchAdapter(input.adapter, input.deviceId ?? null);
-    dependencies.repository.setCameraSettings(
+    const settings = dependencies.repository.setCameraSettings(
       input.adapter,
       input.deviceId ?? null,
       input.resolution,
       Date.now(),
       input.alwaysActive,
+      input.zoomPercent,
     );
     dependencies.workflow.setCameraPreviewEnabled(
       input.adapter === 'webcam' || input.adapter === 'internal_webcam',
@@ -341,6 +343,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       adapter: input.adapter,
       deviceId: input.deviceId ?? null,
       resolution: input.resolution,
+      zoomPercent: settings.cameraZoomPercent,
       alwaysActive: input.alwaysActive,
       status,
     };

@@ -5,6 +5,7 @@ import type {
   AdminHealth,
   AdminSettings as AdminSettingsData,
   BoothSnapshot,
+  CameraConfig,
   CameraResolution,
   FrameLayout,
   FrameImportCandidate,
@@ -13,6 +14,7 @@ import type {
   RpcResult,
   UploadJobSummary,
 } from '@grace-booth/shared';
+import { CAMERA_ZOOM_DEFAULT } from '@grace-booth/shared';
 import { AnchoredToastProvider, ToastProvider } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
@@ -131,6 +133,7 @@ export function App() {
   const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState<string | null>(null);
   const [selectedCameraResolution, setSelectedCameraResolution] =
     useState<CameraResolution>('1080p');
+  const [cameraZoomPercent, setCameraZoomPercent] = useState(CAMERA_ZOOM_DEFAULT);
   const [webcamAlwaysActive, setWebcamAlwaysActive] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [recent, setRecent] = useState<{
@@ -166,6 +169,7 @@ export function App() {
     liveCameraEnabled,
     selectedCameraDeviceId,
     selectedCameraResolution,
+    cameraZoomPercent,
   );
   const grabJpegBase64 = camera.grabJpegBase64;
 
@@ -256,6 +260,7 @@ export function App() {
         if (cameraConfig?.ok) {
           setSelectedCameraDeviceId(cameraConfig.data.deviceId);
           setSelectedCameraResolution(cameraConfig.data.resolution);
+          setCameraZoomPercent(cameraConfig.data.zoomPercent);
           setWebcamAlwaysActive(cameraConfig.data.alwaysActive);
         }
         if (result.ok) {
@@ -429,6 +434,14 @@ export function App() {
       setAdminBusy(false);
     }
   }, [visualSeed]);
+
+  const handleCameraSaved = (config: CameraConfig) => {
+    setSelectedCameraDeviceId(config.deviceId);
+    setSelectedCameraResolution(config.resolution);
+    setCameraZoomPercent(config.zoomPercent);
+    setWebcamAlwaysActive(config.alwaysActive);
+    void refreshAdminData();
+  };
 
   const restartSession = useCallback(async () => {
     if (!snapshot.sessionId || visualSeed) {
@@ -1039,6 +1052,7 @@ export function App() {
             Math.min(snapshot.requiredShotCount ?? 3, snapshot.captureCount + 1)
           }
           totalShots={snapshot.requiredShotCount ?? 3}
+          cameraZoomPercent={cameraZoomPercent}
           {...(liveCameraEnabled
             ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
             : {})}
@@ -1117,6 +1131,7 @@ export function App() {
     beginProtectedAction,
     camera.ready,
     camera.videoRef,
+    cameraZoomPercent,
     countdownSeconds,
     guestBusy,
     guestError,
@@ -1211,12 +1226,7 @@ export function App() {
             <CameraSetupModal
               isOpen={cameraSetupOpen}
               onClose={() => setCameraSetupOpen(false)}
-              onCameraSaved={(_adapter, deviceId, resolution, alwaysActive) => {
-                setSelectedCameraDeviceId(deviceId);
-                setSelectedCameraResolution(resolution);
-                setWebcamAlwaysActive(alwaysActive);
-                void refreshAdminData();
-              }}
+              onCameraSaved={handleCameraSaved}
             />
             {frameImportCandidate ? (
               <FrameImportDialog
@@ -1268,12 +1278,7 @@ export function App() {
           <CameraSetupModal
             isOpen={cameraSetupOpen}
             onClose={() => setCameraSetupOpen(false)}
-            onCameraSaved={(_adapter, deviceId, resolution, alwaysActive) => {
-              setSelectedCameraDeviceId(deviceId);
-              setSelectedCameraResolution(resolution);
-              setWebcamAlwaysActive(alwaysActive);
-              void refreshAdminData();
-            }}
+            onCameraSaved={handleCameraSaved}
           />
           {recent.open && !adminOpen ? (
             <RecentGallery

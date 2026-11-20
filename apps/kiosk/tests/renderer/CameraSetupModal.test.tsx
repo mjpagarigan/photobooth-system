@@ -36,6 +36,7 @@ function cameraConfiguration(
       deviceId,
       resolution,
       alwaysActive,
+      zoomPercent: 100,
       status: {
         adapter,
         state: adapter === 'sony' ? ('unsupported' as const) : ('ready' as const),
@@ -158,6 +159,7 @@ describe('CameraSetupModal resolution preferences', () => {
       alwaysActive: false,
       deviceId: 'camo-camera',
       resolution: '720p',
+      zoomPercent: 100,
     });
   });
 
@@ -180,8 +182,28 @@ describe('CameraSetupModal resolution preferences', () => {
       alwaysActive: false,
       deviceId: 'camo-camera',
       resolution: '720p',
+      zoomPercent: 100,
     });
   });
+
+  it('tells the operator to reselect a saved camera that no longer resolves', async () => {
+    const getUserMedia = vi.fn(() => Promise.reject(new DOMException('', 'OverconstrainedError')));
+    stubCamo(getUserMedia);
+    installBridge(
+      vi.fn().mockResolvedValue(cameraConfiguration('webcam', '1700340e-stale-id', '1080p')),
+    );
+    render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(
+      await screen.findByText('The selected camera is not connected.', undefined, {
+        timeout: 5_000,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Choose the camera again in Active device node, then Apply & Save.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/in use by another app/i)).not.toBeInTheDocument();
+  }, 10_000);
 
   it('loads and persists the always-active webcam preference', async () => {
     stubCamo(vi.fn(() => Promise.resolve(streamAt(1_920, 1_080))));
@@ -201,6 +223,7 @@ describe('CameraSetupModal resolution preferences', () => {
       alwaysActive: false,
       deviceId: 'camo-camera',
       resolution: '1080p',
+      zoomPercent: 100,
     });
   });
 

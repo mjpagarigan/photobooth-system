@@ -45,6 +45,15 @@ import { BoothWorkflow } from './workflow/booth-workflow.js';
 
 registerPrivilegedSchemes();
 
+if (process.platform === 'win32') {
+  // Media Foundation cannot start USB HDMI capture cards (e.g. 345f:2109) at 720p or 1080p; DirectShow can.
+  const disabled = app.commandLine.getSwitchValue('disable-features');
+  app.commandLine.appendSwitch(
+    'disable-features',
+    [disabled, 'MediaFoundationVideoCapture'].filter(Boolean).join(','),
+  );
+}
+
 const isNativeSelfTest = process.argv.includes('--native-self-test');
 const hasInstanceLock = isNativeSelfTest || app.requestSingleInstanceLock();
 if (!hasInstanceLock) app.quit();

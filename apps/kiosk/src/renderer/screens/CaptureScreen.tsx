@@ -1,3 +1,5 @@
+import { CAMERA_ZOOM_DEFAULT } from '@grace-booth/shared';
+
 import { ProgressStepper } from '../components/ProgressStepper';
 import { mockPhotoFor } from '../local-fixtures';
 
@@ -8,6 +10,7 @@ type CaptureScreenProps = {
   totalShots?: number;
   liveVideoRef?: (element: HTMLVideoElement | null) => void;
   liveStreamReady?: boolean;
+  cameraZoomPercent?: number;
 };
 
 const POSE_COPY = [
@@ -23,6 +26,7 @@ export function CaptureScreen({
   totalShots = 3,
   liveVideoRef,
   liveStreamReady = false,
+  cameraZoomPercent = CAMERA_ZOOM_DEFAULT,
 }: CaptureScreenProps) {
   const safeShot = Math.max(1, Math.min(totalShots, shotNumber));
   const poseSuggestion = POSE_COPY[(safeShot - 1) % POSE_COPY.length];
@@ -46,6 +50,7 @@ export function CaptureScreen({
             playsInline
             aria-label="Live camera preview"
             data-testid="viewfinder-live"
+            style={{ scale: cameraZoomPercent / 100 }}
             hidden={!liveStreamReady}
           />
         ) : null}

@@ -192,6 +192,7 @@ function createBridge(
           deviceId: cameraDeviceId,
           resolution: cameraResolution,
           alwaysActive: webcamAlwaysActive,
+          zoomPercent: 100,
           status: {
             adapter: cameraAdapter,
             state: 'ready' as const,
@@ -208,6 +209,7 @@ function createBridge(
           deviceId: null,
           resolution: '1080p' as const,
           alwaysActive: false,
+          zoomPercent: 100,
           status: {
             adapter: 'webcam' as const,
             state: 'ready' as const,

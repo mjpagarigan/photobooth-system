@@ -23,6 +23,7 @@ export const settings = sqliteTable('settings', {
   cameraAdapter: text('camera_adapter', { enum: ['mock', 'sony', 'webcam', 'internal_webcam'] }),
   cameraDeviceId: text('camera_device_id'),
   cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
+  cameraZoomPercent: integer('camera_zoom_percent').notNull().default(100),
   webcamAlwaysActive: integer('webcam_always_active', { mode: 'boolean' }).notNull().default(false),
   supabaseUrl: text('supabase_url'),
   supabasePublishableKey: text('supabase_publishable_key'),

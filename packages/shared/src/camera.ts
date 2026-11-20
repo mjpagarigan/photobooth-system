@@ -7,6 +7,14 @@ export type CameraAdapterKind = z.infer<typeof CameraAdapterKindSchema>;
 export const CameraResolutionSchema = z.enum(['720p', '1080p']);
 export type CameraResolution = z.infer<typeof CameraResolutionSchema>;
 
+export const CAMERA_ZOOM_DEFAULT = 100;
+export const CAMERA_ZOOM_MAX = 160;
+export const CameraZoomPercentSchema = z
+  .number()
+  .int()
+  .min(CAMERA_ZOOM_DEFAULT)
+  .max(CAMERA_ZOOM_MAX);
+
 export const CAMERA_RESOLUTION_DIMENSIONS: Record<
   CameraResolution,
   { width: number; height: number }
@@ -60,6 +68,7 @@ export const CameraConfigSchema = z
     adapter: CameraAdapterKindSchema,
     deviceId: z.string().nullable(),
     resolution: CameraResolutionSchema.default('1080p'),
+    zoomPercent: CameraZoomPercentSchema.default(CAMERA_ZOOM_DEFAULT),
     alwaysActive: z.boolean().default(false),
     status: CameraStatusSchema,
   })

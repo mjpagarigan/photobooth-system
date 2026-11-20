@@ -61,9 +61,10 @@ describe('checked-in local migration', () => {
     ).toThrow();
   });
 
-  it('defaults camera resolution to 1080p and persists a 720p preference', () => {
+  it('defaults camera resolution and zoom and persists camera preferences', () => {
     store = createTestStore();
     expect(store.repository.getSettings().cameraResolution).toBe('1080p');
+    expect(store.repository.getSettings().cameraZoomPercent).toBe(100);
     expect(store.repository.getSettings().webcamAlwaysActive).toBe(false);
     expect(store.repository.getSettings().recruitmentButtonText).toBe('Join a ministry');
 
@@ -73,11 +74,14 @@ describe('checked-in local migration', () => {
       '720p',
       1_000,
       true,
+      135,
     );
     expect(updated.cameraAdapter).toBe('webcam');
     expect(updated.cameraDeviceId).toBe('camo-camera');
     expect(updated.cameraResolution).toBe('720p');
+    expect(updated.cameraZoomPercent).toBe(135);
     expect(updated.webcamAlwaysActive).toBe(true);
+    expect(store.repository.setCameraSettings('webcam').cameraZoomPercent).toBe(135);
     expect(() =>
       store?.database.raw
         .prepare("UPDATE settings SET camera_resolution = '480p' WHERE id = 1")

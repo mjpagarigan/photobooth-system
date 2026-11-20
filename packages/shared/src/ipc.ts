@@ -3,6 +3,7 @@ import {
   CameraAdapterKindSchema,
   CameraConfigSchema,
   CameraResolutionSchema,
+  CameraZoomPercentSchema,
   type CameraAdapterKind,
   type CameraConfig,
   type CameraResolution,
@@ -118,6 +119,7 @@ export const IpcContracts = {
         adapter: CameraAdapterKindSchema,
         deviceId: z.string().nullable().optional(),
         resolution: CameraResolutionSchema.default('1080p'),
+        zoomPercent: CameraZoomPercentSchema.optional(),
         alwaysActive: z.boolean().default(false),
       })
       .strict(),
@@ -478,6 +480,7 @@ export type GraceBoothBridge = {
       adapter: CameraAdapterKind;
       deviceId?: string | null;
       resolution: CameraResolution;
+      zoomPercent?: number;
       alwaysActive: boolean;
     }): Promise<RpcResult<CameraConfig>>;
     submitCameraFrame(captureId: string, jpegBase64: string): Promise<RpcResult<EmptyResponse>>;

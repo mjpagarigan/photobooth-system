@@ -13,6 +13,90 @@ type RunningKiosk = { app: ElectronApplication; page: Page };
 
 test.describe.configure({ mode: 'serial', timeout: 180_000 });
 
+test('camera zoom crops the captured photo while preserving its aspect ratio', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData, { GRACE_BOOTH_E2E_COUNTDOWN_MS: 2_000 });
+    const { page } = kiosk;
+    await bootstrap(page);
+
+    await page.evaluate(() => {
+      const surface = document.createElement('canvas');
+      surface.width = 480;
+      surface.height = 270;
+      const context = surface.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        value: () => {
+          const stream = surface.captureStream();
+          requestAnimationFrame(() => {
+            context.fillStyle = 'black';
+            context.fillRect(0, 0, surface.width, surface.height);
+            context.fillStyle = 'lime';
+            context.fillRect(65, 0, 350, surface.height);
+          });
+          return Promise.resolve(stream);
+        },
+      });
+    });
+
+    const openSetup = page.getByRole('button', { name: 'Camera Setup' });
+    const setup = page.getByRole('dialog', { name: 'Camera configuration' });
+    const zoom = setup.getByRole('slider', { name: 'Camera zoom' });
+    await openSetup.click();
+    await expect(setup.getByText('Mock camera emulator')).toBeVisible();
+    await setup.getByText('Laptop / USB Webcam', { exact: true }).click();
+    await expect(zoom).toHaveValue('100');
+    await zoom.press('End');
+    await expect(zoom).toHaveValue('160');
+    await expect(setup.locator('video')).toHaveCSS('scale', '1.6');
+    await setup.getByRole('button', { name: 'Apply & Save' }).click();
+    await expect(setup).toBeHidden();
+
+    await openSetup.click();
+    await expect(zoom).toHaveValue('160');
+    await setup.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Start photo session' }).click();
+    await expect(page.getByTestId('viewfinder-live')).toHaveCSS('scale', '1.6');
+
+    const review = page.getByTestId('review-screen');
+    await expect(review).toBeVisible({ timeout: 30_000 });
+    const photoUrl = await review
+      .getByRole('img', { name: 'Photo 1', exact: true })
+      .evaluate((image: HTMLImageElement) => image.src);
+    const jpeg = await kiosk.app.evaluate(async ({ net }, url) => {
+      const response = await net.fetch(url);
+      if (!response.ok) throw new Error(`Could not load the captured JPEG (${response.status})`);
+      return Array.from(new Uint8Array(await response.arrayBuffer()));
+    }, photoUrl);
+    const captured = await page.evaluate(async (bytes) => {
+      const image = await createImageBitmap(
+        new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }),
+      );
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      context.drawImage(image, 0, 0);
+      const y = Math.floor(canvas.height / 2);
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        leftGreen: context.getImageData(5, y, 1, 1).data[1],
+        rightGreen: context.getImageData(canvas.width - 6, y, 1, 1).data[1],
+      };
+    }, jpeg);
+    expect(captured).toMatchObject({ width: 480, height: 270 });
+    expect(captured.leftGreen).toBeGreaterThan(200);
+    expect(captured.rightGreen).toBeGreaterThan(200);
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
 test('guest happy path, repeated retakes, final restoration, and Done reset', async () => {
   const userData = await createUserDataDirectory();
   let kiosk: RunningKiosk | null = null;

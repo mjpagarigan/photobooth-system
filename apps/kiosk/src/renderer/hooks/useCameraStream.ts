@@ -1,5 +1,6 @@
 import {
   CAMERA_RESOLUTION_DIMENSIONS,
+  CAMERA_ZOOM_DEFAULT,
   type CameraDevice,
   type CameraResolution,
 } from '@grace-booth/shared';
@@ -14,6 +15,7 @@ export type CameraAcquisitionState =
   | 'initializing'
   | 'ready'
   | 'permission-denied'
+  | 'device-missing'
   | 'unavailable';
 
 export type NegotiatedCameraResolution = {
@@ -25,7 +27,7 @@ export type CameraStreamState = {
   stream: MediaStream | null;
   acquisitionState: CameraAcquisitionState;
   resolution: NegotiatedCameraResolution | null;
-  error: 'permission-denied' | 'unavailable' | null;
+  error: 'permission-denied' | 'device-missing' | 'unavailable' | null;
 };
 
 export type CameraStream = CameraStreamState & {
@@ -82,6 +84,13 @@ function negotiatedResolution(width: unknown, height: unknown): NegotiatedCamera
   return { width: Math.round(width), height: Math.round(height) };
 }
 
+function deviceWasMissing(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'OverconstrainedError' || error.name === 'NotFoundError')
+  );
+}
+
 function permissionWasDenied(error: unknown): boolean {
   return (
     error instanceof DOMException &&
@@ -94,6 +103,7 @@ export function useCameraStream(
   enabled: boolean,
   deviceId?: string | null,
   requestedResolution: CameraResolution = '1080p',
+  zoomPercent = CAMERA_ZOOM_DEFAULT,
 ): CameraStream {
   const [state, setState] = useState<CameraStreamState>({
     stream: null,
@@ -178,6 +188,7 @@ export function useCameraStream(
     };
 
     const open = async (generation: number) => {
+      let failure: 'device-missing' | 'unavailable' = 'unavailable';
       for (let attempt = 0; attempt < ACQUISITION_ATTEMPTS; attempt += 1) {
         if (attempt > 0) {
           await new Promise<void>((resolve) => {
@@ -212,15 +223,16 @@ export function useCameraStream(
             }
             return;
           }
+          failure = deviceWasMissing(error) ? 'device-missing' : 'unavailable';
         }
       }
       if (active && generation === acquisitionGeneration) {
         stopAcquired();
         setState({
           stream: null,
-          acquisitionState: 'unavailable',
+          acquisitionState: failure,
           resolution: null,
-          error: 'unavailable',
+          error: failure,
         });
       }
     };
@@ -334,11 +346,23 @@ export function useCameraStream(
     canvas.height = height;
     const context = canvas.getContext('2d');
     if (!context) return null;
-    context.drawImage(video, 0, 0, width, height);
+    const cropWidth = (width * 100) / zoomPercent;
+    const cropHeight = (height * 100) / zoomPercent;
+    context.drawImage(
+      video,
+      (width - cropWidth) / 2,
+      (height - cropHeight) / 2,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      width,
+      height,
+    );
     const dataUrl = canvas.toDataURL('image/jpeg', CAPTURE_QUALITY);
     const separator = dataUrl.indexOf(',');
     return separator === -1 ? null : dataUrl.slice(separator + 1);
-  }, []);
+  }, [zoomPercent]);
 
   return {
     ...state,
