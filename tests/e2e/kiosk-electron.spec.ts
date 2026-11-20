@@ -13,6 +13,90 @@ type RunningKiosk = { app: ElectronApplication; page: Page };
 
 test.describe.configure({ mode: 'serial', timeout: 180_000 });
 
+test('camera zoom crops the captured photo while preserving its aspect ratio', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData, { GRACE_BOOTH_E2E_COUNTDOWN_MS: 2_000 });
+    const { page } = kiosk;
+    await bootstrap(page);
+
+    await page.evaluate(() => {
+      const surface = document.createElement('canvas');
+      surface.width = 480;
+      surface.height = 270;
+      const context = surface.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        value: () => {
+          const stream = surface.captureStream();
+          requestAnimationFrame(() => {
+            context.fillStyle = 'black';
+            context.fillRect(0, 0, surface.width, surface.height);
+            context.fillStyle = 'lime';
+            context.fillRect(65, 0, 350, surface.height);
+          });
+          return Promise.resolve(stream);
+        },
+      });
+    });
+
+    const openSetup = page.getByRole('button', { name: 'Camera Setup' });
+    const setup = page.getByRole('dialog', { name: 'Camera configuration' });
+    const zoom = setup.getByRole('slider', { name: 'Camera zoom' });
+    await openSetup.click();
+    await expect(setup.getByText('Mock camera emulator')).toBeVisible();
+    await setup.getByText('Laptop / USB Webcam', { exact: true }).click();
+    await expect(zoom).toHaveValue('100');
+    await zoom.press('End');
+    await expect(zoom).toHaveValue('160');
+    await expect(setup.locator('video')).toHaveCSS('scale', '1.6');
+    await setup.getByRole('button', { name: 'Apply & Save' }).click();
+    await expect(setup).toBeHidden();
+
+    await openSetup.click();
+    await expect(zoom).toHaveValue('160');
+    await setup.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Start photo session' }).click();
+    await expect(page.getByTestId('viewfinder-live')).toHaveCSS('scale', '1.6');
+
+    const review = page.getByTestId('review-screen');
+    await expect(review).toBeVisible({ timeout: 30_000 });
+    const photoUrl = await review
+      .getByRole('img', { name: 'Photo 1', exact: true })
+      .evaluate((image: HTMLImageElement) => image.src);
+    const jpeg = await kiosk.app.evaluate(async ({ net }, url) => {
+      const response = await net.fetch(url);
+      if (!response.ok) throw new Error(`Could not load the captured JPEG (${response.status})`);
+      return Array.from(new Uint8Array(await response.arrayBuffer()));
+    }, photoUrl);
+    const captured = await page.evaluate(async (bytes) => {
+      const image = await createImageBitmap(
+        new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }),
+      );
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      context.drawImage(image, 0, 0);
+      const y = Math.floor(canvas.height / 2);
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        leftGreen: context.getImageData(5, y, 1, 1).data[1],
+        rightGreen: context.getImageData(canvas.width - 6, y, 1, 1).data[1],
+      };
+    }, jpeg);
+    expect(captured).toMatchObject({ width: 480, height: 270 });
+    expect(captured.leftGreen).toBeGreaterThan(200);
+    expect(captured.rightGreen).toBeGreaterThan(200);
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
 test('guest happy path, repeated retakes, final restoration, and Done reset', async () => {
   const userData = await createUserDataDirectory();
   let kiosk: RunningKiosk | null = null;
@@ -185,6 +269,135 @@ for (const phase of ['create', 'upload', 'confirm'] as const) {
     }
   });
 }
+
+type E2ePrintHandle = {
+  printer: {
+    setStatus(status: string): void;
+    printed: string[];
+    pendingDocumentKeys(): string[];
+  };
+  addLandscape4rFrame(): Promise<string>;
+};
+
+async function printHandle<T>(
+  app: ElectronApplication,
+  action: (handle: E2ePrintHandle, argument: string) => T | Promise<T>,
+  argument = '',
+): Promise<T> {
+  return app.evaluate(
+    (_electron, [source, value]) => {
+      const handle = (globalThis as unknown as { __graceBoothE2e: E2ePrintHandle }).__graceBoothE2e;
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      const run = new Function('handle', 'argument', `return (${source})(handle, argument);`) as (
+        handle: E2ePrintHandle,
+        argument: string,
+      ) => T | Promise<T>;
+      return run(handle, value);
+    },
+    [action.toString(), argument] as const,
+  );
+}
+
+test('4R print with the printer offline: Proceed, queue, then print once when it is back', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData);
+    await bootstrap(kiosk.page);
+    await printHandle(kiosk.app, (handle) => handle.addLandscape4rFrame());
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('offline'));
+    await expect(kiosk.page.getByTestId('printer-indicator')).toContainText('Printer offline', {
+      timeout: 10_000,
+    });
+
+    await startAndWaitForReview(kiosk.page);
+    // A 1:3 Frame never offers printing.
+    await kiosk.page.getByTestId('collage-option-1').click();
+    await expect(kiosk.page.getByTestId('review-print')).toHaveCount(0);
+
+    await kiosk.page.getByRole('radio', { name: /Landscape 4R/ }).click();
+    const toggle = kiosk.page.getByRole('switch', { name: 'Print this photo' });
+    await expect(toggle).not.toBeChecked();
+    await toggle.click();
+    await kiosk.page.getByRole('button', { name: 'More copies' }).click();
+    await expect(kiosk.page.getByTestId('copy-count')).toHaveValue('2');
+
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+    await expect(kiosk.page.getByTestId('review-printer-warning')).toContainText('offline');
+    await kiosk.page.screenshot({ path: 'test-results/electron-print-proceed.png' });
+    await kiosk.page.getByTestId('print-proceed').click();
+
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await expect(kiosk.page.getByTestId('printer-indicator')).toContainText('2 copies waiting', {
+      timeout: 15_000,
+    });
+    expect(await printHandle(kiosk.app, (handle) => handle.printer.printed.length)).toBe(0);
+
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('ready'));
+    await expect
+      .poll(() => printHandle(kiosk!.app, (handle) => handle.printer.printed.length), {
+        timeout: 20_000,
+      })
+      .toBe(2);
+    await expect(kiosk.page.getByTestId('printer-indicator')).toHaveCount(0, { timeout: 10_000 });
+    const printed = await printHandle(kiosk.app, (handle) => [...handle.printer.printed]);
+    expect(new Set(printed).size).toBe(2);
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
+test('operator cancels a queued copy and reprints from Recent photos', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData);
+    await bootstrap(kiosk.page);
+    await printHandle(kiosk.app, (handle) => handle.addLandscape4rFrame());
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('paper_out'));
+
+    await startAndWaitForReview(kiosk.page);
+    await kiosk.page.getByRole('radio', { name: /Landscape 4R/ }).click();
+    await kiosk.page.getByRole('switch', { name: 'Print this photo' }).click();
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+    await kiosk.page.getByTestId('print-proceed').click();
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await kiosk.page.getByRole('button', { name: 'Done' }).click();
+
+    // Reprint from Recent photos on the booth.
+    await kiosk.page.getByRole('button', { name: 'Recent Photos' }).click();
+    await kiosk.page.getByTestId('gallery-item-1').getByRole('button').first().click();
+    const reprint = kiosk.page.getByTestId('reprint-control');
+    await expect(reprint).toBeVisible();
+    await reprint.getByRole('button', { name: 'Reprint' }).click();
+    await expect(reprint).toContainText('1 copy added to the print queue.');
+    await kiosk.page.keyboard.press('Escape');
+    await kiosk.page.keyboard.press('Escape');
+
+    // Cancel the session copy from the operator's print queue before paper is loaded.
+    await kiosk.page.getByRole('button', { name: 'Admin' }).click();
+    await kiosk.page.locator('#operator-passcode').fill(PASSCODE);
+    await kiosk.page.locator('#operator-passcode').press('Enter');
+    await kiosk.page.getByRole('button', { name: 'Recent photos' }).click();
+    const queue = kiosk.page.getByTestId('print-queue');
+    await expect(queue.getByTestId('print-queue-item')).toHaveCount(2, { timeout: 15_000 });
+    await queue.getByRole('button', { name: /Cancel session copy 1/ }).click();
+    await expect(queue.getByTestId('print-queue-item')).toHaveCount(1);
+    await kiosk.page.screenshot({ path: 'test-results/electron-print-queue.png' });
+
+    await printHandle(kiosk.app, (handle) => handle.printer.setStatus('ready'));
+    await expect
+      .poll(() => printHandle(kiosk!.app, (handle) => handle.printer.printed.length), {
+        timeout: 20_000,
+      })
+      .toBe(1);
+    await expect(queue.getByText('Nothing is waiting to print.')).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
 
 async function launchKiosk(
   userDataDirectory: string,

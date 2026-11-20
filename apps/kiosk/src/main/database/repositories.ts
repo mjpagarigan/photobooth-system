@@ -36,6 +36,7 @@ type RawSettingsRow = {
   camera_adapter: string | null;
   camera_device_id: string | null;
   camera_resolution: string;
+  camera_zoom_percent: number;
   webcam_always_active: number;
   supabase_url: string | null;
   supabase_publishable_key: string | null;
@@ -74,6 +75,7 @@ export type LocalSettings = {
   cameraAdapter: CameraAdapterKind;
   cameraDeviceId: string | null;
   cameraResolution: CameraResolution;
+  cameraZoomPercent: number;
   webcamAlwaysActive: boolean;
   supabaseUrl: string | null;
   supabasePublishableKey: string | null;
@@ -183,7 +185,7 @@ const SETTINGS_SELECT = `
     local_retention_days, cloud_retention_days,
     lan_enabled, lan_bind_host, lan_port, lan_tls_secret_ref,
     lan_certificate_fingerprint, camera_adapter, camera_device_id, camera_resolution,
-    webcam_always_active,
+    camera_zoom_percent, webcam_always_active,
     supabase_url, supabase_publishable_key, dual_display_mode, swap_displays, qr_dismiss_seconds,
     google_photos_enabled, google_photos_email, google_photos_album_id, google_photos_album_title, google_photos_album_share_url,
     revision, created_at, updated_at
@@ -299,14 +301,15 @@ export class LocalRepository {
     resolution: CameraResolution = '1080p',
     now = Date.now(),
     alwaysActive = false,
+    zoomPercent?: number,
   ): LocalSettings {
     this.database.raw
       .prepare(
         `UPDATE settings SET camera_adapter = ?, camera_device_id = ?, camera_resolution = ?,
-          webcam_always_active = ?,
+          webcam_always_active = ?, camera_zoom_percent = COALESCE(?, camera_zoom_percent),
           revision = revision + 1, updated_at = ? WHERE id = 1`,
       )
-      .run(adapter, deviceId, resolution, alwaysActive ? 1 : 0, now);
+      .run(adapter, deviceId, resolution, alwaysActive ? 1 : 0, zoomPercent ?? null, now);
     this.recordAudit('settings_change', 'success', 'camera_adapter_updated', now);
     return this.getSettings();
   }
@@ -1253,7 +1256,12 @@ export class LocalRepository {
       .prepare(
         `${SESSION_SELECT}
         WHERE retention_anchor_at IS NOT NULL AND retention_anchor_at <= ?
-          AND cleanup_state IN ('active', 'tombstoning')`,
+          AND cleanup_state IN ('active', 'tombstoning')
+          AND (cleanup_state = 'tombstoning' OR NOT EXISTS (
+            SELECT 1 FROM print_jobs
+            WHERE print_jobs.session_id = sessions.id
+              AND print_jobs.state NOT IN ('printed', 'failed', 'cancelled')
+          ))`,
       )
       .all(cutoff)
       .map((row) => mapSession(row as Record<string, unknown>));
@@ -1330,7 +1338,12 @@ export class LocalRepository {
       | 'settings_change'
       | 'frame_change'
       | 'upload_retry'
-      | 'cleanup',
+      | 'cleanup'
+      | 'printer_settings_change'
+      | 'print_cancel'
+      | 'print_resolve'
+      | 'reprint'
+      | 'print_test',
     outcome: 'success' | 'failure',
     detailCode: string | null,
     now = Date.now(),
@@ -1523,6 +1536,7 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     cameraAdapter: (row.camera_adapter as CameraAdapterKind | null) ?? 'webcam',
     cameraDeviceId: row.camera_device_id,
     cameraResolution: row.camera_resolution === '720p' ? '720p' : '1080p',
+    cameraZoomPercent: row.camera_zoom_percent,
     webcamAlwaysActive: row.webcam_always_active === 1,
     supabaseUrl: row.supabase_url,
     supabasePublishableKey: row.supabase_publishable_key,

@@ -5,6 +5,8 @@ import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth
 
 import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
+import { PrinterIndicator } from '../components/Printing';
+import { usePrinterHealth } from '../hooks/usePrinterHealth';
 import { RecentGallery } from '../components/RecentGallery';
 import { LOCAL_FIXTURES } from '../local-fixtures';
 
@@ -25,6 +27,7 @@ const DEFAULT_QR_STATE: QrStationState = {
 
 export function QrStationScreen(): React.ReactElement {
   const [stationState, setStationState] = useState<QrStationState>(DEFAULT_QR_STATE);
+  const printerHealth = usePrinterHealth();
   const [secondsRemaining, setSecondsRemaining] = useState<number>(45);
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<GalleryItem[]>([]);
@@ -137,6 +140,7 @@ export function QrStationScreen(): React.ReactElement {
     />
   ) : null;
 
+  const printerIndicator = <PrinterIndicator health={printerHealth} />;
   const timer = (
     <div className="qr-station__timer">
       <span>Clears in {secondsRemaining}s</span>
@@ -150,6 +154,7 @@ export function QrStationScreen(): React.ReactElement {
     return (
       <main className="screen screen--qr-station qr-station--error" data-testid="qr-station-error">
         {timer}
+        {printerIndicator}
         <section className="qr-station__message" aria-labelledby="qr-station-error-title">
           <WarningCircle aria-hidden="true" size={56} />
           <h1 id="qr-station-error-title" data-screen-heading tabIndex={-1}>
@@ -179,6 +184,7 @@ export function QrStationScreen(): React.ReactElement {
           <p>Finish on the main screen, then scan your code right here.</p>
         </section>
         {recentGallery}
+        {printerIndicator}
       </main>
     );
   }
@@ -211,6 +217,7 @@ export function QrStationScreen(): React.ReactElement {
         </section>
       </div>
       {recentGallery}
+      {printerIndicator}
     </main>
   );
 }

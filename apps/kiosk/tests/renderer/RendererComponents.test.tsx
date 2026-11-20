@@ -99,6 +99,7 @@ describe('guest screen components', () => {
         frameName: 'Test',
         uploadStatus: 'unavailable',
         cloudExpiresAt: Date.now() + 60_000,
+        printable: false,
       },
     };
     const repair = vi.fn();
@@ -131,6 +132,7 @@ describe('guest screen components', () => {
         frameName: 'Test',
         uploadStatus: 'uploaded',
         cloudExpiresAt: Date.now() + 60_000,
+        printable: false,
       },
     };
     const user = userEvent.setup();
@@ -178,7 +180,7 @@ describe('guest screen components', () => {
     expect(screen.getByTestId('collage-option-1')).not.toHaveClass('is-selected');
 
     await user.click(screen.getByRole('button', { name: /use these photos/i }));
-    expect(onAccept).toHaveBeenCalledWith(FRAME_2.id);
+    expect(onAccept).toHaveBeenCalledWith(FRAME_2.id, null);
     expect(screen.getByRole('button', { name: /all layouts/i })).toBeVisible();
     expect(screen.getByRole('button', { name: /retake all photos/i })).toBeVisible();
     expect(screen.getByRole('button', { name: /use these photos/i })).toBeVisible();
@@ -252,7 +254,7 @@ describe('guest screen components', () => {
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('collage-option-3')).toHaveClass('is-selected');
     await user.click(screen.getByRole('button', { name: /use these photos/i }));
-    expect(onAccept).toHaveBeenCalledWith(third.id);
+    expect(onAccept).toHaveBeenCalledWith(third.id, null);
   });
 
   it('distinguishes collage processing from upload backoff without claiming readiness', () => {

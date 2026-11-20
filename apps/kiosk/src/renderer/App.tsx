@@ -5,6 +5,7 @@ import type {
   AdminHealth,
   AdminSettings as AdminSettingsData,
   BoothSnapshot,
+  CameraConfig,
   CameraResolution,
   FrameLayout,
   FrameImportCandidate,
@@ -13,6 +14,7 @@ import type {
   RpcResult,
   UploadJobSummary,
 } from '@grace-booth/shared';
+import { CAMERA_ZOOM_DEFAULT } from '@grace-booth/shared';
 import { AnchoredToastProvider, ToastProvider } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
@@ -22,6 +24,8 @@ import { Button } from './components/Button';
 import { CameraSetupModal } from './components/CameraSetupModal';
 import { FrameImportDialog } from './components/FrameImportDialog';
 import { PasscodeDialog } from './components/PasscodeDialog';
+import { PrinterIndicator, PrintQueuePanel } from './components/Printing';
+import { usePrinterHealth } from './hooks/usePrinterHealth';
 import { RecentGallery } from './components/RecentGallery';
 import { useCameraStream } from './hooks/useCameraStream';
 import { LOCAL_FIXTURES } from './local-fixtures';
@@ -129,6 +133,7 @@ export function App() {
   const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState<string | null>(null);
   const [selectedCameraResolution, setSelectedCameraResolution] =
     useState<CameraResolution>('1080p');
+  const [cameraZoomPercent, setCameraZoomPercent] = useState(CAMERA_ZOOM_DEFAULT);
   const [webcamAlwaysActive, setWebcamAlwaysActive] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [recent, setRecent] = useState<{
@@ -138,6 +143,8 @@ export function App() {
     error: string | null;
   }>({ open: false, busy: false, items: [], error: null });
   const [visualSeed, setVisualSeed] = useState<VisualSeedPayload | null>(null);
+  const livePrinterHealth = usePrinterHealth();
+  const printerHealth = visualSeed?.printerHealth ?? livePrinterHealth;
   const countdownAudioRef = useRef<HTMLAudioElement | null>(null);
   const shutterAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioArmedRef = useRef(false);
@@ -162,6 +169,7 @@ export function App() {
     liveCameraEnabled,
     selectedCameraDeviceId,
     selectedCameraResolution,
+    cameraZoomPercent,
   );
   const grabJpegBase64 = camera.grabJpegBase64;
 
@@ -252,6 +260,7 @@ export function App() {
         if (cameraConfig?.ok) {
           setSelectedCameraDeviceId(cameraConfig.data.deviceId);
           setSelectedCameraResolution(cameraConfig.data.resolution);
+          setCameraZoomPercent(cameraConfig.data.zoomPercent);
           setWebcamAlwaysActive(cameraConfig.data.alwaysActive);
         }
         if (result.ok) {
@@ -425,6 +434,14 @@ export function App() {
       setAdminBusy(false);
     }
   }, [visualSeed]);
+
+  const handleCameraSaved = (config: CameraConfig) => {
+    setSelectedCameraDeviceId(config.deviceId);
+    setSelectedCameraResolution(config.resolution);
+    setCameraZoomPercent(config.zoomPercent);
+    setWebcamAlwaysActive(config.alwaysActive);
+    void refreshAdminData();
+  };
 
   const restartSession = useCallback(async () => {
     if (!snapshot.sessionId || visualSeed) {
@@ -1035,6 +1052,7 @@ export function App() {
             Math.min(snapshot.requiredShotCount ?? 3, snapshot.captureCount + 1)
           }
           totalShots={snapshot.requiredShotCount ?? 3}
+          cameraZoomPercent={cameraZoomPercent}
           {...(liveCameraEnabled
             ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
             : {})}
@@ -1050,8 +1068,9 @@ export function App() {
           canRetake={snapshot.controls.canRetakeAll}
           captureUrls={snapshot.media.captureUrls}
           frames={snapshot.media.frames}
-          onAccept={(frameId) =>
-            void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ frameId }))
+          printerHealth={printerHealth}
+          onAccept={(frameId, print) =>
+            void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ frameId, print }))
           }
           onRetake={() => void runGuestCommand((bridge) => bridge.booth.retakeAll())}
         />
@@ -1112,12 +1131,14 @@ export function App() {
     beginProtectedAction,
     camera.ready,
     camera.videoRef,
+    cameraZoomPercent,
     countdownSeconds,
     guestBusy,
     guestError,
     liveCameraEnabled,
     loading,
     openRecentGallery,
+    printerHealth,
     runGuestCommand,
     startGuestSession,
     snapshot,
@@ -1167,6 +1188,7 @@ export function App() {
                       </Button>
                     </div>
                   </header>
+                  <PrintQueuePanel health={printerHealth} />
                   <RecentGallery
                     busy={recent.busy}
                     error={recent.error}
@@ -1175,6 +1197,7 @@ export function App() {
                     onClose={() => setAdminView('settings')}
                     onRetryJob={(jobId) => void retryJob(jobId)}
                     operator={true}
+                    printing={printerHealth !== null}
                   />
                 </section>
               ) : (
@@ -1203,12 +1226,7 @@ export function App() {
             <CameraSetupModal
               isOpen={cameraSetupOpen}
               onClose={() => setCameraSetupOpen(false)}
-              onCameraSaved={(_adapter, deviceId, resolution, alwaysActive) => {
-                setSelectedCameraDeviceId(deviceId);
-                setSelectedCameraResolution(resolution);
-                setWebcamAlwaysActive(alwaysActive);
-                void refreshAdminData();
-              }}
+              onCameraSaved={handleCameraSaved}
             />
             {frameImportCandidate ? (
               <FrameImportDialog
@@ -1234,6 +1252,7 @@ export function App() {
             inert={dialog || cameraSetupOpen || recent.open ? true : undefined}
           >
             {guestContent}
+            <PrinterIndicator health={printerHealth} />
             {cancelArmed ? (
               <div className="cancel-session-hint" data-testid="cancel-hint" role="status">
                 Press ESC again to cancel
@@ -1259,12 +1278,7 @@ export function App() {
           <CameraSetupModal
             isOpen={cameraSetupOpen}
             onClose={() => setCameraSetupOpen(false)}
-            onCameraSaved={(_adapter, deviceId, resolution, alwaysActive) => {
-              setSelectedCameraDeviceId(deviceId);
-              setSelectedCameraResolution(resolution);
-              setWebcamAlwaysActive(alwaysActive);
-              void refreshAdminData();
-            }}
+            onCameraSaved={handleCameraSaved}
           />
           {recent.open && !adminOpen ? (
             <RecentGallery
@@ -1273,6 +1287,7 @@ export function App() {
               items={recent.items}
               onClose={closeRecentGallery}
               operator={false}
+              printing={printerHealth !== null}
             />
           ) : null}
         </>

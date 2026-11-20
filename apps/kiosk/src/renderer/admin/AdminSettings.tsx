@@ -49,6 +49,7 @@ import {
 } from '@grace-booth/ui';
 
 import { Button } from '../components/Button';
+import { PrinterSettingsCard } from './PrinterSettingsCard';
 
 const HEALTH_ICONS = {
   camera: Camera,
@@ -75,6 +76,7 @@ const SETTINGS_SECTIONS = [
   ['overview', 'Overview'],
   ['network', 'Network'],
   ['displays', 'Displays'],
+  ['printer', 'Printer'],
   ['google', 'Google Photos'],
   ['security', 'Security & Cloud'],
   ['queue', 'Upload queue'],
@@ -928,6 +930,19 @@ export function AdminSettings({
                   </Button>
                 </div>
               </Form>
+            </div>
+          </section>
+
+          <section
+            className="account-section"
+            id="settings-printer"
+            aria-labelledby="settings-printer-label"
+          >
+            <h2 className="account-section__label" id="settings-printer-label" tabIndex={-1}>
+              Printer
+            </h2>
+            <div className="account-section__body">
+              <PrinterSettingsCard />
             </div>
           </section>
 

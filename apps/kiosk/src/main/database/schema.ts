@@ -23,6 +23,7 @@ export const settings = sqliteTable('settings', {
   cameraAdapter: text('camera_adapter', { enum: ['mock', 'sony', 'webcam', 'internal_webcam'] }),
   cameraDeviceId: text('camera_device_id'),
   cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
+  cameraZoomPercent: integer('camera_zoom_percent').notNull().default(100),
   webcamAlwaysActive: integer('webcam_always_active', { mode: 'boolean' }).notNull().default(false),
   supabaseUrl: text('supabase_url'),
   supabasePublishableKey: text('supabase_publishable_key'),
@@ -176,11 +177,64 @@ export const auditLog = sqliteTable('audit_log', {
       'frame_change',
       'upload_retry',
       'cleanup',
+      'printer_settings_change',
+      'print_cancel',
+      'print_resolve',
+      'reprint',
+      'print_test',
     ],
   }).notNull(),
   outcome: text('outcome', { enum: ['success', 'failure'] }).notNull(),
   detailCode: text('detail_code'),
   createdAt: integer('created_at').notNull(),
+});
+
+export const printerSettings = sqliteTable('printer_settings', {
+  id: integer('id').primaryKey(),
+  adapter: text('adapter', { enum: ['windows', 'mock'] }).notNull(),
+  printerName: text('printer_name'),
+  paperRawKind: integer('paper_raw_kind'),
+  paperName: text('paper_name'),
+  timeoutSeconds: integer('timeout_seconds').notNull(),
+  iccProfilePath: text('icc_profile_path'),
+  iccProfileName: text('icc_profile_name'),
+  revision: integer('revision').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const printJobs = sqliteTable('print_jobs', {
+  id: text('id').primaryKey(),
+  requestId: text('request_id').notNull(),
+  sessionId: text('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
+  sourceAssetId: text('source_asset_id'),
+  kind: text('kind', { enum: ['session', 'reprint', 'calibration', 'color_test'] }).notNull(),
+  copyIndex: integer('copy_index').notNull(),
+  copyCount: integer('copy_count').notNull(),
+  state: text('state', {
+    enum: [
+      'waiting_for_photo',
+      'queued',
+      'submitting',
+      'spooled',
+      'printed',
+      'needs_attention',
+      'failed',
+      'cancelled',
+    ],
+  }).notNull(),
+  documentKey: text('document_key').notNull().unique(),
+  printerName: text('printer_name'),
+  paperRawKind: integer('paper_raw_kind'),
+  paperName: text('paper_name'),
+  spoolerJobId: integer('spooler_job_id'),
+  attemptCount: integer('attempt_count').notNull(),
+  submittedAt: integer('submitted_at'),
+  printedAt: integer('printed_at'),
+  cancelledAt: integer('cancelled_at'),
+  lastErrorCode: text('last_error_code'),
+  lastErrorMessage: text('last_error_message'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });
 
 export const databaseSchema = {
@@ -191,6 +245,8 @@ export const databaseSchema = {
   sessionAssets,
   uploadJobs,
   auditLog,
+  printerSettings,
+  printJobs,
 };
 
 export type SettingsRow = typeof settings.$inferSelect;

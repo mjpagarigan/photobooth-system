@@ -301,6 +301,19 @@ In Windows **Display settings**, choose **Extend these displays**. Duplicate/Mir
 
 Open **Admin > Settings & health > Displays** to select `Auto`, `Force Enabled`, or `Disabled`, swap displays, and choose a 30/45/60/90-second QR auto-dismiss timer. A newer result replaces an older result and restarts the timer; late older results cannot overwrite it.
 
+### Printing (4R)
+
+Only landscape 4R Frames (3:2, ideally at least 1800×1200 px) can be printed. 1:3 Frames stay digital-only. Prints are bordered 6×4 in landscape: the whole Frame is centered inside the printer's printable area and never cropped.
+
+1. Install the printer in Windows (USB or network) and load 4R paper.
+2. Open **Admin > Settings & health > Printer**. Choose the printer; the kiosk picks the driver's 4×6 in paper size automatically. Save.
+3. Print the **calibration chart** and measure it: 152×102 mm, with the outline fully visible and centered.
+4. Optional: choose the printer's ICC color profile, then turn off color adjustment in the printer driver so color is not converted twice. Print the **color test** to compare with the screen.
+
+On the review screen, **Print on 4R** appears for 4R Frames. It is off for every new session; turn it on and set the number of copies. If the printer is offline or out of paper, an indicator appears on both displays and **Proceed** finishes the session anyway. The copies wait and print automatically when the printer is back. **Admin > Recent photos** shows the print queue, where waiting copies can be cancelled. Open a 4R photo in Recent photos to reprint it.
+
+If the app stopped while it was handing a copy to Windows, that copy shows **Did it print?** in the queue. Check the tray, then choose **Print again** or **It printed**. See [docs/PRINTING_DESIGN.md](docs/PRINTING_DESIGN.md) for the design and the hardware checks still to run.
+
 ## Complete backend setup from scratch
 
 This workflow creates a new Supabase database/Auth/Function backend, private Cloudflare R2 storage, and a Cloudflare Pages download site. Run terminal commands from the repository root unless a different location is stated.

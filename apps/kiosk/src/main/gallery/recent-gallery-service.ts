@@ -1,9 +1,10 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import type {
-  GalleryCloudRepairResult,
-  GalleryItem,
-  GalleryUploadStatus,
+import {
+  isPrintableFrameSize,
+  type GalleryCloudRepairResult,
+  type GalleryItem,
+  type GalleryUploadStatus,
 } from '@grace-booth/shared';
 
 import { validateReadyReceipt } from '../cloud/ready-receipt.js';
@@ -22,12 +23,7 @@ export type RecentGalleryDependencies = {
   qrService: QrService;
   imageProcessor: ImageProcessor;
   delivery: Pick<DeliveryClient, 'checkPhotoAvailability'> &
-    Partial<
-      Pick<
-        DeliveryClient,
-        'authorizePhotoRepair' | 'uploadSigned' | 'confirmPhotoRepair'
-      >
-    >;
+    Partial<Pick<DeliveryClient, 'authorizePhotoRepair' | 'uploadSigned' | 'confirmPhotoRepair'>>;
 };
 
 const PREVIEW_LONG_EDGE = 3600;
@@ -105,7 +101,11 @@ export class RecentGalleryService {
         return originalBoothRequired();
       }
       validateReadyReceipt(secret.photoSessionId, secret.publicToken, secret.ready);
-      if (!delivery.authorizePhotoRepair || !delivery.uploadSigned || !delivery.confirmPhotoRepair) {
+      if (
+        !delivery.authorizePhotoRepair ||
+        !delivery.uploadSigned ||
+        !delivery.confirmPhotoRepair
+      ) {
         throw new AppError(
           'repair_unavailable',
           'Cloud recovery is unavailable on this booth version.',
@@ -193,6 +193,7 @@ export class RecentGalleryService {
                 : (delivery?.availability ?? 'verification-failed')
               : jobStatus(job?.state ?? 'queued'),
           cloudExpiresAt: delivery?.cloudExpiresAt ?? null,
+          printable: isPrintableFrameSize(collageAsset.width, collageAsset.height),
         },
       };
     } catch {

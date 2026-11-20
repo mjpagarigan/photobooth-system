@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { CAMERA_FRAME_REQUEST_EVENT } from '@grace-booth/shared';
 import { app, dialog } from 'electron';
+import sharp from 'sharp';
 
 import { AdminSessionService } from './auth/admin-sessions.js';
 import { CloudSessionStore } from './auth/cloud-session-store.js';
@@ -30,6 +31,10 @@ import { getRendererTarget } from './security/window.js';
 import { AdminServerManager } from './server/admin-server-manager.js';
 import type { LocalAdminDependencies } from './server/local-admin-server.js';
 import { OfflineDeliveryServer } from './server/offline-delivery-server.js';
+import { PrintRepository } from './database/print-repository.js';
+import { MOCK_PRINTER_NAME, MockPrinterAdapter } from './print/mock-printer-adapter.js';
+import { PrintService } from './print/print-service.js';
+import { WindowsSpoolerAdapter } from './print/windows-spooler-adapter.js';
 import { electronSecretProtection } from './storage/electron-secret-protection.js';
 import { MediaService } from './storage/media-service.js';
 import { createAppPaths } from './storage/paths.js';
@@ -39,6 +44,15 @@ import { SecretStore } from './storage/secret-store.js';
 import { BoothWorkflow } from './workflow/booth-workflow.js';
 
 registerPrivilegedSchemes();
+
+if (process.platform === 'win32') {
+  // Media Foundation cannot start USB HDMI capture cards (e.g. 345f:2109) at 720p or 1080p; DirectShow can.
+  const disabled = app.commandLine.getSwitchValue('disable-features');
+  app.commandLine.appendSwitch(
+    'disable-features',
+    [disabled, 'MediaFoundationVideoCapture'].filter(Boolean).join(','),
+  );
+}
 
 const isNativeSelfTest = process.argv.includes('--native-self-test');
 const hasInstanceLock = isNativeSelfTest || app.requestSingleInstanceLock();
@@ -169,6 +183,48 @@ async function startApplication(): Promise<void> {
     imageProcessor,
     delivery,
   });
+  const prints = new PrintRepository(database);
+  const printerAdapter = config.e2e.enabled
+    ? new MockPrinterAdapter({ outputDirectory: join(paths.root, 'e2e-prints') })
+    : new WindowsSpoolerAdapter(join(resourceRoot, 'print', 'print-helper.ps1'));
+  if (printerAdapter instanceof MockPrinterAdapter) {
+    // Test-only handles so Playwright can unplug the fake printer, run it out of paper, and add
+    // a landscape 4R Frame (every shipped Frame is 1:3). Never present in packaged builds.
+    (globalThis as { __graceBoothE2e?: unknown }).__graceBoothE2e = {
+      printer: printerAdapter,
+      addLandscape4rFrame: async (): Promise<string> => {
+        const border = Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="3600" height="2400"><rect x="40" y="40" width="3520" height="2320" fill="none" stroke="#0b3d91" stroke-width="80"/></svg>',
+        );
+        const png = await sharp({
+          create: {
+            width: 3_600,
+            height: 2_400,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        })
+          .composite([{ input: border }])
+          .png()
+          .toBuffer();
+        return (await frameService.importFrame('Landscape 4R', png)).id;
+      },
+    };
+    const printerSettings = prints.getPrinterSettings();
+    if (!printerSettings.printerName) {
+      prints.updatePrinterSettings({
+        printerName: MOCK_PRINTER_NAME,
+        paperRawKind: 127,
+        paperName: '102 x 152 mm (4 x 6 in)',
+        timeoutSeconds: printerSettings.timeoutSeconds,
+        expectedRevision: printerSettings.revision,
+      });
+    }
+  }
+  const printService = new PrintService(prints, repository, vault, paths, printerAdapter, {
+    now,
+    ...(config.e2e.enabled ? { tickMs: 250 } : {}),
+  });
   const workflow = new BoothWorkflow(
     repository,
     vault,
@@ -183,13 +239,21 @@ async function startApplication(): Promise<void> {
         initialCameraAdapter === 'webcam' || initialCameraAdapter === 'internal_webcam',
       isDualDisplayActive: () => displayManager.isDualActive(),
       now,
+      print: printService,
     },
   );
   workflowInstance = workflow;
   const passcodes = new PasscodeService(repository);
   const adminSessions = new AdminSessionService();
   const certificates = new LanCertificateService(repository, secrets);
-  const health = new HealthService(camera, delivery, repository, electronSecretProtection, now);
+  const health = new HealthService(
+    camera,
+    delivery,
+    repository,
+    electronSecretProtection,
+    now,
+    () => printService.getHealth(),
+  );
   const media = new MediaService(repository, vault);
   installProtocolHandlers(join(appPath, 'out', 'renderer'), media);
 
@@ -220,6 +284,9 @@ async function startApplication(): Promise<void> {
   uploadQueue.setOfflineDeliveryServer(offlineDeliveryServer);
   await Promise.all([serverManager.start(), offlineDeliveryServer.start()]);
   await workflow.initialize();
+  await printService.start().catch((error: unknown) => {
+    logger.error({ error }, 'print queue failed to start');
+  });
 
   const target = getRendererTarget(app.isPackaged, process.env.ELECTRON_RENDERER_URL);
   const removeIpcHandlers = registerIpcHandlers({
@@ -236,6 +303,7 @@ async function startApplication(): Promise<void> {
     cameraFrames,
     recentGallery,
     displayManager,
+    print: printService,
     rendererOrigin: target.origin,
     onNetworkSettingsChanged: () => serverManager.requestReconfigure(),
   });
@@ -268,6 +336,7 @@ async function startApplication(): Promise<void> {
     removeIpcHandlers();
     displayManager.close();
     void Promise.allSettled([
+      printService.stop(),
       workflow.close(),
       serverManager.close(),
       offlineDeliveryServer.close(),

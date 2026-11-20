@@ -1,7 +1,10 @@
 import {
   CAMERA_RESOLUTION_DIMENSIONS,
+  CAMERA_ZOOM_DEFAULT,
+  CAMERA_ZOOM_MAX,
   isWebcamCameraAdapter,
   type CameraAdapterKind,
+  type CameraConfig,
   type CameraDevice,
   type CameraResolution,
   type CameraStatus,
@@ -14,7 +17,7 @@ import {
   WarningCircle,
   X,
 } from '@grace-booth/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 import {
   Alert,
@@ -39,17 +42,34 @@ import {
   SelectValue,
   Switch,
 } from '@grace-booth/ui';
-import { enumerateVideoDevices, useCameraStream } from '../hooks/useCameraStream';
+import {
+  enumerateVideoDevices,
+  useCameraStream,
+  type CameraStream,
+} from '../hooks/useCameraStream';
 
 type CameraSetupModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onCameraSaved?: (
-    adapter: CameraAdapterKind,
-    deviceId: string | null,
-    resolution: CameraResolution,
-    alwaysActive: boolean,
-  ) => void;
+  onCameraSaved?: (config: CameraConfig) => void;
+};
+
+const CAMERA_FAILURES: Record<
+  NonNullable<CameraStream['error']>,
+  { problem: string; remedy: string }
+> = {
+  'permission-denied': {
+    problem: 'Camera permission was denied.',
+    remedy: 'Allow camera access in Windows and reopen Camera Settings.',
+  },
+  'device-missing': {
+    problem: 'The selected camera is not connected.',
+    remedy: 'Choose the camera again in Active device node, then Apply & Save.',
+  },
+  unavailable: {
+    problem: 'The camera is unavailable or in use by another app.',
+    remedy: 'Close other camera apps or reconnect the USB camera.',
+  },
 };
 
 const RESOLUTION_ITEMS = [
@@ -61,6 +81,8 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const [selectedAdapter, setSelectedAdapter] = useState<CameraAdapterKind>('webcam');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedResolution, setSelectedResolution] = useState<CameraResolution>('1080p');
+  const [zoomPercent, setZoomPercent] = useState(CAMERA_ZOOM_DEFAULT);
+  const zoomInputId = useId();
   const [alwaysActive, setAlwaysActive] = useState(false);
   const [videoDevices, setVideoDevices] = useState<CameraDevice[]>([]);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
@@ -73,6 +95,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const webcamSelected = isWebcamCameraAdapter(selectedAdapter);
   const previewEnabled = isOpen && configurationLoaded && webcamSelected;
   const cameraStream = useCameraStream(previewEnabled, selectedDeviceId, selectedResolution);
+  const cameraFailure = cameraStream.error ? CAMERA_FAILURES[cameraStream.error] : null;
   const deviceItems = useMemo(() => {
     const items: { label: string; value: string }[] = [
       { label: 'Default system webcam', value: '' },
@@ -120,6 +143,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
         setSelectedAdapter(configResult.data.adapter);
         setSelectedDeviceId(configResult.data.deviceId);
         setSelectedResolution(configResult.data.resolution);
+        setZoomPercent(configResult.data.zoomPercent);
         setAlwaysActive(configResult.data.alwaysActive);
         setCameraStatus(configResult.data.status);
       }
@@ -152,6 +176,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
         adapter: selectedAdapter,
         deviceId: selectedDeviceId,
         resolution: selectedResolution,
+        zoomPercent,
         alwaysActive,
       });
       if (!result.ok) {
@@ -160,7 +185,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
       }
       setCameraStatus(result.data.status);
       setSuccessMessage('Camera configuration saved successfully.');
-      onCameraSaved?.(selectedAdapter, selectedDeviceId, selectedResolution, alwaysActive);
+      onCameraSaved?.(result.data);
       setTimeout(() => {
         onClose();
       }, 700);
@@ -250,6 +275,7 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                     playsInline
                     muted
                     className="camera-preview-video"
+                    style={{ scale: zoomPercent / 100 }}
                   />
                   <div
                     className="camera-preview-box__crosshair camera-preview-box__crosshair--tl"
@@ -280,33 +306,19 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                       <span>Preparing USB Streaming preview…</span>
                     </div>
                   )}
-                  {cameraStream.acquisitionState === 'permission-denied' && (
+                  {cameraFailure && (
                     <div
                       className="camera-preview-overlay camera-preview-overlay--warning"
                       role="alert"
                     >
                       <WarningCircle size={24} weight="bold" />
-                      <span>Camera permission was denied.</span>
-                    </div>
-                  )}
-                  {cameraStream.acquisitionState === 'unavailable' && (
-                    <div
-                      className="camera-preview-overlay camera-preview-overlay--warning"
-                      role="alert"
-                    >
-                      <WarningCircle size={24} weight="bold" />
-                      <span>The camera is unavailable or in use by another app.</span>
+                      <span>{cameraFailure.problem}</span>
                     </div>
                   )}
                 </div>
                 <div
                   className={`camera-preview-caption camera-preview-caption--${cameraStream.acquisitionState}`}
-                  role={
-                    cameraStream.acquisitionState === 'permission-denied' ||
-                    cameraStream.acquisitionState === 'unavailable'
-                      ? 'alert'
-                      : 'status'
-                  }
+                  role={cameraFailure ? 'alert' : 'status'}
                   aria-live="polite"
                 >
                   <span>
@@ -325,13 +337,11 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                     </strong>
                   </span>
                   <span>
-                    {cameraStream.acquisitionState === 'ready'
-                      ? 'Live preview connected.'
-                      : cameraStream.acquisitionState === 'permission-denied'
-                        ? 'Allow camera access in Windows and reopen Camera Settings.'
-                        : cameraStream.acquisitionState === 'unavailable'
-                          ? 'Close other camera apps or reconnect the USB camera.'
-                          : 'Negotiating the selected camera mode.'}
+                    {cameraFailure
+                      ? cameraFailure.remedy
+                      : cameraStream.acquisitionState === 'ready'
+                        ? 'Live preview connected.'
+                        : 'Negotiating the selected camera mode.'}
                   </span>
                 </div>
               </div>
@@ -389,6 +399,27 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
                   </Select>
                 </Field>
               </div>
+
+              <Field className="camera-device-select-row">
+                <div className="toggle-row">
+                  <FieldLabel htmlFor={zoomInputId}>Camera zoom</FieldLabel>
+                  <span aria-hidden="true">{zoomPercent}%</span>
+                </div>
+                <input
+                  id={zoomInputId}
+                  className="camera-zoom-slider"
+                  type="range"
+                  min={CAMERA_ZOOM_DEFAULT}
+                  max={CAMERA_ZOOM_MAX}
+                  value={zoomPercent}
+                  aria-valuetext={`${zoomPercent}%`}
+                  aria-describedby={`${zoomInputId}-description`}
+                  onChange={(event) => setZoomPercent(event.currentTarget.valueAsNumber)}
+                />
+                <FieldDescription id={`${zoomInputId}-description`}>
+                  Crop in from the center to reduce black borders in new photos.
+                </FieldDescription>
+              </Field>
 
               <Field className="camera-device-select-row">
                 <div className="toggle-row">

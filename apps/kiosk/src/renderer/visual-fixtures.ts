@@ -4,6 +4,7 @@ import type {
   BoothSnapshot,
   FrameSummary,
   GalleryItem,
+  PrinterHealth,
   QrStationState,
   UploadJobSummary,
 } from '@grace-booth/shared';
@@ -21,6 +22,7 @@ export type VisualSeedPayload = {
   operatorBusy?: boolean;
   operatorError?: string | null;
   operatorStatus?: string | null;
+  printerHealth?: PrinterHealth | null;
   recentItems?: GalleryItem[];
   settings: AdminSettings | null;
   snapshot: BoothSnapshot;
@@ -394,6 +396,7 @@ export async function createVisualSeedPayload(
             frameName: DEFAULT_FRAME.name,
             uploadStatus: 'failed',
             cloudExpiresAt: 1_789_475_400_000,
+            printable: false,
           },
         }
       : null;

@@ -192,6 +192,7 @@ function createBridge(
           deviceId: cameraDeviceId,
           resolution: cameraResolution,
           alwaysActive: webcamAlwaysActive,
+          zoomPercent: 100,
           status: {
             adapter: cameraAdapter,
             state: 'ready' as const,
@@ -208,6 +209,7 @@ function createBridge(
           deviceId: null,
           resolution: '1080p' as const,
           alwaysActive: false,
+          zoomPercent: 100,
           status: {
             adapter: 'webcam' as const,
             state: 'ready' as const,
@@ -252,6 +254,23 @@ function createBridge(
           canRetryUpload: false,
         }),
       ),
+      subscribe: vi.fn().mockReturnValue(() => undefined),
+    },
+    print: {
+      getHealth: vi.fn().mockResolvedValue(
+        ok({
+          status: 'unconfigured' as const,
+          printerName: null,
+          message: 'No printer is set up.',
+          queuedCount: 0,
+          attentionCount: 0,
+          checkedAt: 1,
+        }),
+      ),
+      listJobs: vi.fn().mockResolvedValue(ok([])),
+      cancelJob: vi.fn(),
+      resolveJob: vi.fn(),
+      reprint: vi.fn().mockResolvedValue(ok([])),
       subscribe: vi.fn().mockReturnValue(() => undefined),
     },
     gallery: {
@@ -329,6 +348,26 @@ function createBridge(
       restartSession: restartSessionMock,
       connectCloud: vi.fn().mockResolvedValue(ok({ message: 'Connected.' })),
       openExternalUrl: vi.fn().mockResolvedValue(ok({})),
+      listPrinters: vi.fn().mockResolvedValue(ok([])),
+      getPrinterSettings: vi.fn().mockResolvedValue(
+        ok({
+          settings: {
+            adapter: 'windows' as const,
+            printerName: null,
+            paperRawKind: null,
+            paperName: null,
+            timeoutSeconds: 240,
+            iccProfileName: null,
+            revision: 0,
+          },
+          capabilities: null,
+        }),
+      ),
+      getPrinterCapabilities: vi.fn(),
+      savePrinterSettings: vi.fn(),
+      chooseIccProfile: vi.fn(),
+      clearIccProfile: vi.fn(),
+      printTestPage: vi.fn(),
     },
   };
 
@@ -627,6 +666,7 @@ describe('recent gallery', () => {
       frameName: 'Test Frame',
       uploadStatus: 'uploaded',
       cloudExpiresAt: 1_800_000_000_000,
+      printable: false,
     },
   });
 

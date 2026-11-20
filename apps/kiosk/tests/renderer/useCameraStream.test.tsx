@@ -177,20 +177,23 @@ describe('useCameraStream lifecycle', () => {
     expect(result.current.resolution).toEqual({ width: 1_280, height: 720 });
   });
 
-  it('never switches away from an unavailable exact selected device', async () => {
-    const getUserMedia = vi.fn(() =>
-      Promise.reject(new DOMException('Device not found', 'NotFoundError')),
-    );
-    stubMediaDevices(ONE_DEVICE, getUserMedia);
-    const { result, unmount } = renderHook(() => useCameraStream(true, 'removed-device', '720p'));
-    mounted = { unmount };
+  it.each(['OverconstrainedError', 'NotFoundError'])(
+    'reports a missing selected device on %s without switching cameras',
+    async (errorName) => {
+      const getUserMedia = vi.fn(() => Promise.reject(new DOMException('', errorName)));
+      stubMediaDevices(ONE_DEVICE, getUserMedia);
+      const { result, unmount } = renderHook(() => useCameraStream(true, 'removed-device', '720p'));
+      mounted = { unmount };
 
-    await waitFor(() => expect(result.current.acquisitionState).toBe('unavailable'), {
-      timeout: 5_000,
-    });
-    expect(getUserMedia).toHaveBeenCalledTimes(3);
-    expectPreferredConstraints(getUserMedia, 'removed-device', 1_280, 720);
-  }, 10_000);
+      await waitFor(() => expect(result.current.acquisitionState).toBe('device-missing'), {
+        timeout: 5_000,
+      });
+      expect(result.current.error).toBe('device-missing');
+      expect(getUserMedia).toHaveBeenCalledTimes(3);
+      expectPreferredConstraints(getUserMedia, 'removed-device', 1_280, 720);
+    },
+    10_000,
+  );
 
   it('classifies permission denial without retrying', async () => {
     const getUserMedia = vi.fn(() =>

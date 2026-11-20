@@ -24,6 +24,7 @@ import {
 } from '@grace-booth/ui';
 
 import { Button } from './Button';
+import { ReprintControl } from './Printing';
 
 type RecentGalleryProps = {
   items: GalleryItem[];
@@ -34,6 +35,8 @@ type RecentGalleryProps = {
   onRetryJob?: ((jobId: string) => void) | undefined;
   onRepairCloudPhoto?: ((sessionId: string) => void) | undefined;
   repairingSessionId?: string | null | undefined;
+  /** Shows Reprint on 4R photos when this booth can print. */
+  printing?: boolean | undefined;
   onClose: () => void;
 };
 
@@ -55,6 +58,7 @@ export function RecentGallery({
   onRetryJob,
   onRepairCloudPhoto,
   repairingSessionId = null,
+  printing = false,
   onClose,
 }: RecentGalleryProps) {
   const [detailItem, setDetailItem] = useState<GalleryItem | null>(null);
@@ -319,6 +323,12 @@ export function RecentGallery({
                     </tbody>
                   </table>
                 </div>
+
+                {printing && detailItem.metadata.printable ? (
+                  <div className="recent-detail-modal__retry-box">
+                    <ReprintControl key={detailItem.sessionId} sessionId={detailItem.sessionId} />
+                  </div>
+                ) : null}
 
                 {operator && detailItem.metadata.uploadStatus === 'failed' && detailJob ? (
                   <div className="recent-detail-modal__retry-box">

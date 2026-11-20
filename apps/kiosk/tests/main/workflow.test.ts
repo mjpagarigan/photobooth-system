@@ -858,12 +858,90 @@ describe('first-run guest-operation guard', () => {
   });
 });
 
+describe('print choice at review', () => {
+  function insertFrame(testStore: TestStore, width: number, height: number): string {
+    const id = randomUUID();
+    const art = testStore.vault.write('frames', Buffer.from(`frame-${id}`));
+    testStore.database.raw
+      .prepare(
+        `INSERT INTO frames
+          (id, name, encrypted_path, width, height, byte_size, sha256, revision, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 10, ?, 0, NULL, 1, 1)`,
+      )
+      .run(
+        id,
+        `Frame ${width}x${height}`,
+        art.relativePath,
+        width,
+        height,
+        id.replace(/-/g, '').padEnd(64, '0'),
+      );
+    testStore.database.raw
+      .prepare(
+        `INSERT INTO frame_slots (frame_id, slot_index, name, x, y, width, height, crop_mode)
+        VALUES (?, 1, 'Photo 1', 0.1, 0.1, 0.8, 0.8, 'crop-to-fill')`,
+      )
+      .run(id);
+    return id;
+  }
+
+  function reviewSession(testStore: TestStore): string {
+    const sessionId = randomUUID();
+    testStore.repository.createSession(sessionId, 1_000);
+    testStore.database.raw
+      .prepare(
+        "UPDATE sessions SET state = 'review', capture_count = 1, required_shot_count = 1 WHERE id = ?",
+      )
+      .run(sessionId);
+    return sessionId;
+  }
+
+  it('queues the chosen copies only for a landscape 4R frame', async () => {
+    const requests: [string, number][] = [];
+    const print = {
+      requestSessionPrint: (sessionId: string, copies: number) =>
+        requests.push([sessionId, copies]),
+      attachSessionPhoto: () => undefined,
+    };
+    ({ store, workflow } = createWorkflow(new SequencedCamera(['ready']), { print }));
+    const strip = insertFrame(store, 1_200, 3_600);
+    const fourR = insertFrame(store, 3_600, 2_400);
+    const sessionId = reviewSession(store);
+    await workflow.initialize();
+
+    expect(() => workflow!.acceptPhotos(strip, { copies: 2 })).toThrow(/landscape 4R/);
+    expect(store.repository.getSession(sessionId)?.state).toBe('review');
+    expect(requests).toEqual([]);
+
+    workflow.acceptPhotos(fourR, { copies: 3 });
+    expect(requests).toEqual([[sessionId, 3]]);
+  });
+
+  it('does not print when printing is left off (the default)', async () => {
+    const requests: unknown[] = [];
+    const print = {
+      requestSessionPrint: (...args: unknown[]) => requests.push(args),
+      attachSessionPhoto: () => undefined,
+    };
+    ({ store, workflow } = createWorkflow(new SequencedCamera(['ready']), { print }));
+    const fourR = insertFrame(store, 3_600, 2_400);
+    reviewSession(store);
+    await workflow.initialize();
+    workflow.acceptPhotos(fourR);
+    expect(requests).toEqual([]);
+  });
+});
+
 function createWorkflow(
   camera: CameraAdapter,
   overrides: {
     shotCountdownsMs?: readonly [number, number, number];
     now?: () => number;
     imageProcessor?: ImageProcessor;
+    print?: {
+      requestSessionPrint(sessionId: string, copies: number): unknown;
+      attachSessionPhoto(sessionId: string, assetId: string): void;
+    };
   } = {},
 ): { store: TestStore; workflow: BoothWorkflow } {
   const testStore = createTestStore();
@@ -909,6 +987,7 @@ function createWorkflow(
         shotCountdownsMs: overrides.shotCountdownsMs ?? [60_000, 60_000, 60_000],
         isDualDisplayActive: () => false,
         now: overrides.now ?? (() => 2_000),
+        ...(overrides.print ? { print: overrides.print } : {}),
       },
     ),
   };
