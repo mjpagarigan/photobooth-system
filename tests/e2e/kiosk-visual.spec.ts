@@ -4,7 +4,9 @@ import { expect, test } from '@playwright/test';
 const STATES = [
   'attract',
   'countdown',
+  'shot-review',
   'review',
+  'review-4-slot',
   'processing',
   'uploading-backoff',
   'final',
@@ -261,7 +263,9 @@ test('forced colors preserve visible focus and status', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active' });
   await page.setViewportSize({ width: 1_366, height: 768 });
   await page.goto('/?visual=admin-settings-degraded');
-  const firstNavigationItem = page.getByRole('button', { name: 'Frame editor' });
+  const firstNavigationItem = page
+    .getByLabel('Operator navigation')
+    .getByRole('button', { name: 'Frame editor' });
   await firstNavigationItem.focus();
   await expect(firstNavigationItem).toBeFocused();
   const outline = await firstNavigationItem.evaluate(
@@ -308,7 +312,7 @@ test('operator settings keep section spacing, desktop upload columns, and jump l
     fullPage: false,
   });
 
-  for (const section of ['Google Photos', 'Security & Cloud'] as const) {
+  for (const section of ['Capture', 'Google Photos', 'Security & Cloud'] as const) {
     await jump.getByRole('link', { name: section }).click();
     await expect(page.getByRole('region', { name: section })).toBeInViewport();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
@@ -434,6 +438,60 @@ test('review fits and remains accessible at portrait viewport', async ({ page })
   );
   expect(seriousOrCritical).toEqual([]);
 });
+
+for (const state of ['shot-review', 'review-4-slot'] as const) {
+  test(`${state} fits and remains accessible at portrait 768x1024`, async ({ page }) => {
+    const externalRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.origin !== 'http://127.0.0.1:4174') {
+        externalRequests.push(request.url());
+      }
+    });
+
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto(`/?visual=${state}`);
+    if (state === 'shot-review') {
+      await expect(page.getByTestId('shot-review-screen')).toBeVisible();
+      await expect(page.getByTestId('shot-review-image')).toBeVisible();
+      await expect(page.getByTestId('shot-review-continue')).toBeVisible();
+      await expect(page.getByTestId('shot-review-retake')).toBeVisible();
+      await expect(page.locator('[data-testid="shot-review-strip"] li')).toHaveCount(4);
+    } else {
+      await expect(page.getByTestId('review-screen')).toBeVisible();
+      await expect(page.getByRole('list', { name: 'Your photos' })).toHaveClass(
+        /review-shots--grid/,
+      );
+      await expect(page.getByRole('list', { name: 'Your photos' }).locator('img')).toHaveCount(4);
+    }
+    await waitForVisualAssets(page);
+    await page.addStyleTag({
+      content: `
+        *, *::before, *::after {
+          animation-delay: 0s !important;
+          animation-duration: 0s !important;
+          caret-color: transparent !important;
+          transition-delay: 0s !important;
+          transition-duration: 0s !important;
+        }
+      `,
+    });
+
+    await expectNoPageOverflow(page);
+    expect(externalRequests).toEqual([]);
+
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    const seriousOrCritical = accessibility.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    );
+    expect(seriousOrCritical).toEqual([]);
+
+    await expect(page).toHaveScreenshot(`${state}-768x1024.png`, {
+      animations: 'disabled',
+      fullPage: false,
+    });
+  });
+}
 
 test('operator frame editor remains reachable at portrait viewport', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });

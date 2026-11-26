@@ -60,8 +60,8 @@ test('camera zoom crops the captured photo while preserving its aspect ratio', a
     await page.getByRole('button', { name: 'Start photo session' }).click();
     await expect(page.getByTestId('viewfinder-live')).toHaveCSS('scale', '1.6');
 
+    await waitForReviewScreen(page);
     const review = page.getByTestId('review-screen');
-    await expect(review).toBeVisible({ timeout: 30_000 });
     const photoUrl = await review
       .getByRole('img', { name: 'Photo 1', exact: true })
       .evaluate((image: HTMLImageElement) => image.src);
@@ -107,8 +107,12 @@ test('guest happy path, repeated retakes, final restoration, and Done reset', as
 
     for (let retake = 0; retake < 2; retake += 1) {
       await kiosk.page.getByRole('button', { name: 'Retake all photos' }).click();
-      await expect(kiosk.page.getByTestId('capture-screen')).toBeVisible();
-      await expect(kiosk.page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+      await expect(
+        kiosk.page
+          .locator('[data-testid="capture-screen"], [data-testid="shot-review-screen"]')
+          .first(),
+      ).toBeVisible();
+      await waitForReviewScreen(kiosk.page);
     }
 
     await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
@@ -181,12 +185,198 @@ test('three production-length countdowns require at least 15 seconds', async () 
     kiosk = await launchKiosk(userData, {
       GRACE_BOOTH_E2E_COUNTDOWN_MS: 5_000,
       GRACE_BOOTH_E2E_CAMERA_DELAY_MS: 0,
+      GRACE_BOOTH_E2E_REVIEW_MODE: 'continuous',
     });
     await bootstrap(kiosk.page);
     const startedAt = Date.now();
     await kiosk.page.getByRole('button', { name: 'Start photo session' }).click();
     await expect(kiosk.page.getByTestId('review-screen')).toBeVisible({ timeout: 45_000 });
     expect(Date.now() - startedAt).toBeGreaterThanOrEqual(14_500);
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
+test('4-slot per-shot capture pauses after each shot, retakes a single slot cleanly, and completes Final QR', async () => {
+  const userData = await createUserDataDirectory();
+  const countdownMs = 40;
+  const noAutoAdvanceHoldMs = countdownMs * 10;
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData, { GRACE_BOOTH_E2E_COUNTDOWN_MS: String(countdownMs) });
+    const { page } = kiosk;
+    await bootstrap(page);
+
+    await unlockAdmin(page);
+    await expect(page.getByTestId('frame-editor')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Active for new sessions' })).toBeVisible();
+
+    const slotCountInput = page.getByLabel('Shots / slots');
+    await slotCountInput.fill('4');
+    await expect(slotCountInput).toHaveValue('4');
+    await expect(page.getByRole('tab', { name: 'Slot 4' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save configuration' }).click();
+    await expect(page.getByText('Frame layout saved.')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('frame-item-1')).toContainText('4 slots');
+
+    await page.getByRole('button', { name: 'Back to booth' }).click();
+    await expect(page.getByTestId('attract-screen')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Four photos. One keepsake.')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Start photo session' }).click();
+    const shotReview = page.getByTestId('shot-review-screen');
+    const shotImage = page.getByTestId('shot-review-image');
+    const continueButton = page.getByTestId('shot-review-continue');
+    const retakeButton = page.getByTestId('shot-review-retake');
+
+    await expect(shotReview).toBeVisible({ timeout: 15_000 });
+    await expect(shotReview).toContainText('Photo 1 of 4.');
+    await expect(shotImage).toBeVisible();
+    await expect(continueButton).toHaveText('Next photo');
+
+    await page.waitForTimeout(noAutoAdvanceHoldMs);
+    await expect(shotReview).toBeVisible();
+    await expect(shotReview).toContainText('Photo 1 of 4.');
+    await expect(page.getByTestId('review-screen')).toHaveCount(0);
+
+    const shot1Src = await shotImage.getAttribute('src');
+    if (!shot1Src) throw new Error('Shot 1 preview image did not render a source URL');
+
+    await continueButton.click();
+    await expect(shotReview).toContainText('Photo 2 of 4.', { timeout: 15_000 });
+    await expect(shotImage).toBeVisible();
+    const shot2InitialSrc = await shotImage.getAttribute('src');
+    if (!shot2InitialSrc) throw new Error('Shot 2 preview image did not render a source URL');
+    expect(shot2InitialSrc).not.toBe(shot1Src);
+
+    const slot1Thumb = page.locator('[data-testid="shot-review-strip"] [data-slot="1"] img');
+    await expect(slot1Thumb).toHaveAttribute('src', shot1Src);
+
+    await retakeButton.click();
+    await expect(shotReview).toContainText('Photo 2 of 4.', { timeout: 15_000 });
+    await expect(shotImage).not.toHaveAttribute('src', shot2InitialSrc, { timeout: 15_000 });
+    await expect(shotImage).toBeVisible();
+    const shot2RetakeSrc = await shotImage.getAttribute('src');
+    if (!shot2RetakeSrc)
+      throw new Error('Retaken Shot 2 preview image did not render a source URL');
+    expect(shot2RetakeSrc).not.toBe(shot2InitialSrc);
+    await expect(slot1Thumb).toHaveAttribute('src', shot1Src);
+
+    await continueButton.click();
+    await expect(shotReview).toContainText('Photo 3 of 4.', { timeout: 15_000 });
+    await expect(shotImage).toBeVisible();
+    await expect(continueButton).toHaveText('Next photo');
+
+    await continueButton.click();
+    await expect(shotReview).toContainText('Photo 4 of 4.', { timeout: 15_000 });
+    await expect(shotImage).toBeVisible();
+    await expect(continueButton).toHaveText('Review all photos');
+
+    await continueButton.click();
+    const review = page.getByTestId('review-screen');
+    await expect(review).toBeVisible({ timeout: 15_000 });
+    await expect(review).toContainText('All 4 photos captured');
+    const photoList = review.getByRole('list', { name: 'Your photos' });
+    await expect(photoList).toHaveClass(/review-shots--grid/);
+    await expect(photoList.locator('img')).toHaveCount(4);
+    await expect(review.getByRole('img', { name: 'Photo 1', exact: true })).toHaveAttribute(
+      'src',
+      shot1Src,
+    );
+    await expect(review.getByRole('img', { name: 'Photo 2', exact: true })).toHaveAttribute(
+      'src',
+      shot2RetakeSrc,
+    );
+
+    await page.getByRole('button', { name: 'Use these photos' }).click();
+    await expect(page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await expect(
+      page.getByRole('img', { name: 'QR code for your private photo download' }),
+    ).toBeVisible();
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
+test('default 8-second per-shot countdown runs on every shot and Admin capture settings switch to 1-second continuous mode', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData, {
+      GRACE_BOOTH_E2E_COUNTDOWN_MS: 'settings',
+      GRACE_BOOTH_E2E_CAMERA_DELAY_MS: 0,
+    });
+    const { page } = kiosk;
+    await bootstrap(page);
+
+    await page.getByRole('button', { name: 'Start photo session' }).click();
+    await expect(page.getByTestId('capture-screen')).toBeVisible();
+    await expect(page.getByTestId('countdown-value')).toHaveText('8');
+
+    const shotReview = page.getByTestId('shot-review-screen');
+    await expect(shotReview).toBeVisible({ timeout: 20_000 });
+    await expect(shotReview).toContainText('Photo 1 of 3.');
+
+    await page.getByTestId('shot-review-continue').click();
+    await expect(page.getByTestId('capture-screen')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Photo 2 of 3')).toBeVisible();
+    await expect(page.getByTestId('countdown-value')).toHaveText('8');
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('cancel-hint')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('attract-screen')).toBeVisible({ timeout: 10_000 });
+
+    await unlockAdmin(page);
+    const settingsNavButton = page.getByRole('button', { name: 'Settings & health' });
+    await expect(settingsNavButton).toBeVisible({ timeout: 30_000 });
+    await settingsNavButton.click();
+    await expect(page.getByTestId('admin-settings')).toBeVisible();
+
+    const captureSection = page.locator('#settings-capture');
+    await captureSection.scrollIntoViewIfNeeded();
+    await expect(captureSection.getByTestId('capture-active-frame')).toContainText('3 slots');
+    await expect(captureSection.getByTestId('capture-review-mode')).toHaveText(
+      'Review every photo (Recommended)',
+    );
+    await expect(captureSection.getByTestId('capture-countdown-seconds')).toHaveValue('8');
+
+    await captureSection.getByTestId('capture-review-mode').click();
+    await page.getByRole('option', { name: 'Continuous shooting' }).click();
+    await expect(captureSection.getByTestId('capture-review-mode')).toHaveText(
+      'Continuous shooting',
+    );
+    await captureSection.getByTestId('capture-countdown-seconds').fill('1');
+    await captureSection.getByTestId('save-capture-settings').click();
+    await expect(page.getByTestId('admin-settings').getByRole('status')).toContainText(
+      'Capture settings saved.',
+      { timeout: 30_000 },
+    );
+
+    await page.getByRole('button', { name: 'Back to booth' }).click();
+    await expect(page.getByTestId('attract-screen')).toBeVisible({ timeout: 10_000 });
+
+    await page.evaluate(() => {
+      document.body.dataset.shotReviewObserved = 'false';
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('[data-testid="shot-review-screen"]')) {
+          document.body.dataset.shotReviewObserved = 'true';
+        }
+        if (document.querySelector('[data-testid="review-screen"]')) {
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    });
+
+    await page.getByRole('button', { name: 'Start photo session' }).click();
+    await expect(page.getByTestId('countdown-value')).toHaveText('1');
+    await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid="collage-option-1"] .photo-slot img')).toHaveCount(3);
+    expect(await page.evaluate(() => document.body.dataset.shotReviewObserved)).toBe('false');
   } finally {
     await closeKiosk(kiosk?.app);
     await removeUserDataDirectory(userData);
@@ -203,6 +393,8 @@ test('camera failure requires the operator passcode before restart', async () =>
     });
     await bootstrap(kiosk.page);
     await kiosk.page.getByRole('button', { name: 'Start photo session' }).click();
+    await expect(kiosk.page.getByTestId('shot-review-screen')).toBeVisible({ timeout: 15_000 });
+    await kiosk.page.getByTestId('shot-review-continue').click();
     await expect(kiosk.page.getByTestId('recovery-camera')).toBeVisible({ timeout: 30_000 });
 
     await kiosk.page.getByRole('button', { name: 'Restart session' }).click();
@@ -440,10 +632,57 @@ async function bootstrap(page: Page): Promise<void> {
   await expect(page.getByTestId('attract-screen')).toBeVisible({ timeout: 15_000 });
 }
 
+async function unlockAdmin(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Admin' }).click();
+  await page.locator('#operator-passcode').fill(PASSCODE);
+  await page.locator('#operator-passcode').press('Enter');
+}
+
+async function waitForReviewScreen(page: Page): Promise<void> {
+  const review = page.getByTestId('review-screen');
+  const anyTarget = page.locator(
+    '[data-testid="shot-review-screen"], [data-testid="review-screen"]',
+  );
+
+  for (let step = 0; step < 12; step += 1) {
+    await anyTarget.first().waitFor({ state: 'visible', timeout: 30_000 });
+    if (await review.isVisible()) {
+      return;
+    }
+    await expect(page.getByTestId('shot-review-image')).toBeVisible();
+    const currentSlot = await page
+      .locator('[data-testid="shot-review-strip"] [aria-current="step"]')
+      .getAttribute('data-slot');
+    await page.getByTestId('shot-review-continue').click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate((slotBefore) => {
+            if (document.querySelector('[data-testid="review-screen"]')) return 'review';
+            const active = document.querySelector(
+              '[data-testid="shot-review-strip"] [aria-current="step"]',
+            );
+            if (!active) return 'capturing';
+            return active.getAttribute('data-slot') !== slotBefore ? 'next-shot' : 'waiting';
+          }, currentSlot),
+        { timeout: 30_000 },
+      )
+      .not.toBe('waiting');
+  }
+
+  await expect(review).toBeVisible({ timeout: 30_000 });
+}
+
 async function startAndWaitForReview(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Start photo session' }).click();
-  await expect(page.getByTestId('capture-screen')).toBeVisible();
-  await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page
+      .locator(
+        '[data-testid="capture-screen"], [data-testid="shot-review-screen"], [data-testid="review-screen"]',
+      )
+      .first(),
+  ).toBeVisible();
+  await waitForReviewScreen(page);
   await expect(page.locator('[data-testid="collage-option-1"] .photo-slot img')).toHaveCount(3);
   await expect(page.locator('[data-testid="collage-option-2"] .photo-slot img')).toHaveCount(3);
 }
