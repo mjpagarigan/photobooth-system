@@ -403,7 +403,12 @@ export class LocalRepository {
     })();
   }
 
-  setGooglePhotosConfig(input: GooglePhotosConfig, now = Date.now()): LocalSettings {
+  setGooglePhotosConfig(
+    input: GooglePhotosConfig,
+    now = Date.now(),
+    options: { bumpRevision?: boolean } = {},
+  ): LocalSettings {
+    const revisionClause = (options.bumpRevision ?? true) ? 'revision = revision + 1,' : '';
     this.database.raw
       .prepare(
         `UPDATE settings SET
@@ -412,7 +417,7 @@ export class LocalRepository {
           google_photos_album_id = ?,
           google_photos_album_title = ?,
           google_photos_album_share_url = ?,
-          revision = revision + 1,
+          ${revisionClause}
           updated_at = ?
         WHERE id = 1`,
       )

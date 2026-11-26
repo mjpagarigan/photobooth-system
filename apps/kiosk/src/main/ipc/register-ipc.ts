@@ -111,14 +111,18 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
         remoteStatus.config.connectedEmail !== localSettings.googlePhotosEmail ||
         remoteStatus.config.enabled !== localSettings.googlePhotosEnabled
       ) {
-        dependencies.repository.setGooglePhotosConfig({
-          connectedEmail: remoteStatus.config.connectedEmail,
-          albumId: remoteStatus.config.albumId ?? localSettings.googlePhotosAlbumId,
-          albumTitle: remoteStatus.config.albumTitle ?? localSettings.googlePhotosAlbumTitle,
-          albumShareUrl:
-            remoteStatus.config.albumShareUrl ?? localSettings.googlePhotosAlbumShareUrl,
-          enabled: remoteStatus.config.enabled,
-        });
+        dependencies.repository.setGooglePhotosConfig(
+          {
+            connectedEmail: remoteStatus.config.connectedEmail,
+            albumId: remoteStatus.config.albumId ?? localSettings.googlePhotosAlbumId,
+            albumTitle: remoteStatus.config.albumTitle ?? localSettings.googlePhotosAlbumTitle,
+            albumShareUrl:
+              remoteStatus.config.albumShareUrl ?? localSettings.googlePhotosAlbumShareUrl,
+            enabled: remoteStatus.config.enabled,
+          },
+          Date.now(),
+          { bumpRevision: false },
+        );
       }
       return remoteStatus;
     }

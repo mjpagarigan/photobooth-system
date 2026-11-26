@@ -1093,4 +1093,74 @@ describe('countdown calculation and per-shot review flow', () => {
     await user.click(screen.getByTestId('open-frame-editor-from-capture'));
     expect(await screen.findByTestId('frame-editor')).toBeVisible();
   });
+
+  it('hides the corner printer indicator during capture and shot review so it never blocks shot controls', async () => {
+    const harness = createBridge();
+    harness.bridge.print.getHealth = vi.fn().mockResolvedValue(
+      ok({
+        status: 'offline' as const,
+        printerName: 'EPSON L805',
+        message: 'Printer is offline.',
+        queuedCount: 0,
+        attentionCount: 0,
+        checkedAt: 1,
+      }),
+    );
+    window.graceBooth = harness.bridge;
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+    expect(await screen.findByTestId('printer-indicator')).toBeVisible();
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'shot_review',
+          state: 'shot_review',
+          shotNumber: 1,
+          captureCount: 0,
+          media: { captureUrls: ['/mock/photo-1.jpg'], collageUrl: null, qrImageUrl: null },
+          controls: {
+            canStart: false,
+            canAcceptShot: true,
+            canRetakeShot: true,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: false,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('shot-review-screen');
+    expect(screen.queryByTestId('printer-indicator')).not.toBeInTheDocument();
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'review',
+          state: 'review',
+          shotNumber: null,
+          captureCount: 3,
+          media: {
+            captureUrls: ['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg'],
+            collageUrl: null,
+            qrImageUrl: null,
+          },
+          controls: {
+            canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
+            canRetakeAll: true,
+            canAcceptPhotos: true,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: false,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('review-screen');
+    expect(screen.getByTestId('printer-indicator')).toBeVisible();
+  });
 });

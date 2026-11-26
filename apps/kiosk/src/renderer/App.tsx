@@ -1338,7 +1338,7 @@ export function App() {
             inert={dialog || cameraSetupOpen || recent.open ? true : undefined}
           >
             {guestContent}
-            <PrinterIndicator health={printerHealth} />
+            {!captureWindowOpen ? <PrinterIndicator health={printerHealth} /> : null}
             {cancelArmed ? (
               <div className="cancel-session-hint" data-testid="cancel-hint" role="status">
                 Press ESC again to cancel

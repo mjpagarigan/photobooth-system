@@ -312,6 +312,33 @@ describe('checked-in local migration', () => {
     ]);
   });
 
+  it('allows background Google Photos cache sync without invalidating pending settings revisions', () => {
+    store = createTestStore();
+    const initial = store.repository.getSettings();
+    const synced = store.repository.setGooglePhotosConfig(
+      {
+        enabled: true,
+        connectedEmail: 'operator@example.com',
+        albumId: 'album-1',
+        albumTitle: 'Event Album',
+        albumShareUrl: 'https://photos.app.goo.gl/test',
+      },
+      1_500,
+      { bumpRevision: false },
+    );
+    expect(synced.googlePhotosEnabled).toBe(true);
+    expect(synced.googlePhotosEmail).toBe('operator@example.com');
+    expect(synced.revision).toBe(initial.revision);
+
+    const saved = store.repository.setCaptureSettings(
+      { countdownSeconds: 1, reviewMode: 'continuous', expectedRevision: initial.revision },
+      2_000,
+    );
+    expect(saved.captureCountdownSeconds).toBe(1);
+    expect(saved.captureReviewMode).toBe('continuous');
+    expect(saved.revision).toBe(initial.revision + 1);
+  });
+
   it('tracks non-destructive per-shot retake attempts and resolves only winning shots in listCurrentAssets', () => {
     store = createTestStore();
     const sessionId = randomUUID();
