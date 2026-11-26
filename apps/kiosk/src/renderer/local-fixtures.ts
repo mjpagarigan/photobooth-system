@@ -5,7 +5,7 @@ export const LOCAL_FIXTURES = {
   annivFrame: '/frames/anniv-frame.png',
   defaultFrame: '/frames/mat-frame.png',
   matFrame: '/frames/mat-frame.png',
-  mockPhotos: ['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg'],
+  mockPhotos: ['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg', '/mock/photo-4.jpg'],
   shutterAudio: '/audio/shutter.wav',
   ministryIdleBackground: '/backgrounds/ministry-idle.jpg',
 } as const;
@@ -99,8 +99,7 @@ export const ANNIVERSARY_FRAME_PREVIEW: FrameSummary = {
 };
 
 export function mockPhotoFor(slotIndex: number): string {
-  return (
-    LOCAL_FIXTURES.mockPhotos[Math.max(0, Math.min(2, slotIndex - 1))] ??
-    LOCAL_FIXTURES.mockPhotos[0]
-  );
+  const photos = LOCAL_FIXTURES.mockPhotos;
+  const normalized = Math.max(1, Math.trunc(slotIndex)) - 1;
+  return photos[normalized % photos.length] ?? photos[0];
 }

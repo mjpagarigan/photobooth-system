@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -18,6 +18,7 @@ import type {
 } from '@grace-booth/shared';
 
 import { App } from '../../src/renderer/App';
+import { computeDisplayedCountdownSeconds } from '../../src/renderer/capture-helpers';
 import { DEFAULT_FRAME_LAYOUT, LOCAL_FIXTURES } from '../../src/renderer/local-fixtures';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
@@ -139,6 +140,7 @@ function sessionSnapshot(patch: Partial<BoothSnapshot> = {}): BoothSnapshot {
 }
 
 type BridgeHarness = {
+  acceptShotMock: Mock<GraceBoothBridge['booth']['acceptShot']>;
   bootstrapPasscodeMock: Mock<GraceBoothBridge['admin']['bootstrapPasscode']>;
   bridge: GraceBoothBridge;
   cancelSessionMock: Mock<GraceBoothBridge['booth']['cancelSession']>;
@@ -146,6 +148,8 @@ type BridgeHarness = {
   getAuthStatusMock: Mock<GraceBoothBridge['admin']['getAuthStatus']>;
   getRecentMock: Mock<GraceBoothBridge['gallery']['getRecent']>;
   restartSessionMock: Mock<GraceBoothBridge['admin']['restartSession']>;
+  retakeShotMock: Mock<GraceBoothBridge['booth']['retakeShot']>;
+  saveCaptureSettingsMock: Mock<GraceBoothBridge['admin']['saveCaptureSettings']>;
   startMock: Mock<GraceBoothBridge['booth']['start']>;
 };
 
@@ -182,12 +186,30 @@ function createBridge(
       ok({ configured: true, authenticated: true, expiresAt: Date.now() + 60_000 }),
     );
 
+  const acceptShotMock = vi
+    .fn<GraceBoothBridge['booth']['acceptShot']>()
+    .mockResolvedValue(ok(initial));
+  const retakeShotMock = vi
+    .fn<GraceBoothBridge['booth']['retakeShot']>()
+    .mockResolvedValue(ok(initial));
+  const saveCaptureSettingsMock = vi
+    .fn<GraceBoothBridge['admin']['saveCaptureSettings']>()
+    .mockImplementation((input) =>
+      Promise.resolve(
+        ok({
+          ...SETTINGS,
+          capture: { countdownSeconds: input.countdownSeconds, reviewMode: input.reviewMode },
+          revision: SETTINGS.revision + 1,
+        }),
+      ),
+    );
+
   const bridge: GraceBoothBridge = {
     booth: {
       getSnapshot: vi.fn().mockResolvedValue(ok(initial)),
       start: startMock,
-      acceptShot: vi.fn().mockResolvedValue(ok(initial)),
-      retakeShot: vi.fn().mockResolvedValue(ok(initial)),
+      acceptShot: acceptShotMock,
+      retakeShot: retakeShotMock,
       retakeAll: vi.fn().mockResolvedValue(ok(initial)),
       acceptPhotos: vi.fn<(input: { frameId: string }) => Promise<RpcResult<BoothSnapshot>>>(() =>
         Promise.resolve(ok(initial)),
@@ -301,7 +323,7 @@ function createBridge(
       changePasscode: vi.fn().mockResolvedValue(ok({})),
       getSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
       saveSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
-      saveCaptureSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
+      saveCaptureSettings: saveCaptureSettingsMock,
       getDisplays: vi.fn().mockResolvedValue(ok([])),
       swapDisplays: vi.fn().mockResolvedValue(ok([])),
       saveDualDisplaySettings: vi
@@ -383,6 +405,7 @@ function createBridge(
   };
 
   return {
+    acceptShotMock,
     bootstrapPasscodeMock,
     bridge,
     cancelSessionMock,
@@ -395,15 +418,22 @@ function createBridge(
     getAuthStatusMock,
     getRecentMock,
     restartSessionMock,
+    retakeShotMock,
+    saveCaptureSettingsMock,
     startMock,
   };
 }
+
+const audioInstances: AudioStub[] = [];
 
 class AudioStub {
   currentTime = 0;
   preload = '';
   load = vi.fn();
   play = vi.fn().mockResolvedValue(undefined);
+  constructor() {
+    audioInstances.push(this);
+  }
 }
 
 function cameraStream(width = 1_920, height = 1_080) {
@@ -435,6 +465,7 @@ function stubCamera(getUserMedia: Mock): void {
 }
 
 beforeEach(() => {
+  audioInstances.length = 0;
   window.history.replaceState({}, '', '/');
   vi.stubGlobal('Audio', AudioStub);
   const assignedStreams = new WeakMap<HTMLMediaElement, MediaProvider | null>();
@@ -799,5 +830,267 @@ describe('guest ESC cancellation', () => {
     expect(screen.getByTestId('cancel-hint')).toBeVisible();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(harness.cancelSessionMock).toHaveBeenCalledOnce());
+  });
+
+  it('cancels on double-ESC during shot_review and ignores a single ESC', async () => {
+    const shotReviewSnapshot = sessionSnapshot({
+      screen: 'shot_review',
+      state: 'shot_review',
+      shotNumber: 2,
+      captureCount: 1,
+      requiredShotCount: 4,
+      countdownEndsAt: null,
+      media: {
+        captureUrls: ['/mock/photo-1.jpg', '/mock/photo-2.jpg'],
+        collageUrl: null,
+        qrImageUrl: null,
+      },
+      controls: {
+        canStart: false,
+        canAcceptShot: true,
+        canRetakeShot: true,
+        canRetakeAll: false,
+        canAcceptPhotos: false,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        canFinish: false,
+      },
+    });
+    const harness = createBridge(shotReviewSnapshot);
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('shot-review-screen');
+
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('cancel-hint')).toBeVisible();
+    expect(harness.cancelSessionMock).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(harness.cancelSessionMock).toHaveBeenCalledOnce());
+  });
+});
+
+describe('countdown calculation and per-shot review flow', () => {
+  it('computes 12s and 30s countdowns without clamping to 8s while bounding clock skew', () => {
+    const now = 1_000_000;
+    expect(computeDisplayedCountdownSeconds(now + 12_000, 12, now)).toBe(12);
+    expect(computeDisplayedCountdownSeconds(now + 30_000, 30, now)).toBe(30);
+    expect(computeDisplayedCountdownSeconds(now + 12_600, 12, now)).toBe(12);
+    expect(computeDisplayedCountdownSeconds(now + 11_400, null, now)).toBe(12);
+    expect(computeDisplayedCountdownSeconds(now - 500, 8, now)).toBe(1);
+    expect(computeDisplayedCountdownSeconds(null, null, now)).toBe(8);
+  });
+
+  it('renders configured 12s and 30s countdowns in the live capture screen', async () => {
+    const harness = createBridge();
+    window.graceBooth = harness.bridge;
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          countdownEndsAt: Date.now() + 11_800,
+          countdownTotalSeconds: 12,
+        }),
+      ),
+    );
+    expect(await screen.findByTestId('countdown-value')).toHaveTextContent('12');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          countdownEndsAt: Date.now() + 29_800,
+          countdownTotalSeconds: 30,
+        }),
+      ),
+    );
+    expect(await screen.findByTestId('countdown-value')).toHaveTextContent('30');
+  });
+
+  it('invokes acceptShot and retakeShot with the active shot number and arms audio idempotently', async () => {
+    const shotTwoReview = sessionSnapshot({
+      screen: 'shot_review',
+      state: 'shot_review',
+      shotNumber: 2,
+      captureCount: 1,
+      requiredShotCount: 4,
+      countdownEndsAt: null,
+      media: {
+        captureUrls: ['/mock/photo-1.jpg', '/mock/photo-2.jpg'],
+        collageUrl: null,
+        qrImageUrl: null,
+      },
+      controls: {
+        canStart: false,
+        canAcceptShot: true,
+        canRetakeShot: true,
+        canRetakeAll: false,
+        canAcceptPhotos: false,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        canFinish: false,
+      },
+    });
+    const harness = createBridge(shotTwoReview);
+    harness.retakeShotMock.mockResolvedValue(ok(shotTwoReview));
+    harness.acceptShotMock.mockResolvedValue(
+      ok(
+        sessionSnapshot({
+          screen: 'countdown',
+          state: 'countdown',
+          shotNumber: 3,
+          captureCount: 2,
+          requiredShotCount: 4,
+          countdownEndsAt: Date.now() + 8_000,
+          countdownTotalSeconds: 8,
+        }),
+      ),
+    );
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('shot-review-screen');
+
+    expect(audioInstances).toHaveLength(0);
+
+    await user.click(screen.getByTestId('shot-review-retake'));
+    await waitFor(() => expect(harness.retakeShotMock).toHaveBeenCalledWith(2));
+    expect(audioInstances).toHaveLength(2);
+    expect(audioInstances[0]?.load).toHaveBeenCalledOnce();
+    expect(audioInstances[1]?.load).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByTestId('shot-review-continue'));
+    await waitFor(() => expect(harness.acceptShotMock).toHaveBeenCalledWith(2));
+    expect(audioInstances).toHaveLength(2);
+    expect(audioInstances[0]?.load).toHaveBeenCalledOnce();
+    expect(audioInstances[1]?.load).toHaveBeenCalledOnce();
+    expect(await screen.findByTestId('capture-screen')).toHaveAttribute('data-phase', 'countdown');
+  });
+
+  it('keeps the webcam stream alive and the video element mounted through shot_review', async () => {
+    const stream = cameraStream(1_280, 720);
+    const getUserMedia = vi.fn(() => Promise.resolve(stream));
+    stubCamera(getUserMedia);
+    const harness = createBridge(ATTRACT, 'webcam', 'sony-uvc', '720p');
+    harness.startMock.mockResolvedValue(
+      ok(
+        sessionSnapshot({
+          cameraPreviewEnabled: true,
+          shotNumber: 1,
+          captureCount: 0,
+          requiredShotCount: 4,
+          countdownEndsAt: Date.now() + 8_000,
+          countdownTotalSeconds: 8,
+        }),
+      ),
+    );
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    await user.click(screen.getByRole('button', { name: /start photo session/i }));
+    await screen.findByTestId('capture-screen');
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+    const initialVideo = screen.getByTestId('viewfinder-live');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'shot_review',
+          state: 'shot_review',
+          shotNumber: 1,
+          captureCount: 0,
+          requiredShotCount: 4,
+          countdownEndsAt: null,
+          cameraPreviewEnabled: true,
+          media: { captureUrls: ['/mock/photo-1.jpg'], collageUrl: null, qrImageUrl: null },
+          controls: {
+            canStart: false,
+            canAcceptShot: true,
+            canRetakeShot: true,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: false,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('shot-review-screen');
+    expect(screen.getByTestId('viewfinder-live')).toBe(initialVideo);
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    expect(stream.track.stop).not.toHaveBeenCalled();
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'countdown',
+          state: 'countdown',
+          shotNumber: 2,
+          captureCount: 1,
+          requiredShotCount: 4,
+          countdownEndsAt: Date.now() + 8_000,
+          countdownTotalSeconds: 8,
+          cameraPreviewEnabled: true,
+        }),
+      ),
+    );
+    await screen.findByTestId('capture-screen');
+    expect(screen.getByTestId('viewfinder-live')).toBe(initialVideo);
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    expect(stream.track.stop).not.toHaveBeenCalled();
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'review',
+          state: 'review',
+          shotNumber: null,
+          captureCount: 4,
+          requiredShotCount: 4,
+          cameraPreviewEnabled: true,
+        }),
+      ),
+    );
+    await screen.findByTestId('review-screen');
+    await waitFor(() => expect(stream.track.stop).toHaveBeenCalledOnce());
+  });
+
+  it('saves admin capture settings through the bridge and jumps to Frame Editor', async () => {
+    const harness = createBridge();
+    harness.getAuthStatusMock.mockResolvedValue(
+      ok({ configured: true, authenticated: true, expiresAt: Date.now() + 60_000 }),
+    );
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    await user.click(screen.getByRole('button', { name: 'Admin' }));
+    await screen.findByTestId('frame-editor');
+
+    await user.click(screen.getByRole('button', { name: /settings/i }));
+    await screen.findByTestId('admin-settings');
+
+    fireEvent.change(screen.getByTestId('capture-countdown-seconds'), { target: { value: '15' } });
+    await user.click(screen.getByTestId('capture-review-mode'));
+    await user.click(await screen.findByRole('option', { name: 'Continuous shooting' }));
+    await user.click(screen.getByTestId('save-capture-settings'));
+
+    await waitFor(() =>
+      expect(harness.saveCaptureSettingsMock).toHaveBeenCalledWith({
+        countdownSeconds: 15,
+        reviewMode: 'continuous',
+        expectedRevision: SETTINGS.revision,
+      }),
+    );
+    expect(await screen.findByText('Capture settings saved.')).toBeVisible();
+
+    await user.click(screen.getByTestId('open-frame-editor-from-capture'));
+    expect(await screen.findByTestId('frame-editor')).toBeVisible();
   });
 });

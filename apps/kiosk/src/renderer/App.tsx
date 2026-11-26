@@ -12,14 +12,20 @@ import type {
   GalleryItem,
   GraceBoothBridge,
   RpcResult,
+  SaveCaptureSettingsInput,
   UploadJobSummary,
 } from '@grace-booth/shared';
-import { CAMERA_ZOOM_DEFAULT } from '@grace-booth/shared';
+import {
+  CAMERA_ZOOM_DEFAULT,
+  isCancellableSessionState,
+  isCaptureScreen,
+} from '@grace-booth/shared';
 import { AnchoredToastProvider, ToastProvider } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
 import { FrameEditor } from './admin/FrameEditor';
+import { computeDisplayedCountdownSeconds } from './capture-helpers';
 import { Button } from './components/Button';
 import { CameraSetupModal } from './components/CameraSetupModal';
 import { FrameImportDialog } from './components/FrameImportDialog';
@@ -80,34 +86,38 @@ function adminErrorMessage<T>(result: RpcResult<T>): string {
   }
 }
 
-function useCountdown(deadline: number | null, fixedValue?: number): number {
-  const computeSeconds = (d: number | null): number =>
-    d ? Math.max(1, Math.min(8, Math.ceil((d - Date.now()) / 1_000))) : 8;
+function useCountdown(
+  deadline: number | null,
+  totalSeconds?: number | null,
+  fixedValue?: number,
+): number {
+  const [seconds, setSeconds] = useState(() =>
+    computeDisplayedCountdownSeconds(deadline, totalSeconds),
+  );
+  const nextKey = `${deadline ?? 'none'}:${totalSeconds ?? 'none'}`;
+  const [prevKey, setPrevKey] = useState(nextKey);
 
-  const [seconds, setSeconds] = useState(() => computeSeconds(deadline));
-  const [prevDeadline, setPrevDeadline] = useState(deadline);
-
-  if (prevDeadline !== deadline) {
-    setPrevDeadline(deadline);
-    setSeconds(computeSeconds(deadline));
+  if (prevKey !== nextKey) {
+    setPrevKey(nextKey);
+    setSeconds(computeDisplayedCountdownSeconds(deadline, totalSeconds));
   }
 
   useEffect(() => {
-    if (fixedValue !== undefined || !deadline) {
+    if (fixedValue !== undefined || deadline === null) {
       return;
     }
 
     const update = () => {
-      setSeconds(computeSeconds(deadline));
+      setSeconds(computeDisplayedCountdownSeconds(deadline, totalSeconds));
     };
     update();
     const interval = window.setInterval(update, 100);
     return () => {
       window.clearInterval(interval);
     };
-  }, [deadline, fixedValue]);
+  }, [deadline, fixedValue, totalSeconds]);
 
-  return fixedValue ?? (deadline ? seconds : 8);
+  return fixedValue ?? seconds;
 }
 
 export function App() {
@@ -155,10 +165,11 @@ export function App() {
 
   const countdownSeconds = useCountdown(
     snapshot.state === 'countdown' ? snapshot.countdownEndsAt : null,
+    snapshot.state === 'countdown' ? snapshot.countdownTotalSeconds : null,
     visualSeed?.countdownSeconds,
   );
 
-  const captureWindowOpen = snapshot.screen === 'countdown' || snapshot.screen === 'capturing';
+  const captureWindowOpen = isCaptureScreen(snapshot.screen);
   const guestFlowOpen = !adminOpen && !dialog && !cameraSetupOpen;
   const liveCameraEnabled =
     !visualSeed &&
@@ -319,15 +330,17 @@ export function App() {
   }, [adminOpen, adminView, snapshot.screen, snapshot.state]);
 
   const prepareAudio = useCallback(() => {
-    if (typeof Audio === 'undefined') {
+    if (audioArmedRef.current || typeof Audio === 'undefined') {
       return;
     }
-    countdownAudioRef.current ??= new Audio(LOCAL_FIXTURES.countdownAudio);
-    shutterAudioRef.current ??= new Audio(LOCAL_FIXTURES.shutterAudio);
-    countdownAudioRef.current.preload = 'auto';
-    shutterAudioRef.current.preload = 'auto';
-    countdownAudioRef.current.load();
-    shutterAudioRef.current.load();
+    const countdownAudio = countdownAudioRef.current ?? new Audio(LOCAL_FIXTURES.countdownAudio);
+    const shutterAudio = shutterAudioRef.current ?? new Audio(LOCAL_FIXTURES.shutterAudio);
+    countdownAudio.preload = 'auto';
+    shutterAudio.preload = 'auto';
+    countdownAudio.load();
+    shutterAudio.load();
+    countdownAudioRef.current = countdownAudio;
+    shutterAudioRef.current = shutterAudio;
     audioArmedRef.current = true;
   }, []);
 
@@ -396,6 +409,27 @@ export function App() {
   const startGuestSession = useCallback(() => {
     prepareAudio();
     void runGuestCommand((bridge) => bridge.booth.start());
+  }, [prepareAudio, runGuestCommand]);
+
+  const acceptShot = useCallback(
+    (shotNumber: number) => {
+      prepareAudio();
+      void runGuestCommand((bridge) => bridge.booth.acceptShot(shotNumber));
+    },
+    [prepareAudio, runGuestCommand],
+  );
+
+  const retakeShot = useCallback(
+    (shotNumber: number) => {
+      prepareAudio();
+      void runGuestCommand((bridge) => bridge.booth.retakeShot(shotNumber));
+    },
+    [prepareAudio, runGuestCommand],
+  );
+
+  const retakeAll = useCallback(() => {
+    prepareAudio();
+    void runGuestCommand((bridge) => bridge.booth.retakeAll());
   }, [prepareAudio, runGuestCommand]);
 
   const refreshAdminData = useCallback(async (): Promise<boolean> => {
@@ -532,9 +566,7 @@ export function App() {
     !dialog &&
     !cameraSetupOpen &&
     !recent.open &&
-    (snapshot.state === 'countdown' ||
-      snapshot.state === 'capturing' ||
-      snapshot.state === 'review');
+    isCancellableSessionState(snapshot.state);
 
   useEffect(() => {
     if (!sessionCancellable) {
@@ -807,6 +839,33 @@ export function App() {
     [visualSeed],
   );
 
+  const saveCaptureSettings = useCallback(
+    async (input: SaveCaptureSettingsInput) => {
+      if (visualSeed) {
+        return;
+      }
+      const bridge = getBridge();
+      if (!bridge) {
+        return;
+      }
+      setAdminBusy(true);
+      setAdminError(null);
+      setAdminStatus(null);
+      try {
+        const result = await bridge.admin.saveCaptureSettings(input);
+        if (result.ok) {
+          setAdminSettings(result.data);
+          setAdminStatus('Capture settings saved.');
+        } else {
+          setAdminError(adminErrorMessage(result));
+        }
+      } finally {
+        setAdminBusy(false);
+      }
+    },
+    [visualSeed],
+  );
+
   const retryJob = useCallback(
     async (jobId: string) => {
       if (visualSeed) {
@@ -1042,21 +1101,42 @@ export function App() {
       );
     }
 
-    if (snapshot.screen === 'countdown' || snapshot.screen === 'capturing') {
+    if (isCaptureScreen(snapshot.screen)) {
+      const totalShots = snapshot.requiredShotCount ?? 3;
+      const shotNumber = snapshot.shotNumber ?? Math.min(totalShots, snapshot.captureCount + 1);
+      const sharedProps = {
+        shotNumber,
+        totalShots,
+        cameraZoomPercent,
+        ...(liveCameraEnabled
+          ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
+          : {}),
+      };
+
+      if (snapshot.screen === 'shot_review') {
+        const capturedPhotoUrl = snapshot.media.captureUrls[shotNumber - 1] ?? null;
+        return (
+          <CaptureScreen
+            {...sharedProps}
+            phase="shot_review"
+            busy={guestBusy}
+            canAcceptShot={snapshot.controls.canAcceptShot}
+            canRetakeShot={snapshot.controls.canRetakeShot}
+            capturedPhotoUrl={capturedPhotoUrl}
+            captureUrls={snapshot.media.captureUrls}
+            errorMessage={guestError}
+            onAcceptShot={() => acceptShot(shotNumber)}
+            onRetakeShot={() => retakeShot(shotNumber)}
+          />
+        );
+      }
+
+      if (snapshot.screen === 'capturing') {
+        return <CaptureScreen {...sharedProps} phase="capturing" />;
+      }
+
       return (
-        <CaptureScreen
-          phase={snapshot.screen}
-          secondsRemaining={countdownSeconds}
-          shotNumber={
-            snapshot.shotNumber ??
-            Math.min(snapshot.requiredShotCount ?? 3, snapshot.captureCount + 1)
-          }
-          totalShots={snapshot.requiredShotCount ?? 3}
-          cameraZoomPercent={cameraZoomPercent}
-          {...(liveCameraEnabled
-            ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
-            : {})}
-        />
+        <CaptureScreen {...sharedProps} phase="countdown" secondsRemaining={countdownSeconds} />
       );
     }
 
@@ -1072,7 +1152,7 @@ export function App() {
           onAccept={(frameId, print) =>
             void runGuestCommand((bridge) => bridge.booth.acceptPhotos({ frameId, print }))
           }
-          onRetake={() => void runGuestCommand((bridge) => bridge.booth.retakeAll())}
+          onRetake={retakeAll}
         />
       );
     }
@@ -1086,6 +1166,7 @@ export function App() {
           )}
           onOpenAdmin={() => void beginProtectedAction('admin')}
           state={snapshot.state}
+          totalShots={snapshot.requiredShotCount ?? 3}
         />
       );
     }
@@ -1128,6 +1209,7 @@ export function App() {
       />
     );
   }, [
+    acceptShot,
     beginProtectedAction,
     camera.ready,
     camera.videoRef,
@@ -1139,6 +1221,8 @@ export function App() {
     loading,
     openRecentGallery,
     printerHealth,
+    retakeAll,
+    retakeShot,
     runGuestCommand,
     startGuestSession,
     snapshot,
@@ -1215,8 +1299,10 @@ export function App() {
                     void connectCloud(email, password, supabaseUrl, supabasePublishableKey)
                   }
                   onOpenCameras={() => setCameraSetupOpen(true)}
+                  onOpenFrameEditor={() => setAdminView('frame')}
                   onRefresh={() => void refreshAdminData()}
                   onRetryJob={(jobId: string) => void retryJob(jobId)}
+                  onSaveCaptureSettings={(input) => void saveCaptureSettings(input)}
                   onSaveSettings={(input) => void saveSettings(input)}
                   settings={adminSettings}
                   status={adminStatus}

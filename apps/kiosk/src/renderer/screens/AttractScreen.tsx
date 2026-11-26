@@ -2,7 +2,19 @@ import { useEffect, useRef } from 'react';
 
 import { Button } from '../components/Button';
 
-const SHOT_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+const SHOT_WORDS = [
+  'Zero',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+];
 
 type AttractScreenProps = {
   busy?: boolean;
@@ -34,6 +46,7 @@ export function AttractScreen({
   }, [busy, canStart]);
 
   const shotWord = SHOT_WORDS[shotCount] ?? String(shotCount);
+  const stripSlotCount = shotCount === 3 ? 3 : Math.min(4, Math.max(1, Math.trunc(shotCount)));
 
   return (
     <main className="screen screen--attract" data-testid="attract-screen">
@@ -106,9 +119,9 @@ export function AttractScreen({
         <div className="attract-strips" aria-hidden="true">
           {(['left', 'center', 'right'] as const).map((side) => (
             <div key={side} className={`attract-strip attract-strip--${side}`}>
-              <span />
-              <span />
-              <span />
+              {Array.from({ length: stripSlotCount }, (_, index) => (
+                <span key={index} />
+              ))}
             </div>
           ))}
         </div>

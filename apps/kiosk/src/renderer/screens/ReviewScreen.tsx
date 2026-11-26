@@ -145,9 +145,12 @@ export function ReviewScreen({
             Looking good. <span>Pick a layout, then use these photos.</span>
           </h1>
 
-          <ul className="review-shots" aria-label="Your photos">
+          <ul
+            className={`review-shots${captureUrls.length >= 4 ? ' review-shots--grid' : ''}`}
+            aria-label="Your photos"
+          >
             {captureUrls.map((url, index) => (
-              <li key={url}>
+              <li key={`${index}-${url}`}>
                 <img src={url} alt={`Photo ${index + 1}`} draggable="false" />
               </li>
             ))}

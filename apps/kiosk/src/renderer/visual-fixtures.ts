@@ -31,7 +31,9 @@ export type VisualSeedPayload = {
 export type VisualFixtureMode =
   | 'attract'
   | 'countdown'
+  | 'shot-review'
   | 'review'
+  | 'review-4-slot'
   | 'processing'
   | 'uploading-backoff'
   | 'final'
@@ -55,6 +57,66 @@ const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FRAME_ID = '22222222-2222-4222-8222-222222222222';
 const JOB_ID = '33333333-3333-4333-8333-333333333333';
 const CAPTURE_URLS = ['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg'];
+const CAPTURE_URLS_4 = [
+  '/mock/photo-1.jpg',
+  '/mock/photo-2.jpg',
+  '/mock/photo-3.jpg',
+  '/mock/photo-4.jpg',
+];
+
+const FOUR_SLOT_FRAME_LAYOUT: FrameSummary['slots'] = [
+  {
+    slotIndex: 1,
+    zIndex: 0,
+    name: 'Photo 1',
+    x: 0.05,
+    y: 0.07,
+    width: 0.43,
+    height: 0.39,
+    cropMode: 'crop-to-fill',
+  },
+  {
+    slotIndex: 2,
+    zIndex: 1,
+    name: 'Photo 2',
+    x: 0.52,
+    y: 0.07,
+    width: 0.43,
+    height: 0.39,
+    cropMode: 'crop-to-fill',
+  },
+  {
+    slotIndex: 3,
+    zIndex: 2,
+    name: 'Photo 3',
+    x: 0.05,
+    y: 0.5,
+    width: 0.43,
+    height: 0.39,
+    cropMode: 'crop-to-fill',
+  },
+  {
+    slotIndex: 4,
+    zIndex: 3,
+    name: 'Photo 4',
+    x: 0.52,
+    y: 0.5,
+    width: 0.43,
+    height: 0.39,
+    cropMode: 'crop-to-fill',
+  },
+];
+
+const FOUR_SLOT_FRAME: FrameSummary = {
+  id: '00000000-0000-4000-8000-000000000004',
+  name: '4R Four-Slot Keepsake',
+  width: 1800,
+  height: 1200,
+  byteSize: 44_090,
+  mediaUrl: LOCAL_FIXTURES.matFrame,
+  revision: 1,
+  slots: FOUR_SLOT_FRAME_LAYOUT,
+};
 
 const DEFAULT_FRAME: FrameSummary = {
   id: FRAME_ID,
@@ -255,6 +317,45 @@ async function buildReadyCollage(): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
+function buildFourSlotFrameOverlay(): string {
+  if (typeof document === 'undefined') {
+    return LOCAL_FIXTURES.matFrame;
+  }
+  const width = 900;
+  const height = 600;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return LOCAL_FIXTURES.matFrame;
+  }
+
+  context.fillStyle = '#f8f5ef';
+  context.fillRect(0, 0, width, height);
+
+  context.globalCompositeOperation = 'destination-out';
+  for (const slot of FOUR_SLOT_FRAME_LAYOUT) {
+    context.fillRect(
+      Math.round(slot.x * width),
+      Math.round(slot.y * height),
+      Math.round(slot.width * width),
+      Math.round(slot.height * height),
+    );
+  }
+
+  context.globalCompositeOperation = 'source-over';
+  context.strokeStyle = '#d6cfc2';
+  context.lineWidth = 4;
+  context.strokeRect(10, 10, width - 20, height - 20);
+  context.fillStyle = '#1d1d1f';
+  context.font = '600 22px system-ui, sans-serif';
+  context.textAlign = 'center';
+  context.fillText('M.A.T. PHOTOBOOTH · FOUR-SLOT KEEPSAKE', width / 2, height - 22);
+
+  return canvas.toDataURL('image/png');
+}
+
 export async function createQrStationVisualState(): Promise<QrStationState> {
   return {
     status: 'active',
@@ -288,6 +389,28 @@ export async function createVisualSeedPayload(
         media: { captureUrls: CAPTURE_URLS.slice(0, 1), collageUrl: null, qrImageUrl: null },
       });
       break;
+    case 'shot-review': {
+      const fourSlotFrame: FrameSummary = {
+        ...FOUR_SLOT_FRAME,
+        mediaUrl: buildFourSlotFrameOverlay(),
+      };
+      snapshot = withSession({
+        screen: 'shot_review',
+        state: 'shot_review',
+        shotNumber: 2,
+        captureCount: 1,
+        requiredShotCount: 4,
+        media: {
+          captureUrls: CAPTURE_URLS_4.slice(0, 2),
+          collageUrl: null,
+          frame: fourSlotFrame,
+          frames: [fourSlotFrame],
+          qrImageUrl: null,
+        },
+        controls: { canAcceptShot: true, canRetakeShot: true },
+      });
+      break;
+    }
     case 'review':
       snapshot = withSession({
         screen: 'review',
@@ -304,6 +427,28 @@ export async function createVisualSeedPayload(
         controls: { canRetakeAll: true, canAcceptPhotos: true },
       });
       break;
+    case 'review-4-slot': {
+      const fourSlotFrame: FrameSummary = {
+        ...FOUR_SLOT_FRAME,
+        mediaUrl: buildFourSlotFrameOverlay(),
+      };
+      snapshot = withSession({
+        screen: 'review',
+        state: 'review',
+        shotNumber: null,
+        captureCount: 4,
+        requiredShotCount: 4,
+        media: {
+          captureUrls: CAPTURE_URLS_4,
+          collageUrl: null,
+          frame: fourSlotFrame,
+          frames: [fourSlotFrame],
+          qrImageUrl: null,
+        },
+        controls: { canRetakeAll: true, canAcceptPhotos: true },
+      });
+      break;
+    }
     case 'processing':
       snapshot = withSession({
         screen: 'processing',

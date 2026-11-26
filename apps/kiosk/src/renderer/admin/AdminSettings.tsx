@@ -25,6 +25,7 @@ import type {
   AdminSettings as AdminSettingsData,
   DisplayInfo,
   DualDisplayMode,
+  SaveCaptureSettingsInput,
   UploadJobSummary,
 } from '@grace-booth/shared';
 import {
@@ -49,6 +50,7 @@ import {
 } from '@grace-booth/ui';
 
 import { Button } from '../components/Button';
+import { CaptureSettingsCard } from './CaptureSettingsCard';
 import { PrinterSettingsCard } from './PrinterSettingsCard';
 
 const HEALTH_ICONS = {
@@ -74,6 +76,7 @@ function jobLabel(job: UploadJobSummary): string {
 
 const SETTINGS_SECTIONS = [
   ['overview', 'Overview'],
+  ['capture', 'Capture'],
   ['network', 'Network'],
   ['displays', 'Displays'],
   ['printer', 'Printer'],
@@ -101,8 +104,10 @@ type AdminSettingsProps = {
     supabasePublishableKey?: string | null,
   ) => void;
   onOpenCameras?: () => void;
+  onOpenFrameEditor?: () => void;
   onRefresh: () => void;
   onRetryJob?: (jobId: string) => void;
+  onSaveCaptureSettings?: (input: SaveCaptureSettingsInput) => void;
   onSaveSettings: (input: {
     googleFormsUrl: string | null;
     recruitmentButtonText: string;
@@ -124,8 +129,10 @@ export function AdminSettings({
   onChooseLanCertificate,
   onConnectCloud,
   onOpenCameras,
+  onOpenFrameEditor,
   onRefresh,
   onRetryJob,
+  onSaveCaptureSettings,
   onSaveSettings,
   settings,
   status,
@@ -679,6 +686,19 @@ export function AdminSettings({
                       </dd>
                     </div>
                     <div>
+                      <dt>Capture</dt>
+                      <dd>
+                        {settings.capture.reviewMode === 'per_shot'
+                          ? 'Review every photo'
+                          : 'Continuous shooting'}{' '}
+                        · {settings.capture.countdownSeconds}s countdown
+                        <small>
+                          {settings.activeFrame.name} ({settings.activeFrame.slots.length}{' '}
+                          {settings.activeFrame.slots.length === 1 ? 'slot' : 'slots'})
+                        </small>
+                      </dd>
+                    </div>
+                    <div>
                       <dt>Retention</dt>
                       <dd>
                         Photos {settings.localRetentionDays} days · Links{' '}
@@ -716,6 +736,26 @@ export function AdminSettings({
                   </ul>
                 </section>
               </div>
+            </div>
+          </section>
+
+          <section
+            className="account-section"
+            id="settings-capture"
+            aria-labelledby="settings-capture-label"
+          >
+            <h2 className="account-section__label" id="settings-capture-label" tabIndex={-1}>
+              Capture
+            </h2>
+            <div className="account-section__body">
+              <CaptureSettingsCard
+                activeFrame={settings.activeFrame}
+                busy={busy}
+                capture={settings.capture}
+                onOpenFrameEditor={onOpenFrameEditor}
+                onSave={(input) => onSaveCaptureSettings?.(input)}
+                revision={settings.revision}
+              />
             </div>
           </section>
 

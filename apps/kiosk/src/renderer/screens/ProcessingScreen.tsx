@@ -6,7 +6,53 @@ type ProcessingScreenProps = {
   message?: string | null;
   state: SessionState | null;
   onOpenAdmin?: () => void;
+  totalShots?: number;
 };
+
+type StripSlotRect = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+function stripSlotRectsFor(totalShots: number): StripSlotRect[] {
+  const safeCount = Math.max(1, Math.min(10, Math.trunc(totalShots)));
+  if (safeCount === 3) {
+    return [0, 1, 2].map((index) => ({
+      x: 8,
+      y: 40 + index * 70,
+      width: 104,
+      height: 62,
+    }));
+  }
+
+  const top = 40;
+  const availableHeight = 202;
+  if (safeCount <= 4) {
+    const gap = 8;
+    const height = (availableHeight - gap * (safeCount - 1)) / safeCount;
+    return Array.from({ length: safeCount }, (_, index) => ({
+      x: 8,
+      y: top + index * (height + gap),
+      width: 104,
+      height,
+    }));
+  }
+
+  const columns = 2;
+  const rows = Math.ceil(safeCount / columns);
+  const colGap = 6;
+  const rowGap = 6;
+  const width = (104 - colGap) / columns;
+  const height = (availableHeight - rowGap * (rows - 1)) / rows;
+  return Array.from({ length: safeCount }, (_, index) => ({
+    x: 8 + (index % columns) * (width + colGap),
+    y: top + Math.floor(index / columns) * (height + rowGap),
+    width,
+    height,
+  }));
+}
 
 type ProcessingCopy = {
   headline: string;
@@ -62,8 +108,14 @@ const STEPS = [
   'Making your QR code',
 ] as const;
 
-export function ProcessingScreen({ message, onOpenAdmin, state }: ProcessingScreenProps) {
+export function ProcessingScreen({
+  message,
+  onOpenAdmin,
+  state,
+  totalShots = 3,
+}: ProcessingScreenProps) {
   const copy = copyForState(state, message);
+  const stripSlotRects = stripSlotRectsFor(totalShots);
   const [reducedMotion, setReducedMotion] = useState(
     () =>
       typeof window.matchMedia === 'function' &&
@@ -152,14 +204,14 @@ export function ProcessingScreen({ message, onOpenAdmin, state }: ProcessingScre
                 rx="6"
               />
               <rect className="processing-strip__band" x="8" y="8" width="104" height="24" rx="3" />
-              {[0, 1, 2].map((index) => (
+              {stripSlotRects.map((rect, index) => (
                 <rect
                   className="processing-strip__shot"
                   key={index}
-                  x="8"
-                  y={40 + index * 70}
-                  width="104"
-                  height="62"
+                  x={rect.x}
+                  y={rect.y}
+                  width={rect.width}
+                  height={rect.height}
                   rx="2"
                 />
               ))}

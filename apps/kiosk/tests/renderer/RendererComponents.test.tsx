@@ -12,7 +12,9 @@ import { AdminSettings as AdminSettingsScreen } from '../../src/renderer/admin/A
 import { AdminShell } from '../../src/renderer/admin/AdminShell';
 import { FrameEditor } from '../../src/renderer/admin/FrameEditor';
 import { fitFrameWithin } from '../../src/renderer/admin/frame-editor-layout';
+import { posePromptForShot } from '../../src/renderer/capture-helpers';
 import { RecentGallery } from '../../src/renderer/components/RecentGallery';
+import { AttractScreen } from '../../src/renderer/screens/AttractScreen';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
 import { ProcessingScreen } from '../../src/renderer/screens/ProcessingScreen';
 import { RecoveryScreen } from '../../src/renderer/screens/RecoveryScreen';
@@ -21,6 +23,7 @@ import {
   ANNIVERSARY_FRAME_LAYOUT,
   DEFAULT_FRAME_LAYOUT,
   LOCAL_FIXTURES,
+  mockPhotoFor,
 } from '../../src/renderer/local-fixtures';
 import { recoveryVariantFor, safeGuestMessage } from '../../src/renderer/types';
 
@@ -159,6 +162,201 @@ describe('guest screen components', () => {
     expect(screen.getByText('Photo 3 of 3')).toBeVisible();
     expect(screen.getByTestId('countdown-value')).toHaveTextContent('5');
     expect(screen.getByText(/Celebrate Together · Grand celebratory finale!/i)).toBeVisible();
+  });
+
+  it('produces at least four distinct pose prompts and always lands the finale on the final shot', () => {
+    const fourShotPrompts = [1, 2, 3, 4].map((shot) => posePromptForShot(shot, 4));
+    expect(new Set(fourShotPrompts).size).toBe(4);
+    expect(fourShotPrompts[3]).toContain('Celebrate Together');
+    expect(posePromptForShot(1, 1)).toContain('Celebrate Together');
+    expect(posePromptForShot(5, 5)).toContain('Celebrate Together');
+    expect(posePromptForShot(3, 5)).not.toContain('Celebrate Together');
+  });
+
+  it('renders per-shot guest review controls, labels, disabled states, and keeps the video node mounted across phases', async () => {
+    const user = userEvent.setup();
+    const onAcceptShot = vi.fn();
+    const onRetakeShot = vi.fn();
+    const liveVideoRef = vi.fn();
+
+    const { rerender } = render(
+      <CaptureScreen
+        phase="countdown"
+        secondsRemaining={8}
+        shotNumber={2}
+        totalShots={4}
+        liveVideoRef={liveVideoRef}
+        liveStreamReady
+      />,
+    );
+    const videoDuringCountdown = screen.getByTestId('viewfinder-live');
+
+    rerender(
+      <CaptureScreen
+        phase="capturing"
+        shotNumber={2}
+        totalShots={4}
+        liveVideoRef={liveVideoRef}
+        liveStreamReady
+      />,
+    );
+    expect(screen.getByTestId('viewfinder-live')).toBe(videoDuringCountdown);
+
+    rerender(
+      <CaptureScreen
+        phase="shot_review"
+        shotNumber={2}
+        totalShots={4}
+        capturedPhotoUrl="/mock/photo-2.jpg"
+        captureUrls={['/mock/photo-1.jpg', '/mock/photo-2.jpg']}
+        canAcceptShot
+        canRetakeShot
+        liveVideoRef={liveVideoRef}
+        liveStreamReady
+        onAcceptShot={onAcceptShot}
+        onRetakeShot={onRetakeShot}
+      />,
+    );
+    expect(screen.getByTestId('shot-review-screen')).toBeVisible();
+    expect(screen.getByTestId('viewfinder-live')).toBe(videoDuringCountdown);
+    expect(screen.getByTestId('shot-review-image')).toHaveAttribute('src', '/mock/photo-2.jpg');
+    expect(screen.getByRole('heading', { name: /like this shot\?/i })).toHaveAttribute(
+      'tabindex',
+      '-1',
+    );
+    expect(screen.getByTestId('shot-review-strip').querySelectorAll('li')).toHaveLength(4);
+    expect(
+      screen.getByTestId('shot-review-strip').querySelector('[data-slot="2"]'),
+    ).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByTestId('shot-review-continue')).toHaveTextContent('Next photo');
+    expect(screen.getByTestId('shot-review-retake')).toHaveTextContent('Retake photo');
+
+    await user.click(screen.getByTestId('shot-review-retake'));
+    await user.click(screen.getByTestId('shot-review-continue'));
+    expect(onRetakeShot).toHaveBeenCalledOnce();
+    expect(onAcceptShot).toHaveBeenCalledOnce();
+
+    rerender(
+      <CaptureScreen
+        phase="shot_review"
+        shotNumber={4}
+        totalShots={4}
+        capturedPhotoUrl="/mock/photo-4.jpg"
+        captureUrls={[
+          '/mock/photo-1.jpg',
+          '/mock/photo-2.jpg',
+          '/mock/photo-3.jpg',
+          '/mock/photo-4.jpg',
+        ]}
+        busy
+        canAcceptShot
+        canRetakeShot
+        liveVideoRef={liveVideoRef}
+        liveStreamReady
+        onAcceptShot={onAcceptShot}
+        onRetakeShot={onRetakeShot}
+      />,
+    );
+    expect(screen.getByTestId('shot-review-continue')).toHaveTextContent('Review all photos');
+    expect(screen.getByTestId('shot-review-continue')).toBeDisabled();
+    expect(screen.getByTestId('shot-review-retake')).toBeDisabled();
+
+    rerender(
+      <CaptureScreen
+        phase="shot_review"
+        shotNumber={4}
+        totalShots={4}
+        capturedPhotoUrl={null}
+        captureUrls={['/mock/photo-1.jpg', '/mock/photo-2.jpg', '/mock/photo-3.jpg']}
+        canAcceptShot={false}
+        canRetakeShot
+        liveVideoRef={liveVideoRef}
+        liveStreamReady
+        onAcceptShot={onAcceptShot}
+        onRetakeShot={onRetakeShot}
+      />,
+    );
+    expect(screen.getByTestId('shot-review-continue')).toBeDisabled();
+    expect(screen.getByTestId('shot-review-retake')).toBeEnabled();
+
+    rerender(
+      <CaptureScreen
+        phase="countdown"
+        secondsRemaining={8}
+        shotNumber={3}
+        totalShots={4}
+        liveVideoRef={liveVideoRef}
+        liveStreamReady
+      />,
+    );
+    expect(screen.getByTestId('viewfinder-live')).toBe(videoDuringCountdown);
+  });
+
+  it('uses a bounded grid on ReviewScreen when four or more photos are present', () => {
+    const fourSlotFrame = {
+      ...FRAME,
+      slots: [
+        ...FRAME.slots,
+        {
+          slotIndex: 4,
+          zIndex: 3,
+          name: 'Photo 4',
+          x: 0.5,
+          y: 0.5,
+          width: 0.4,
+          height: 0.4,
+          cropMode: 'crop-to-fill' as const,
+        },
+      ],
+    };
+
+    const { rerender } = render(
+      <ReviewScreen
+        canAccept
+        canRetake
+        captureUrls={['/a.jpg', '/b.jpg', '/c.jpg']}
+        frames={[FRAME]}
+        onAccept={() => undefined}
+        onRetake={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('list', { name: 'Your photos' })).not.toHaveClass('review-shots--grid');
+
+    rerender(
+      <ReviewScreen
+        canAccept
+        canRetake
+        captureUrls={['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg']}
+        frames={[fourSlotFrame]}
+        onAccept={() => undefined}
+        onRetake={() => undefined}
+      />,
+    );
+    const list = screen.getByRole('list', { name: 'Your photos' });
+    expect(list).toHaveClass('review-shots--grid');
+    expect(list.querySelectorAll('img')).toHaveLength(4);
+    expect(screen.getByText('All 4 photos captured')).toBeVisible();
+  });
+
+  it('adapts AttractScreen copy, ProcessingScreen strip slots, and mock photo lookup for 4+ slots', () => {
+    expect(mockPhotoFor(4)).toBe('/mock/photo-4.jpg');
+    expect(mockPhotoFor(5)).toBe('/mock/photo-1.jpg');
+
+    const { container: attractContainer } = render(
+      <AttractScreen
+        canStart
+        onOpenAdmin={() => undefined}
+        onStart={() => undefined}
+        shotCount={4}
+      />,
+    );
+    expect(screen.getByText('Four photos. One keepsake.')).toBeVisible();
+    expect(attractContainer.querySelectorAll('.attract-strip--center span')).toHaveLength(4);
+
+    const { container: processingContainer } = render(
+      <ProcessingScreen state="processing" totalShots={4} />,
+    );
+    expect(processingContainer.querySelectorAll('.processing-strip__shot')).toHaveLength(4);
   });
 
   it('renders only whole-set review actions across two collage options', async () => {
@@ -558,6 +756,71 @@ describe('AdminSettings', () => {
     expect(onSaveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ recruitmentButtonText: 'Sumali sa ministeryo 🙌' }),
     );
+  });
+
+  it('validates capture countdown bounds, saves capture settings with expectedRevision, and opens Frame Editor', async () => {
+    const user = userEvent.setup();
+    const onSaveCaptureSettings = vi.fn();
+    const onOpenFrameEditor = vi.fn();
+    const fourSlotFrame = {
+      ...FRAME,
+      name: '4R Celebration',
+      slots: [
+        ...FRAME.slots,
+        {
+          slotIndex: 4,
+          zIndex: 3,
+          name: 'Photo 4',
+          x: 0.5,
+          y: 0.5,
+          width: 0.4,
+          height: 0.4,
+          cropMode: 'crop-to-fill' as const,
+        },
+      ],
+    };
+
+    render(
+      <AdminSettingsScreen
+        {...props}
+        onOpenFrameEditor={onOpenFrameEditor}
+        onSaveCaptureSettings={onSaveCaptureSettings}
+        settings={{ ...SETTINGS, activeFrame: fourSlotFrame }}
+      />,
+    );
+
+    expect(screen.getByTestId('capture-active-frame')).toHaveTextContent(
+      '4R Celebration (4 slots)',
+    );
+    const saveButton = screen.getByTestId('save-capture-settings');
+    expect(saveButton).toBeDisabled();
+
+    const countdownInput = screen.getByTestId('capture-countdown-seconds');
+    fireEvent.change(countdownInput, { target: { value: '0' } });
+    expect(saveButton).toBeDisabled();
+    expect(screen.getByText(/between 1 and 30 seconds/i)).toBeVisible();
+
+    fireEvent.change(countdownInput, { target: { value: '31' } });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(countdownInput, { target: { value: '8.5' } });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(countdownInput, { target: { value: '12' } });
+    expect(saveButton).toBeEnabled();
+
+    await user.click(screen.getByTestId('capture-review-mode'));
+    await user.click(await screen.findByRole('option', { name: 'Continuous shooting' }));
+
+    await user.click(saveButton);
+    expect(onSaveCaptureSettings).toHaveBeenCalledWith({
+      countdownSeconds: 12,
+      reviewMode: 'continuous',
+      expectedRevision: SETTINGS.revision,
+    });
+
+    await user.click(screen.getByTestId('open-frame-editor-from-capture'));
+    expect(onOpenFrameEditor).toHaveBeenCalledOnce();
   });
 });
 
