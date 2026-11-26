@@ -153,6 +153,15 @@ export const IpcContracts = {
       .strict(),
     response: rpcResultSchema(EmptyResponseSchema),
   },
+  'booth:set-camera-preview': {
+    request: z
+      .object({
+        active: z.boolean(),
+        adapter: CameraAdapterKindSchema.optional(),
+      })
+      .strict(),
+    response: rpcResultSchema(EmptyResponseSchema),
+  },
   'qr-station:get-state': {
     request: EmptyRequestSchema,
     response: rpcResultSchema(QrStationStateSchema),
@@ -474,6 +483,16 @@ export const CameraFrameRequestEventSchema = z
   .strict();
 export type CameraFrameRequestEvent = z.infer<typeof CameraFrameRequestEventSchema>;
 
+export const CAMERA_PREVIEW_FRAME_EVENT = 'booth:camera-preview-frame' as const;
+export const CameraPreviewFrameEventSchema = z
+  .object({
+    jpegBase64: z.string().min(4).max(2_000_000),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })
+  .strict();
+export type CameraPreviewFrameEvent = z.infer<typeof CameraPreviewFrameEventSchema>;
+
 export const PRINTER_HEALTH_EVENT = 'print:health-changed' as const;
 export const PrinterHealthEventSchema = PrinterHealthSchema;
 
@@ -505,8 +524,13 @@ export type GraceBoothBridge = {
       alwaysActive: boolean;
     }): Promise<RpcResult<CameraConfig>>;
     submitCameraFrame(captureId: string, jpegBase64: string): Promise<RpcResult<EmptyResponse>>;
+    setCameraPreview(
+      active: boolean,
+      adapter?: CameraAdapterKind,
+    ): Promise<RpcResult<EmptyResponse>>;
     subscribe(listener: (snapshot: BoothSnapshot) => void): () => void;
     onCameraFrameRequest(listener: (request: CameraFrameRequestEvent) => void): () => void;
+    onCameraPreviewFrame(listener: (frame: CameraPreviewFrameEvent) => void): () => void;
   };
   qrStation: {
     getState(): Promise<RpcResult<QrStationState>>;

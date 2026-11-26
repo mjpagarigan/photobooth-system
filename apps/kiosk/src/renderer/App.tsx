@@ -5,6 +5,7 @@ import type {
   AdminHealth,
   AdminSettings as AdminSettingsData,
   BoothSnapshot,
+  CameraAdapterKind,
   CameraConfig,
   CameraResolution,
   FrameLayout,
@@ -34,6 +35,7 @@ import { PrinterIndicator, PrintQueuePanel } from './components/Printing';
 import { usePrinterHealth } from './hooks/usePrinterHealth';
 import { RecentGallery } from './components/RecentGallery';
 import { useCameraStream } from './hooks/useCameraStream';
+import { useNikonLivePreview } from './hooks/useNikonLivePreview';
 import { LOCAL_FIXTURES } from './local-fixtures';
 import { AttractScreen } from './screens/AttractScreen';
 import { CaptureScreen } from './screens/CaptureScreen';
@@ -140,6 +142,7 @@ export function App() {
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [cameraSetupOpen, setCameraSetupOpen] = useState(false);
+  const [selectedCameraAdapter, setSelectedCameraAdapter] = useState<CameraAdapterKind>('webcam');
   const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState<string | null>(null);
   const [selectedCameraResolution, setSelectedCameraResolution] =
     useState<CameraResolution>('1080p');
@@ -170,22 +173,32 @@ export function App() {
   );
 
   const captureWindowOpen = isCaptureScreen(snapshot.screen);
+  const liveShotPhaseOpen = snapshot.screen === 'countdown' || snapshot.screen === 'capturing';
   const guestFlowOpen = !adminOpen && !dialog && !cameraSetupOpen;
-  const liveCameraEnabled =
+  const isNikonAdapter = selectedCameraAdapter === 'nikon';
+  const webcamCameraEnabled =
     !visualSeed &&
     snapshot.cameraPreviewEnabled &&
     guestFlowOpen &&
+    !isNikonAdapter &&
     (captureWindowOpen || webcamAlwaysActive);
+  const nikonPreviewEnabled =
+    !visualSeed &&
+    snapshot.cameraPreviewEnabled &&
+    guestFlowOpen &&
+    liveShotPhaseOpen &&
+    isNikonAdapter;
   const camera = useCameraStream(
-    liveCameraEnabled,
+    webcamCameraEnabled,
     selectedCameraDeviceId,
     selectedCameraResolution,
     cameraZoomPercent,
   );
+  const nikonPreview = useNikonLivePreview(nikonPreviewEnabled);
   const grabJpegBase64 = camera.grabJpegBase64;
 
   useEffect(() => {
-    if (!liveCameraEnabled) {
+    if (!webcamCameraEnabled) {
       return;
     }
     const bridge = getBridge();
@@ -199,7 +212,7 @@ export function App() {
       }
       void bridge.booth.submitCameraFrame(request.captureId, jpegBase64).catch(() => undefined);
     });
-  }, [grabJpegBase64, liveCameraEnabled]);
+  }, [grabJpegBase64, webcamCameraEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -269,6 +282,7 @@ export function App() {
           return;
         }
         if (cameraConfig?.ok) {
+          setSelectedCameraAdapter(cameraConfig.data.adapter);
           setSelectedCameraDeviceId(cameraConfig.data.deviceId);
           setSelectedCameraResolution(cameraConfig.data.resolution);
           setCameraZoomPercent(cameraConfig.data.zoomPercent);
@@ -470,6 +484,7 @@ export function App() {
   }, [visualSeed]);
 
   const handleCameraSaved = (config: CameraConfig) => {
+    setSelectedCameraAdapter(config.adapter);
     setSelectedCameraDeviceId(config.deviceId);
     setSelectedCameraResolution(config.resolution);
     setCameraZoomPercent(config.zoomPercent);
@@ -1107,10 +1122,19 @@ export function App() {
       const sharedProps = {
         shotNumber,
         totalShots,
-        cameraZoomPercent,
-        ...(liveCameraEnabled
-          ? { liveVideoRef: camera.videoRef, liveStreamReady: camera.ready }
-          : {}),
+        ...(nikonPreviewEnabled
+          ? {
+              liveImageUrl: nikonPreview.frameUrl,
+              liveStreamReady: nikonPreview.ready,
+              cameraZoomPercent: 100,
+            }
+          : webcamCameraEnabled
+            ? {
+                liveVideoRef: camera.videoRef,
+                liveStreamReady: camera.ready,
+                cameraZoomPercent,
+              }
+            : { cameraZoomPercent }),
       };
 
       if (snapshot.screen === 'shot_review') {
@@ -1217,8 +1241,10 @@ export function App() {
     countdownSeconds,
     guestBusy,
     guestError,
-    liveCameraEnabled,
     loading,
+    nikonPreview.frameUrl,
+    nikonPreview.ready,
+    nikonPreviewEnabled,
     openRecentGallery,
     printerHealth,
     retakeAll,
@@ -1226,6 +1252,7 @@ export function App() {
     runGuestCommand,
     startGuestSession,
     snapshot,
+    webcamCameraEnabled,
   ]);
 
   if (adminOpen && adminSettings) {

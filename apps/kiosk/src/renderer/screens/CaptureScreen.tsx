@@ -9,6 +9,7 @@ type CaptureScreenSharedProps = {
   shotNumber: number;
   totalShots?: number;
   liveVideoRef?: (element: HTMLVideoElement | null) => void;
+  liveImageUrl?: string | null;
   liveStreamReady?: boolean;
   cameraZoomPercent?: number;
 };
@@ -39,6 +40,7 @@ export function CaptureScreen(props: CaptureScreenProps) {
     shotNumber,
     totalShots = 3,
     liveVideoRef,
+    liveImageUrl,
     liveStreamReady = false,
     cameraZoomPercent = CAMERA_ZOOM_DEFAULT,
   } = props;
@@ -55,14 +57,26 @@ export function CaptureScreen(props: CaptureScreenProps) {
     >
       <header className="capture-header">
         <div className="camera-ready-badge" role="status">
-          {phase !== 'shot_review' && liveVideoRef && !liveStreamReady
+          {phase !== 'shot_review' &&
+          (liveVideoRef || liveImageUrl !== undefined) &&
+          !liveStreamReady
             ? 'Getting camera ready…'
             : null}
         </div>
         <ProgressStepper activeStep={safeShot} total={safeTotal} />
       </header>
       <section className="viewfinder" aria-labelledby="capture-title">
-        {liveVideoRef ? (
+        {liveImageUrl ? (
+          <img
+            className="viewfinder__live"
+            src={liveImageUrl}
+            alt="Live camera preview"
+            aria-hidden={phase === 'shot_review' ? true : undefined}
+            data-testid="viewfinder-live"
+            style={{ scale: cameraZoomPercent / 100 }}
+            hidden={!liveStreamReady}
+          />
+        ) : liveVideoRef ? (
           <video
             className="viewfinder__live"
             ref={liveVideoRef}

@@ -11,6 +11,7 @@ import type {
   AdminSettings,
   BoothSnapshot,
   CameraAdapterKind,
+  CameraPreviewFrameEvent,
   CameraResolution,
   GalleryItem,
   GraceBoothBridge,
@@ -145,11 +146,13 @@ type BridgeHarness = {
   bridge: GraceBoothBridge;
   cancelSessionMock: Mock<GraceBoothBridge['booth']['cancelSession']>;
   emit: (snapshot: BoothSnapshot) => void;
+  emitPreviewFrame: (frame: CameraPreviewFrameEvent) => void;
   getAuthStatusMock: Mock<GraceBoothBridge['admin']['getAuthStatus']>;
   getRecentMock: Mock<GraceBoothBridge['gallery']['getRecent']>;
   restartSessionMock: Mock<GraceBoothBridge['admin']['restartSession']>;
   retakeShotMock: Mock<GraceBoothBridge['booth']['retakeShot']>;
   saveCaptureSettingsMock: Mock<GraceBoothBridge['admin']['saveCaptureSettings']>;
+  setCameraPreviewMock: Mock<GraceBoothBridge['booth']['setCameraPreview']>;
   startMock: Mock<GraceBoothBridge['booth']['start']>;
 };
 
@@ -161,6 +164,10 @@ function createBridge(
   webcamAlwaysActive = false,
 ): BridgeHarness {
   let listener: ((snapshot: BoothSnapshot) => void) | null = null;
+  let previewFrameListener: ((frame: CameraPreviewFrameEvent) => void) | null = null;
+  const setCameraPreviewMock = vi
+    .fn<GraceBoothBridge['booth']['setCameraPreview']>()
+    .mockResolvedValue(ok({}));
   const startMock = vi.fn<GraceBoothBridge['booth']['start']>().mockResolvedValue(
     ok(
       sessionSnapshot({
@@ -253,6 +260,7 @@ function createBridge(
         }),
       ),
       submitCameraFrame: vi.fn().mockResolvedValue(ok({})),
+      setCameraPreview: setCameraPreviewMock,
       subscribe: vi.fn((nextListener: (snapshot: BoothSnapshot) => void) => {
         listener = nextListener;
         return () => {
@@ -260,6 +268,14 @@ function createBridge(
         };
       }),
       onCameraFrameRequest: vi.fn().mockReturnValue(() => undefined),
+      onCameraPreviewFrame: vi.fn((nextListener: (frame: CameraPreviewFrameEvent) => void) => {
+        previewFrameListener = nextListener;
+        return () => {
+          if (previewFrameListener === nextListener) {
+            previewFrameListener = null;
+          }
+        };
+      }),
     },
     qrStation: {
       getState: vi.fn().mockResolvedValue(
@@ -415,11 +431,15 @@ function createBridge(
       }
       listener(snapshot);
     },
+    emitPreviewFrame: (frame: CameraPreviewFrameEvent) => {
+      previewFrameListener?.(frame);
+    },
     getAuthStatusMock,
     getRecentMock,
     restartSessionMock,
     retakeShotMock,
     saveCaptureSettingsMock,
+    setCameraPreviewMock,
     startMock,
   };
 }
@@ -1058,6 +1078,137 @@ describe('countdown calculation and per-shot review flow', () => {
     );
     await screen.findByTestId('review-screen');
     await waitFor(() => expect(stream.track.stop).toHaveBeenCalledOnce());
+  });
+
+  it('activates Nikon live preview on countdown, pauses during shot_review, and resumes on the next countdown', async () => {
+    const getUserMedia = vi.fn();
+    stubCamera(getUserMedia);
+    const harness = createBridge(ATTRACT, 'nikon', null, '1080p');
+    harness.startMock.mockResolvedValue(
+      ok(
+        sessionSnapshot({
+          screen: 'countdown',
+          state: 'countdown',
+          shotNumber: 1,
+          captureCount: 0,
+          requiredShotCount: 4,
+          countdownEndsAt: Date.now() + 8_000,
+          countdownTotalSeconds: 8,
+          cameraPreviewEnabled: true,
+        }),
+      ),
+    );
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+    expect(harness.setCameraPreviewMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /start photo session/i }));
+    await screen.findByTestId('capture-screen');
+    await waitFor(() =>
+      expect(harness.setCameraPreviewMock).toHaveBeenNthCalledWith(1, true, 'nikon'),
+    );
+    expect(screen.getByText('Getting camera ready…')).toBeVisible();
+    expect(getUserMedia).not.toHaveBeenCalled();
+
+    act(() => harness.emitPreviewFrame({ jpegBase64: '/9j/SHOT1', width: 640, height: 424 }));
+    const firstFrame = await screen.findByTestId('viewfinder-live');
+    expect(firstFrame.tagName).toBe('IMG');
+    expect(firstFrame).toHaveAttribute('src', 'data:image/jpeg;base64,/9j/SHOT1');
+    expect(screen.queryByText('Getting camera ready…')).not.toBeInTheDocument();
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'capturing',
+          state: 'capturing',
+          shotNumber: 1,
+          captureCount: 0,
+          requiredShotCount: 4,
+          countdownEndsAt: null,
+          cameraPreviewEnabled: true,
+        }),
+      ),
+    );
+    expect(await screen.findByTestId('capture-screen')).toHaveAttribute('data-phase', 'capturing');
+    expect(harness.setCameraPreviewMock).toHaveBeenCalledTimes(1);
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'shot_review',
+          state: 'shot_review',
+          shotNumber: 1,
+          captureCount: 0,
+          requiredShotCount: 4,
+          countdownEndsAt: null,
+          cameraPreviewEnabled: true,
+          media: { captureUrls: ['/mock/photo-1.jpg'], collageUrl: null, qrImageUrl: null },
+          controls: {
+            canStart: false,
+            canAcceptShot: true,
+            canRetakeShot: true,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: false,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('shot-review-screen');
+    await waitFor(() =>
+      expect(harness.setCameraPreviewMock).toHaveBeenNthCalledWith(2, false, 'nikon'),
+    );
+    expect(screen.queryByTestId('viewfinder-live')).not.toBeInTheDocument();
+    expect(screen.queryByText('Getting camera ready…')).not.toBeInTheDocument();
+    expect(screen.getByTestId('shot-review-image')).toHaveAttribute('src', '/mock/photo-1.jpg');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'countdown',
+          state: 'countdown',
+          shotNumber: 2,
+          captureCount: 1,
+          requiredShotCount: 4,
+          countdownEndsAt: Date.now() + 8_000,
+          countdownTotalSeconds: 8,
+          cameraPreviewEnabled: true,
+          media: { captureUrls: ['/mock/photo-1.jpg'], collageUrl: null, qrImageUrl: null },
+        }),
+      ),
+    );
+    await screen.findByTestId('capture-screen');
+    await waitFor(() =>
+      expect(harness.setCameraPreviewMock).toHaveBeenNthCalledWith(3, true, 'nikon'),
+    );
+    expect(screen.getByText('Getting camera ready…')).toBeVisible();
+
+    act(() => harness.emitPreviewFrame({ jpegBase64: '/9j/SHOT2', width: 640, height: 424 }));
+    const secondFrame = await screen.findByTestId('viewfinder-live');
+    expect(secondFrame).toHaveAttribute('src', 'data:image/jpeg;base64,/9j/SHOT2');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'review',
+          state: 'review',
+          shotNumber: null,
+          captureCount: 4,
+          requiredShotCount: 4,
+          cameraPreviewEnabled: true,
+        }),
+      ),
+    );
+    await screen.findByTestId('review-screen');
+    await waitFor(() =>
+      expect(harness.setCameraPreviewMock).toHaveBeenNthCalledWith(4, false, 'nikon'),
+    );
+    expect(harness.setCameraPreviewMock).toHaveBeenCalledTimes(4);
+    expect(getUserMedia).not.toHaveBeenCalled();
   });
 
   it('saves admin capture settings through the bridge and jumps to Frame Editor', async () => {

@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { MAX_FRAME_SLOTS, MIN_FRAME_SLOTS, OpaqueIdSchema, UtcMillisSchema } from './domain.js';
 
-export const CameraAdapterKindSchema = z.enum(['mock', 'sony', 'webcam', 'internal_webcam']);
+export const CameraAdapterKindSchema = z.enum([
+  'mock',
+  'sony',
+  'webcam',
+  'internal_webcam',
+  'nikon',
+]);
 export type CameraAdapterKind = z.infer<typeof CameraAdapterKindSchema>;
 
 export const CameraResolutionSchema = z.enum(['720p', '1080p']);
@@ -27,6 +33,12 @@ export function isWebcamCameraAdapter(
   adapter: CameraAdapterKind,
 ): adapter is 'webcam' | 'internal_webcam' {
   return adapter === 'webcam' || adapter === 'internal_webcam';
+}
+
+export function hasLivePreviewCameraAdapter(
+  adapter: CameraAdapterKind,
+): adapter is 'webcam' | 'internal_webcam' | 'nikon' {
+  return adapter === 'webcam' || adapter === 'internal_webcam' || adapter === 'nikon';
 }
 export const CameraConnectionStateSchema = z.enum([
   'disconnected',

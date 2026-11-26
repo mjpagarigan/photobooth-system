@@ -4,9 +4,11 @@ import { basename } from 'node:path';
 
 import {
   BOOTH_SNAPSHOT_EVENT,
+  CAMERA_PREVIEW_FRAME_EVENT,
   FrameLayoutSchema,
   QR_STATION_EVENT,
   IpcContracts,
+  hasLivePreviewCameraAdapter,
   type AdminSettings,
   type GooglePhotosConfig,
   type GooglePhotosStatus,
@@ -346,9 +348,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       input.alwaysActive,
       input.zoomPercent,
     );
-    dependencies.workflow.setCameraPreviewEnabled(
-      input.adapter === 'webcam' || input.adapter === 'internal_webcam',
-    );
+    dependencies.workflow.setCameraPreviewEnabled(hasLivePreviewCameraAdapter(input.adapter));
     return {
       adapter: input.adapter,
       deviceId: input.deviceId ?? null,
@@ -360,6 +360,10 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   });
   register('booth:submit-camera-frame', (_event, input) => {
     dependencies.cameraFrames.submitFrame(input.captureId, Buffer.from(input.jpegBase64, 'base64'));
+    return {};
+  });
+  register('booth:set-camera-preview', async (_event, input) => {
+    await dependencies.camera.setLivePreviewActive(input.active, input.adapter);
     return {};
   });
 
@@ -586,11 +590,17 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
       if (!window.isDestroyed()) window.webContents.send(QR_STATION_EVENT, state);
     }
   });
+  const unsubscribePreviewFrames = dependencies.camera.subscribePreviewFrames((frame) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(CAMERA_PREVIEW_FRAME_EVENT, frame);
+    }
+  });
   const unsubscribePrint = registerPrintHandlers(register, requireAdmin, dependencies.print);
   return () => {
     pendingFrames.clear();
     unsubscribeSnapshot();
     unsubscribeQr();
+    unsubscribePreviewFrames();
     unsubscribePrint();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };
