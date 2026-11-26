@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CAMERA_FRAME_REQUEST_EVENT } from '@grace-booth/shared';
+import { CAMERA_FRAME_REQUEST_EVENT, hasLivePreviewCameraAdapter } from '@grace-booth/shared';
 import { app, dialog } from 'electron';
 import sharp from 'sharp';
 
@@ -146,13 +146,15 @@ async function startApplication(): Promise<void> {
         ? {}
         : { failOnShotNumbers: new Set([config.e2e.captureFailShot]) }),
     },
+    nikonOptions: {
+      helperScriptPath: join(resourceRoot, 'camera', 'nikon-helper.ps1'),
+      tempDirectory: join(paths.root, 'camera-tmp'),
+    },
     frameBroker: cameraFrames,
     initialAdapter: config.e2e.enabled ? config.cameraAdapter : initialCameraAdapter,
     initialDeviceId: initialCameraDeviceId,
     onAdapterChanged: (adapter) => {
-      workflowInstance?.setCameraPreviewEnabled(
-        adapter === 'webcam' || adapter === 'internal_webcam',
-      );
+      workflowInstance?.setCameraPreviewEnabled(hasLivePreviewCameraAdapter(adapter));
     },
   });
   const imageProcessor = new WorkerImageProcessor(new URL('./image-worker.js', import.meta.url));
@@ -235,8 +237,7 @@ async function startApplication(): Promise<void> {
     qrService,
     {
       shotCountdownsMs: config.shotCountdownsMs,
-      cameraPreviewEnabled:
-        initialCameraAdapter === 'webcam' || initialCameraAdapter === 'internal_webcam',
+      cameraPreviewEnabled: hasLivePreviewCameraAdapter(initialCameraAdapter),
       isDualDisplayActive: () => displayManager.isDualActive(),
       now,
       print: printService,

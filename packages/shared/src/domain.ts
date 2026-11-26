@@ -235,7 +235,7 @@ export const AdminSettingsSchema = z
     lan: LanSettingsSchema,
     activeFrame: FrameSummarySchema,
     frames: z.array(FrameSummarySchema).optional(),
-    cameraAdapter: z.enum(['mock', 'sony', 'webcam', 'internal_webcam']).default('webcam'),
+    cameraAdapter: z.enum(['mock', 'sony', 'webcam', 'internal_webcam', 'nikon']).default('webcam'),
     cameraDeviceId: z.string().nullable().default(null),
     cameraResolution: z.enum(['720p', '1080p']).default('1080p'),
     webcamAlwaysActive: z.boolean().default(false),

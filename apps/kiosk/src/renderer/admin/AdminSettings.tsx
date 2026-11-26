@@ -665,11 +665,13 @@ export function AdminSettings({
                     <div>
                       <dt>Camera</dt>
                       <dd>
-                        {settings.cameraAdapter === 'sony'
-                          ? 'Sony A7 Mirrorless'
-                          : settings.cameraAdapter === 'mock'
-                            ? 'Mock Camera'
-                            : 'Laptop / Internal Webcam'}{' '}
+                        {settings.cameraAdapter === 'nikon'
+                          ? 'Nikon DSLR (USB)'
+                          : settings.cameraAdapter === 'sony'
+                            ? 'Sony A7 Mirrorless'
+                            : settings.cameraAdapter === 'mock'
+                              ? 'Mock Camera'
+                              : 'Laptop / Internal Webcam'}{' '}
                         · {settings.cameraResolution}
                         {onOpenCameras ? (
                           <button className="ops-link" onClick={onOpenCameras} type="button">

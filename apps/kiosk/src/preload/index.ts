@@ -3,6 +3,8 @@ import {
   BoothSnapshotEventSchema,
   CAMERA_FRAME_REQUEST_EVENT,
   CameraFrameRequestEventSchema,
+  CAMERA_PREVIEW_FRAME_EVENT,
+  CameraPreviewFrameEventSchema,
   PRINTER_HEALTH_EVENT,
   PrinterHealthEventSchema,
   QR_STATION_EVENT,
@@ -47,6 +49,8 @@ const bridge: GraceBoothBridge = {
     setCamera: (input) => invoke('booth:set-camera', input),
     submitCameraFrame: (captureId, jpegBase64) =>
       invoke('booth:submit-camera-frame', { captureId, jpegBase64 }),
+    setCameraPreview: (active, adapter) =>
+      invoke('booth:set-camera-preview', adapter ? { active, adapter } : { active }),
     subscribe: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
         const parsed = BoothSnapshotEventSchema.safeParse(value);
@@ -62,6 +66,14 @@ const bridge: GraceBoothBridge = {
       };
       ipcRenderer.on(CAMERA_FRAME_REQUEST_EVENT, handler);
       return () => ipcRenderer.removeListener(CAMERA_FRAME_REQUEST_EVENT, handler);
+    },
+    onCameraPreviewFrame: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
+        const parsed = CameraPreviewFrameEventSchema.safeParse(value);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(CAMERA_PREVIEW_FRAME_EVENT, handler);
+      return () => ipcRenderer.removeListener(CAMERA_PREVIEW_FRAME_EVENT, handler);
     },
   },
   qrStation: {

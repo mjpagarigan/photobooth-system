@@ -5,7 +5,7 @@ import { AppError } from './errors.js';
 
 const EnvironmentSchema = z
   .object({
-    GRACE_BOOTH_CAMERA_ADAPTER: z.enum(['mock', 'sony', 'webcam']).default('webcam'),
+    GRACE_BOOTH_CAMERA_ADAPTER: z.enum(['mock', 'sony', 'webcam', 'nikon']).default('webcam'),
     GRACE_BOOTH_SUPABASE_URL: z
       .url()
       .refine((value) => {

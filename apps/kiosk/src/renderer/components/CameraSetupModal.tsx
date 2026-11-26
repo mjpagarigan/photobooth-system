@@ -47,6 +47,7 @@ import {
   useCameraStream,
   type CameraStream,
 } from '../hooks/useCameraStream';
+import { useNikonLivePreview } from '../hooks/useNikonLivePreview';
 
 type CameraSetupModalProps = {
   isOpen: boolean;
@@ -93,8 +94,11 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const webcamSelected = isWebcamCameraAdapter(selectedAdapter);
-  const previewEnabled = isOpen && configurationLoaded && webcamSelected;
-  const cameraStream = useCameraStream(previewEnabled, selectedDeviceId, selectedResolution);
+  const nikonSelected = selectedAdapter === 'nikon';
+  const webcamPreviewEnabled = isOpen && configurationLoaded && webcamSelected;
+  const nikonPreviewEnabled = isOpen && configurationLoaded && nikonSelected;
+  const cameraStream = useCameraStream(webcamPreviewEnabled, selectedDeviceId, selectedResolution);
+  const nikonPreview = useNikonLivePreview(nikonPreviewEnabled);
   const cameraFailure = cameraStream.error ? CAMERA_FAILURES[cameraStream.error] : null;
   const deviceItems = useMemo(() => {
     const items: { label: string; value: string }[] = [
@@ -244,6 +248,17 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               </label>
 
               <label
+                className={`camera-source-card ${selectedAdapter === 'nikon' ? 'camera-source-card--active' : ''}`}
+              >
+                <Radio value="nikon" />
+                <Camera size={24} weight="bold" />
+                <span className="camera-source-card__title">Nikon DSLR (USB)</span>
+                <span className="camera-source-card__desc">
+                  Single 8-pin USB cable — live view + 24 MP shutter
+                </span>
+              </label>
+
+              <label
                 className={`camera-source-card ${selectedAdapter === 'sony' ? 'camera-source-card--active' : ''}`}
               >
                 <Radio value="sony" />
@@ -265,7 +280,109 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
             </RadioGroup>
           </Field>
 
-          {(selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam') && (
+          {nikonSelected && (
+            <div className="camera-webcam-section">
+              <Alert className="camera-info-card camera-nikon-banner">
+                <div className="toggle-row">
+                  <div className="camera-info-card__badge">
+                    {cameraStatus?.adapter === 'nikon' && cameraStatus.state === 'ready' ? (
+                      <CheckCircle size={20} weight="bold" />
+                    ) : (
+                      <WarningCircle size={20} weight="bold" />
+                    )}
+                    <span>
+                      {cameraStatus?.adapter === 'nikon'
+                        ? cameraStatus.state === 'ready'
+                          ? 'Nikon USB shutter ready'
+                          : 'Nikon USB camera not connected'
+                        : 'Nikon DSLR over single 8-pin USB cable'}
+                    </span>
+                  </div>
+                  <Button
+                    title="Refresh Nikon USB status"
+                    aria-label="Refresh Nikon USB status"
+                    onClick={() => void loadCameras()}
+                    disabled={loading}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <ArrowsClockwise className={loading ? 'spin' : ''} size={18} weight="bold" />
+                  </Button>
+                </div>
+                <p>
+                  {cameraStatus?.adapter === 'nikon'
+                    ? cameraStatus.operatorMessage
+                    : 'Connect only the 8-pin USB cable and set the camera dial to M, A, S, or P. Unplug any HDMI cable from the camera.'}
+                </p>
+              </Alert>
+
+              <div className="camera-preview-container">
+                <div className="camera-preview-box">
+                  {nikonPreview.frameUrl ? (
+                    <img
+                      className="camera-preview-video"
+                      src={nikonPreview.frameUrl}
+                      alt="Nikon USB live preview"
+                    />
+                  ) : null}
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--tl"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--tr"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--bl"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  <div
+                    className="camera-preview-box__crosshair camera-preview-box__crosshair--br"
+                    aria-hidden="true"
+                  >
+                    +
+                  </div>
+                  {!nikonPreview.ready && (
+                    <div className="camera-preview-overlay">
+                      <span>Starting Nikon USB Live View…</span>
+                    </div>
+                  )}
+                </div>
+                <div
+                  className={`camera-preview-caption camera-preview-caption--${nikonPreview.ready ? 'ready' : 'initializing'}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span>
+                    Live preview:{' '}
+                    <strong>
+                      {nikonPreview.resolution
+                        ? `${nikonPreview.resolution.width} × ${nikonPreview.resolution.height}`
+                        : 'Waiting for Nikon'}
+                    </strong>
+                  </span>
+                  <span>
+                    Still capture: <strong>Full sensor JPEG over USB</strong>
+                  </span>
+                  <span>
+                    {nikonPreview.ready
+                      ? 'USB Live View connected.'
+                      : 'Starting Nikon Live View stream…'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {webcamSelected && (
             <div className="camera-webcam-section">
               <div className="camera-preview-container">
                 <div className="camera-preview-box">

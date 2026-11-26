@@ -221,6 +221,7 @@ function createBridge(
         }),
       ),
       submitCameraFrame: vi.fn().mockResolvedValue(ok({})),
+      setCameraPreview: vi.fn().mockResolvedValue(ok({})),
       subscribe: vi.fn((nextListener: (snapshot: BoothSnapshot) => void) => {
         listener = nextListener;
         return () => {
@@ -228,6 +229,7 @@ function createBridge(
         };
       }),
       onCameraFrameRequest: vi.fn().mockReturnValue(() => undefined),
+      onCameraPreviewFrame: vi.fn().mockReturnValue(() => undefined),
     },
     qrStation: {
       getState: vi.fn().mockResolvedValue(

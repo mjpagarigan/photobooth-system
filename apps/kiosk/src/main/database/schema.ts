@@ -20,7 +20,9 @@ export const settings = sqliteTable('settings', {
   lanPort: integer('lan_port').notNull(),
   lanTlsSecretRef: text('lan_tls_secret_ref'),
   lanCertificateFingerprint: text('lan_certificate_fingerprint'),
-  cameraAdapter: text('camera_adapter', { enum: ['mock', 'sony', 'webcam', 'internal_webcam'] }),
+  cameraAdapter: text('camera_adapter', {
+    enum: ['mock', 'sony', 'webcam', 'internal_webcam', 'nikon'],
+  }),
   cameraDeviceId: text('camera_device_id'),
   cameraResolution: text('camera_resolution', { enum: ['720p', '1080p'] }).notNull(),
   cameraZoomPercent: integer('camera_zoom_percent').notNull().default(100),

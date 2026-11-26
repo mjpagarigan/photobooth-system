@@ -6,7 +6,11 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CameraResolution, GraceBoothBridge } from '@grace-booth/shared';
+import type {
+  CameraPreviewFrameEvent,
+  CameraResolution,
+  GraceBoothBridge,
+} from '@grace-booth/shared';
 
 import { CameraSetupModal } from '../../src/renderer/components/CameraSetupModal';
 
@@ -24,7 +28,7 @@ function streamAt(width: number, height: number) {
 }
 
 function cameraConfiguration(
-  adapter: 'webcam' | 'sony',
+  adapter: 'webcam' | 'sony' | 'nikon',
   deviceId: string | null,
   resolution: CameraResolution = '1080p',
   alwaysActive = false,
@@ -41,7 +45,12 @@ function cameraConfiguration(
         adapter,
         state: adapter === 'sony' ? ('unsupported' as const) : ('ready' as const),
         code: adapter === 'sony' ? 'sony_adapter_unavailable' : null,
-        operatorMessage: adapter === 'sony' ? 'Unsupported' : 'Ready',
+        operatorMessage:
+          adapter === 'sony'
+            ? 'Unsupported'
+            : adapter === 'nikon'
+              ? 'Nikon D5200 is ready on USB (6000x4000, 100% battery).'
+              : 'Ready',
         capabilities: { stillCapture: adapter !== 'sony', preview: adapter !== 'sony' },
         checkedAt: 1,
       },
@@ -53,9 +62,39 @@ function installBridge(getCameras: GraceBoothBridge['booth']['getCameras']) {
   const setCamera = vi
     .fn<GraceBoothBridge['booth']['setCamera']>()
     .mockResolvedValue(cameraConfiguration('webcam', 'camo-camera', '720p'));
+  const setCameraPreview = vi
+    .fn<GraceBoothBridge['booth']['setCameraPreview']>()
+    .mockResolvedValue({ ok: true, data: {} });
+  const previewListeners = new Set<(frame: CameraPreviewFrameEvent) => void>();
+  const onCameraPreviewFrame = vi.fn<GraceBoothBridge['booth']['onCameraPreviewFrame']>(
+    (listener) => {
+      previewListeners.add(listener);
+      return () => {
+        previewListeners.delete(listener);
+      };
+    },
+  );
   window.graceBooth = {
-    booth: { getCameras, setCamera },
+    booth: {
+      getCameras,
+      setCamera,
+      setCameraPreview,
+      onCameraPreviewFrame,
+    },
   } as unknown as GraceBoothBridge;
+  (
+    window as unknown as {
+      __emitPreviewFrame?: (frame: CameraPreviewFrameEvent) => void;
+      __setCameraPreviewSpy?: typeof setCameraPreview;
+    }
+  ).__emitPreviewFrame = (frame: CameraPreviewFrameEvent) => {
+    for (const listener of previewListeners) listener(frame);
+  };
+  (
+    window as unknown as {
+      __setCameraPreviewSpy?: typeof setCameraPreview;
+    }
+  ).__setCameraPreviewSpy = setCameraPreview;
   return setCamera;
 }
 
@@ -236,5 +275,51 @@ describe('CameraSetupModal resolution preferences', () => {
     expect(await screen.findByText(/Sony PC Remote adapter unavailable/i)).toBeVisible();
     expect(screen.getByRole('button', { name: /apply & save/i })).toBeDisabled();
     expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it('supports Nikon DSLR single-cable USB mode with live preview and USB shutter status', async () => {
+    const getUserMedia = vi.fn();
+    stubCamo(getUserMedia);
+    const setCamera = installBridge(
+      vi.fn().mockResolvedValue(cameraConfiguration('nikon', 'camo-camera', '1080p')),
+    );
+    const user = userEvent.setup();
+    render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/Nikon USB shutter ready/i)).toBeVisible();
+    expect(
+      screen.getByText(/Nikon D5200 is ready on USB \(6000x4000, 100% battery\)/i),
+    ).toBeVisible();
+    expect(getUserMedia).not.toHaveBeenCalled();
+
+    const previewSpy = (
+      window as unknown as {
+        __setCameraPreviewSpy?: ReturnType<typeof vi.fn>;
+      }
+    ).__setCameraPreviewSpy;
+    await waitFor(() => expect(previewSpy).toHaveBeenCalledWith(true, 'nikon'));
+
+    act(() => {
+      (
+        window as unknown as { __emitPreviewFrame?: (frame: CameraPreviewFrameEvent) => void }
+      ).__emitPreviewFrame?.({
+        jpegBase64: '/9j/4AAQ',
+        width: 640,
+        height: 424,
+      });
+    });
+
+    const previewImg = await screen.findByAltText('Nikon USB live preview');
+    expect(previewImg).toHaveAttribute('src', 'data:image/jpeg;base64,/9j/4AAQ');
+    expect(screen.getByText('640 × 424')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /apply & save/i }));
+    expect(setCamera).toHaveBeenCalledWith({
+      adapter: 'nikon',
+      alwaysActive: false,
+      deviceId: 'camo-camera',
+      resolution: '1080p',
+      zoomPercent: 100,
+    });
   });
 });
