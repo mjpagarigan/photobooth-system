@@ -39,6 +39,10 @@ export const settings = sqliteTable('settings', {
   googlePhotosAlbumId: text('google_photos_album_id'),
   googlePhotosAlbumTitle: text('google_photos_album_title'),
   googlePhotosAlbumShareUrl: text('google_photos_album_share_url'),
+  captureCountdownSeconds: integer('capture_countdown_seconds').notNull().default(8),
+  captureReviewMode: text('capture_review_mode', { enum: ['per_shot', 'continuous'] })
+    .notNull()
+    .default('per_shot'),
   revision: integer('revision').notNull(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
@@ -84,6 +88,7 @@ export const sessions = sqliteTable('sessions', {
       'attract',
       'countdown',
       'capturing',
+      'shot_review',
       'review',
       'processing',
       'pending_upload',
@@ -100,6 +105,10 @@ export const sessions = sqliteTable('sessions', {
   requiredShotCount: integer('required_shot_count').notNull().default(3),
   selectedOption: integer('selected_option').notNull().default(1),
   selectedFrameId: text('selected_frame_id'),
+  captureCountdownSeconds: integer('capture_countdown_seconds').notNull().default(8),
+  captureReviewMode: text('capture_review_mode', { enum: ['per_shot', 'continuous'] })
+    .notNull()
+    .default('per_shot'),
   collageAssetId: text('collage_asset_id'),
   cloudPhotoSessionId: text('cloud_photo_session_id'),
   publicSecretRef: text('public_secret_ref'),
@@ -123,6 +132,7 @@ export const sessionAssets = sqliteTable('session_assets', {
   kind: text('kind', { enum: ['capture', 'collage'] }).notNull(),
   retakeRound: integer('retake_round').notNull(),
   shotNumber: integer('shot_number'),
+  shotAttempt: integer('shot_attempt').notNull().default(1),
   encryptedPath: text('encrypted_path').notNull().unique(),
   contentType: text('content_type', { enum: ['image/jpeg'] }).notNull(),
   width: integer('width').notNull(),

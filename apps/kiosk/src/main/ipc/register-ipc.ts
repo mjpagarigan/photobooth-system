@@ -306,6 +306,12 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     assertOperatorBootstrapComplete(dependencies.passcodes.isConfigured());
     return dependencies.workflow.start();
   });
+  register('booth:accept-shot', (_event, input) =>
+    dependencies.workflow.acceptShot(input.shotNumber),
+  );
+  register('booth:retake-shot', (_event, input) =>
+    dependencies.workflow.retakeShot(input.shotNumber),
+  );
   register('booth:retake-all', () => dependencies.workflow.retakeAll());
   register('booth:accept-photos', (_event, input) =>
     dependencies.workflow.acceptPhotos(input.frameId, input.print ?? null),
@@ -405,6 +411,12 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     dependencies.onNetworkSettingsChanged();
     return adminSettings(dependencies.repository, dependencies.frameService);
   });
+  register('admin:save-capture-settings', async (event, input) => {
+    requireAdmin(event);
+    dependencies.repository.setCaptureSettings(input);
+    dependencies.workflow.refreshIdleSnapshot();
+    return adminSettings(dependencies.repository, dependencies.frameService);
+  });
   register('admin:list-frames', (event) => {
     requireAdmin(event);
     return dependencies.frameService.getFrameSummaries();
@@ -463,7 +475,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   });
   register('admin:update-frame-layout', (event, input) => {
     requireAdmin(event);
-    return dependencies.frameService.toSummary(
+    const summary = dependencies.frameService.toSummary(
       dependencies.frameService.updateLayout(
         input.frameId,
         input.name,
@@ -471,18 +483,24 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
         input.expectedRevision,
       ),
     );
+    dependencies.workflow.refreshIdleSnapshot();
+    return summary;
   });
   register('admin:delete-frame', (event, input) => {
     requireAdmin(event);
-    return dependencies.frameService
+    const summaries = dependencies.frameService
       .deleteFrame(input.frameId)
       .map((frame) => dependencies.frameService.toSummary(frame));
+    dependencies.workflow.refreshIdleSnapshot();
+    return summaries;
   });
   register('admin:activate-frame', (event, input) => {
     requireAdmin(event);
-    return dependencies.frameService.toSummary(
+    const summary = dependencies.frameService.toSummary(
       dependencies.frameService.activateFrame(input.frameId),
     );
+    dependencies.workflow.refreshIdleSnapshot();
+    return summary;
   });
   register('admin:move-frame', (event, input) => {
     requireAdmin(event);
@@ -617,6 +635,10 @@ async function adminSettings(
       albumTitle: settings.googlePhotosAlbumTitle,
       albumShareUrl: settings.googlePhotosAlbumShareUrl,
       enabled: settings.googlePhotosEnabled,
+    },
+    capture: {
+      countdownSeconds: settings.captureCountdownSeconds,
+      reviewMode: settings.captureReviewMode,
     },
     revision: settings.revision,
   };

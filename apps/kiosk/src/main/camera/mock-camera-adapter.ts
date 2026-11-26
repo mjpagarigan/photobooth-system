@@ -50,8 +50,9 @@ export class MockCameraAdapter implements CameraAdapter {
       if (this.options.failOnShotNumbers?.has(request.shotNumber)) {
         throw new AppError('mock_capture_failure', 'The camera could not take that photo.', true);
       }
+      const fixtureIndex = ((request.shotNumber - 1) % 4) + 1;
       const bytes = await readFile(
-        join(this.options.fixtureDirectory, `photo-${request.shotNumber}.jpg`),
+        join(this.options.fixtureDirectory, `photo-${fixtureIndex}.jpg`),
       );
       if (bytes.byteLength < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) {
         throw new AppError('mock_fixture_invalid', 'A mock camera fixture is not a valid JPEG.');

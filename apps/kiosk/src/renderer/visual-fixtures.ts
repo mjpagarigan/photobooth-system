@@ -107,6 +107,10 @@ const SETTINGS: AdminSettings = {
     albumShareUrl: 'https://example.invalid/fixture-album',
     enabled: true,
   },
+  capture: {
+    countdownSeconds: 8,
+    reviewMode: 'per_shot',
+  },
   revision: 3,
 };
 
@@ -148,6 +152,8 @@ const BASE_SNAPSHOT: BoothSnapshot = {
   media: { captureUrls: [], collageUrl: null, qrImageUrl: null },
   controls: {
     canStart: true,
+    canAcceptShot: false,
+    canRetakeShot: false,
     canRetakeAll: false,
     canAcceptPhotos: false,
     canRetryUpload: false,

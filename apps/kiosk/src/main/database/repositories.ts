@@ -1,14 +1,28 @@
 import type {
   CameraAdapterKind,
   CameraResolution,
+  CaptureReviewMode,
+  CaptureSettings,
   DualDisplayMode,
   DualDisplaySettings,
   FrameLayout,
   GooglePhotosConfig,
+  SaveCaptureSettingsInput,
   SessionState,
   UploadJobState,
 } from '@grace-booth/shared';
-import { FrameLayoutSchema, SessionStateSchema, UploadJobStateSchema } from '@grace-booth/shared';
+import {
+  CaptureCountdownSecondsSchema,
+  CaptureReviewModeSchema,
+  CaptureSettingsSchema,
+  DEFAULT_CAPTURE_COUNTDOWN_SECONDS,
+  DEFAULT_CAPTURE_REVIEW_MODE,
+  DEFAULT_CAPTURE_SETTINGS,
+  FrameLayoutSchema,
+  SaveCaptureSettingsInputSchema,
+  SessionStateSchema,
+  UploadJobStateSchema,
+} from '@grace-booth/shared';
 
 import { AppError } from '../errors.js';
 import { reduceSessionState } from '../workflow/session-state-machine.js';
@@ -48,6 +62,8 @@ type RawSettingsRow = {
   google_photos_album_id: string | null;
   google_photos_album_title: string | null;
   google_photos_album_share_url: string | null;
+  capture_countdown_seconds: number;
+  capture_review_mode: string;
   revision: number;
   created_at: number;
   updated_at: number;
@@ -87,6 +103,8 @@ export type LocalSettings = {
   googlePhotosAlbumId: string | null;
   googlePhotosAlbumTitle: string | null;
   googlePhotosAlbumShareUrl: string | null;
+  captureCountdownSeconds: number;
+  captureReviewMode: CaptureReviewMode;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -114,6 +132,7 @@ export type StoredAsset = {
   kind: 'capture' | 'collage';
   retakeRound: number;
   shotNumber: number | null;
+  shotAttempt: number;
   encryptedPath: string;
   contentType: 'image/jpeg';
   width: number;
@@ -133,6 +152,8 @@ export type StoredSession = {
   requiredShotCount: number;
   selectedOption: number;
   selectedFrameId: string | null;
+  captureCountdownSeconds: number;
+  captureReviewMode: CaptureReviewMode;
   collageAssetId: string | null;
   cloudPhotoSessionId: string | null;
   publicSecretRef: string | null;
@@ -188,12 +209,14 @@ const SETTINGS_SELECT = `
     camera_zoom_percent, webcam_always_active,
     supabase_url, supabase_publishable_key, dual_display_mode, swap_displays, qr_dismiss_seconds,
     google_photos_enabled, google_photos_email, google_photos_album_id, google_photos_album_title, google_photos_album_share_url,
+    capture_countdown_seconds, capture_review_mode,
     revision, created_at, updated_at
   FROM settings WHERE id = 1
 `;
 
 const SESSION_SELECT = `
   SELECT id, state, capture_round, capture_count, required_shot_count, selected_option, selected_frame_id,
+    capture_countdown_seconds, capture_review_mode,
     collage_asset_id, cloud_photo_session_id, public_secret_ref, ready_at, expires_at,
     last_error_code, last_error_message, created_at, updated_at, completed_at,
     retention_anchor_at, cleanup_state, cleanup_started_at
@@ -281,6 +304,27 @@ export class LocalRepository {
       throw new AppError('settings_conflict', 'Settings changed elsewhere. Reload and try again.');
     }
     this.recordAudit('settings_change', 'success', null, now);
+    return this.getSettings();
+  }
+
+  setCaptureSettings(input: SaveCaptureSettingsInput, now = Date.now()): LocalSettings {
+    const parsed = SaveCaptureSettingsInputSchema.parse(input);
+    this.database.raw.transaction(() => {
+      const result = this.database.raw
+        .prepare(
+          `UPDATE settings SET capture_countdown_seconds = ?, capture_review_mode = ?,
+            revision = revision + 1, updated_at = ?
+          WHERE id = 1 AND revision = ?`,
+        )
+        .run(parsed.countdownSeconds, parsed.reviewMode, now, parsed.expectedRevision);
+      if (result.changes !== 1) {
+        throw new AppError(
+          'settings_conflict',
+          'Settings changed elsewhere. Reload and try again.',
+        );
+      }
+      this.recordAudit('settings_change', 'success', 'capture_settings_updated', now);
+    })();
     return this.getSettings();
   }
 
@@ -602,15 +646,27 @@ export class LocalRepository {
     now = Date.now(),
     selectedFrameId: string | null = null,
     requiredShotCount = 3,
+    capturePolicy: CaptureSettings = DEFAULT_CAPTURE_SETTINGS,
   ): StoredSession {
+    const parsedPolicy = CaptureSettingsSchema.parse(capturePolicy);
     this.database.raw
       .prepare(
         `INSERT INTO sessions
           (id, state, capture_round, capture_count, required_shot_count, selected_frame_id,
+            capture_countdown_seconds, capture_review_mode,
             retention_anchor_at, created_at, updated_at)
-        VALUES (?, 'countdown', 0, 0, ?, ?, ?, ?, ?)`,
+        VALUES (?, 'countdown', 0, 0, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(sessionId, requiredShotCount, selectedFrameId, now, now, now);
+      .run(
+        sessionId,
+        requiredShotCount,
+        selectedFrameId,
+        parsedPolicy.countdownSeconds,
+        parsedPolicy.reviewMode,
+        now,
+        now,
+        now,
+      );
     return this.requireSession(sessionId);
   }
 
@@ -717,29 +773,112 @@ export class LocalRepository {
   addCapture(asset: NewAsset, now = Date.now()): StoredSession {
     return this.database.raw.transaction(() => {
       const current = this.requireSession(asset.sessionId);
-      if (current.state !== 'capturing' || asset.retakeRound !== current.captureRound) {
+      const expectedShotNumber = current.captureCount + 1;
+      if (
+        current.state !== 'capturing' ||
+        asset.kind !== 'capture' ||
+        asset.retakeRound !== current.captureRound ||
+        asset.shotNumber !== expectedShotNumber ||
+        expectedShotNumber > current.requiredShotCount
+      ) {
         throw new AppError('state_conflict', 'The capture round changed unexpectedly.');
       }
+      const maxAttemptRow = this.database.raw
+        .prepare(
+          `SELECT COALESCE(MAX(shot_attempt), 0) AS max_attempt
+          FROM session_assets
+          WHERE session_id = ? AND kind = 'capture' AND retake_round = ? AND shot_number = ?`,
+        )
+        .get(asset.sessionId, asset.retakeRound, asset.shotNumber) as { max_attempt: number };
+      const nextAttempt = maxAttemptRow.max_attempt + 1;
+      this.insertAsset(asset, nextAttempt);
+
+      if (current.captureReviewMode === 'per_shot') {
+        const expectedState = reduceSessionState(current.state, 'capture_shot_ready');
+        const result = this.database.raw
+          .prepare(
+            `UPDATE sessions SET state = ?, updated_at = ?
+            WHERE id = ? AND state = 'capturing' AND capture_count = ?
+              AND capture_count < required_shot_count`,
+          )
+          .run(expectedState, now, asset.sessionId, current.captureCount);
+        if (result.changes !== 1) {
+          throw new AppError('state_conflict', 'The capture could not be recorded safely.');
+        }
+        return this.requireSession(asset.sessionId);
+      }
+
       const requiredCount = current.requiredShotCount;
       const isComplete = current.captureCount + 1 >= requiredCount;
       const expectedState = reduceSessionState(
         current.state,
         isComplete ? 'capture_complete' : 'capture_more',
       );
-      this.insertAsset(asset);
       const result = this.database.raw
         .prepare(
           `UPDATE sessions SET capture_count = capture_count + 1, state = ?,
-            updated_at = ? WHERE id = ? AND state = 'capturing' AND capture_count < ?`,
+            updated_at = ? WHERE id = ? AND state = 'capturing' AND capture_count = ? AND capture_count < ?`,
         )
-        .run(isComplete ? 'review' : 'countdown', now, asset.sessionId, requiredCount);
+        .run(expectedState, now, asset.sessionId, current.captureCount, requiredCount);
       if (result.changes !== 1) {
         throw new AppError('state_conflict', 'The capture could not be recorded safely.');
       }
-      const saved = this.requireSession(asset.sessionId);
-      if (saved.state !== expectedState)
-        throw new AppError('state_conflict', 'Capture state is invalid.');
-      return saved;
+      return this.requireSession(asset.sessionId);
+    })();
+  }
+
+  acceptShot(sessionId: string, expectedShotNumber: number, now = Date.now()): StoredSession {
+    return this.database.raw.transaction(() => {
+      const current = this.requireSession(sessionId);
+      if (current.state !== 'shot_review' || expectedShotNumber !== current.captureCount + 1) {
+        throw new AppError('state_conflict', 'That photo is no longer waiting for confirmation.');
+      }
+      const hasCapture = this.database.raw
+        .prepare(
+          `SELECT 1 FROM session_assets
+          WHERE session_id = ? AND kind = 'capture' AND retake_round = ? AND shot_number = ?
+            AND cleanup_state = 'active'
+          LIMIT 1`,
+        )
+        .get(sessionId, current.captureRound, expectedShotNumber);
+      if (!hasCapture) {
+        throw new AppError('state_conflict', 'The captured photo could not be found.');
+      }
+      const isComplete = current.captureCount + 1 >= current.requiredShotCount;
+      const expectedState = reduceSessionState(
+        current.state,
+        isComplete ? 'accept_shot_complete' : 'accept_shot_more',
+      );
+      const result = this.database.raw
+        .prepare(
+          `UPDATE sessions SET capture_count = capture_count + 1, state = ?, updated_at = ?
+          WHERE id = ? AND state = 'shot_review' AND capture_count = ?`,
+        )
+        .run(expectedState, now, sessionId, current.captureCount);
+      if (result.changes !== 1) {
+        throw new AppError('state_conflict', 'That photo could not be confirmed safely.');
+      }
+      return this.requireSession(sessionId);
+    })();
+  }
+
+  retakeShot(sessionId: string, expectedShotNumber: number, now = Date.now()): StoredSession {
+    return this.database.raw.transaction(() => {
+      const current = this.requireSession(sessionId);
+      if (current.state !== 'shot_review' || expectedShotNumber !== current.captureCount + 1) {
+        throw new AppError('state_conflict', 'That photo can no longer be retaken.');
+      }
+      const expectedState = reduceSessionState(current.state, 'retake_shot');
+      const result = this.database.raw
+        .prepare(
+          `UPDATE sessions SET state = ?, updated_at = ?
+          WHERE id = ? AND state = 'shot_review' AND capture_count = ?`,
+        )
+        .run(expectedState, now, sessionId, current.captureCount);
+      if (result.changes !== 1) {
+        throw new AppError('state_conflict', 'That photo could not be retaken safely.');
+      }
+      return this.requireSession(sessionId);
     })();
   }
 
@@ -795,9 +934,11 @@ export class LocalRepository {
   listAssets(sessionId: string): StoredAsset[] {
     return this.database.raw
       .prepare(
-        `SELECT id, session_id, kind, retake_round, shot_number, encrypted_path, content_type,
-          width, height, byte_size, sha256, created_at, cleanup_state, tombstone_path
-        FROM session_assets WHERE session_id = ? ORDER BY kind, retake_round, shot_number`,
+        `SELECT id, session_id, kind, retake_round, shot_number, shot_attempt, encrypted_path,
+          content_type, width, height, byte_size, sha256, created_at, cleanup_state, tombstone_path
+        FROM session_assets
+        WHERE session_id = ?
+        ORDER BY kind, retake_round, shot_number, shot_attempt`,
       )
       .all(sessionId)
       .map((row) => mapAsset(row as Record<string, unknown>));
@@ -806,15 +947,33 @@ export class LocalRepository {
   listCurrentAssets(sessionId: string): StoredAsset[] {
     return this.database.raw
       .prepare(
-        `SELECT a.id, a.session_id, a.kind, a.retake_round, a.shot_number,
+        `SELECT a.id, a.session_id, a.kind, a.retake_round, a.shot_number, a.shot_attempt,
           a.encrypted_path, a.content_type, a.width, a.height, a.byte_size,
           a.sha256, a.created_at, a.cleanup_state, a.tombstone_path
         FROM session_assets a
         JOIN sessions s ON s.id = a.session_id
         WHERE a.session_id = ?
-          AND (a.kind = 'collage' OR a.retake_round = s.capture_round)
           AND a.cleanup_state = 'active'
-        ORDER BY a.kind, a.retake_round, a.shot_number`,
+          AND (
+            a.kind = 'collage'
+            OR (
+              a.kind = 'capture'
+              AND a.retake_round = s.capture_round
+              AND a.shot_number BETWEEN 1 AND (
+                CASE WHEN s.state = 'shot_review' THEN s.capture_count + 1 ELSE s.capture_count END
+              )
+              AND a.shot_attempt = (
+                SELECT MAX(a2.shot_attempt)
+                FROM session_assets a2
+                WHERE a2.session_id = a.session_id
+                  AND a2.kind = 'capture'
+                  AND a2.retake_round = a.retake_round
+                  AND a2.shot_number = a.shot_number
+                  AND a2.cleanup_state = 'active'
+              )
+            )
+          )
+        ORDER BY a.kind, a.shot_number ASC`,
       )
       .all(sessionId)
       .map((row) => mapAsset(row as Record<string, unknown>));
@@ -823,8 +982,8 @@ export class LocalRepository {
   getAsset(assetId: string): StoredAsset | null {
     const row = this.database.raw
       .prepare(
-        `SELECT id, session_id, kind, retake_round, shot_number, encrypted_path, content_type,
-          width, height, byte_size, sha256, created_at, cleanup_state, tombstone_path
+        `SELECT id, session_id, kind, retake_round, shot_number, shot_attempt, encrypted_path,
+          content_type, width, height, byte_size, sha256, created_at, cleanup_state, tombstone_path
         FROM session_assets WHERE id = ?`,
       )
       .get(assetId);
@@ -1405,13 +1564,13 @@ export class LocalRepository {
     }
   }
 
-  private insertAsset(asset: NewAsset): void {
+  private insertAsset(asset: NewAsset, shotAttempt = 1): void {
     this.database.raw
       .prepare(
         `INSERT INTO session_assets
-          (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type,
-            width, height, byte_size, sha256, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'image/jpeg', ?, ?, ?, ?, ?)`,
+          (id, session_id, kind, retake_round, shot_number, shot_attempt, encrypted_path,
+            content_type, width, height, byte_size, sha256, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'image/jpeg', ?, ?, ?, ?, ?)`,
       )
       .run(
         asset.id,
@@ -1419,6 +1578,7 @@ export class LocalRepository {
         asset.kind,
         asset.retakeRound,
         asset.shotNumber,
+        shotAttempt,
         asset.encryptedPath,
         asset.width,
         asset.height,
@@ -1548,6 +1708,8 @@ function mapSettings(row: RawSettingsRow): LocalSettings {
     googlePhotosAlbumId: row.google_photos_album_id,
     googlePhotosAlbumTitle: row.google_photos_album_title,
     googlePhotosAlbumShareUrl: row.google_photos_album_share_url,
+    captureCountdownSeconds: CaptureCountdownSecondsSchema.parse(row.capture_countdown_seconds),
+    captureReviewMode: CaptureReviewModeSchema.parse(row.capture_review_mode),
     revision: row.revision,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1563,6 +1725,12 @@ function mapSession(row: Record<string, unknown>): StoredSession {
     requiredShotCount: Math.max(1, Math.min(10, Number(row.required_shot_count ?? 3))),
     selectedOption: Number(row.selected_option ?? 1),
     selectedFrameId: nullableString(row.selected_frame_id),
+    captureCountdownSeconds: CaptureCountdownSecondsSchema.parse(
+      Number(row.capture_countdown_seconds ?? DEFAULT_CAPTURE_COUNTDOWN_SECONDS),
+    ),
+    captureReviewMode: CaptureReviewModeSchema.parse(
+      row.capture_review_mode ?? DEFAULT_CAPTURE_REVIEW_MODE,
+    ),
     collageAssetId: nullableString(row.collage_asset_id),
     cloudPhotoSessionId: nullableString(row.cloud_photo_session_id),
     publicSecretRef: nullableString(row.public_secret_ref),
@@ -1586,6 +1754,7 @@ function mapAsset(row: Record<string, unknown>): StoredAsset {
     kind: row.kind === 'collage' ? 'collage' : 'capture',
     retakeRound: Number(row.retake_round),
     shotNumber: nullableNumber(row.shot_number),
+    shotAttempt: Number(row.shot_attempt ?? 1),
     encryptedPath: String(row.encrypted_path),
     contentType: 'image/jpeg',
     width: Number(row.width),

@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 import {
+  MAX_FRAME_SLOTS,
   isPrintableFrameSize,
   type GalleryCloudRepairResult,
   type GalleryItem,
@@ -151,7 +152,7 @@ export class RecentGalleryService {
     try {
       if (!session.collageAssetId) return null;
       const repository = this.dependencies.repository;
-      const assets = repository.listAssets(session.id);
+      const assets = repository.listCurrentAssets(session.id);
       const collageAsset = assets.find((asset) => asset.id === session.collageAssetId);
       if (!collageAsset) return null;
 
@@ -184,7 +185,7 @@ export class RecentGalleryService {
         qrDataUrl: delivery?.qrDataUrl ?? null,
         metadata: {
           capturedAt: session.createdAt,
-          photoCount: Math.min(3, captures.length),
+          photoCount: Math.min(MAX_FRAME_SLOTS, captures.length),
           frameName: frame?.name ?? null,
           uploadStatus:
             job?.state === 'succeeded'

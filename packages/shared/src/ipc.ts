@@ -8,6 +8,7 @@ import {
   type CameraConfig,
   type CameraResolution,
 } from './camera.js';
+import { SaveCaptureSettingsInputSchema, type SaveCaptureSettingsInput } from './capture.js';
 import {
   AdminAuthStatusSchema,
   AdminHealthSchema,
@@ -21,6 +22,8 @@ import {
   FrameSummarySchema,
   GalleryItemSchema,
   GalleryCloudRepairResultSchema,
+  MAX_FRAME_SLOTS,
+  MIN_FRAME_SLOTS,
   OpaqueIdSchema,
   OptionalGoogleFormsUrlSchema,
   RecruitmentButtonTextSchema,
@@ -78,6 +81,18 @@ export const IpcContracts = {
   },
   'booth:start': {
     request: EmptyRequestSchema,
+    response: rpcResultSchema(BoothSnapshotSchema),
+  },
+  'booth:accept-shot': {
+    request: z
+      .object({ shotNumber: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS) })
+      .strict(),
+    response: rpcResultSchema(BoothSnapshotSchema),
+  },
+  'booth:retake-shot': {
+    request: z
+      .object({ shotNumber: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS) })
+      .strict(),
     response: rpcResultSchema(BoothSnapshotSchema),
   },
   'booth:retake-all': {
@@ -265,6 +280,10 @@ export const IpcContracts = {
       .strict(),
     response: rpcResultSchema(AdminSettingsSchema),
   },
+  'admin:save-capture-settings': {
+    request: SaveCaptureSettingsInputSchema,
+    response: rpcResultSchema(AdminSettingsSchema),
+  },
   'admin:google-photos:get-status': {
     request: EmptyRequestSchema,
     response: rpcResultSchema(GooglePhotosStatusSchema),
@@ -356,7 +375,7 @@ export const IpcContracts = {
       .object({
         candidateId: OpaqueIdSchema,
         name: z.string().trim().min(1).max(120),
-        shotCount: z.number().int().min(1).max(10),
+        shotCount: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS),
       })
       .strict(),
     response: rpcResultSchema(FrameSummarySchema.nullable()),
@@ -466,6 +485,8 @@ export type GraceBoothBridge = {
   booth: {
     getSnapshot(): Promise<RpcResult<BoothSnapshot>>;
     start(): Promise<RpcResult<BoothSnapshot>>;
+    acceptShot(shotNumber: number): Promise<RpcResult<BoothSnapshot>>;
+    retakeShot(shotNumber: number): Promise<RpcResult<BoothSnapshot>>;
     retakeAll(): Promise<RpcResult<BoothSnapshot>>;
     acceptPhotos(input: {
       frameId: string;
@@ -522,6 +543,7 @@ export type GraceBoothBridge = {
       lanPort: number;
       expectedRevision: number;
     }): Promise<RpcResult<AdminSettings>>;
+    saveCaptureSettings(input: SaveCaptureSettingsInput): Promise<RpcResult<AdminSettings>>;
     getGooglePhotosStatus(): Promise<RpcResult<GooglePhotosStatus>>;
     saveGooglePhotosConfig(config: GooglePhotosConfig): Promise<RpcResult<GooglePhotosConfig>>;
     createGooglePhotosAlbum(

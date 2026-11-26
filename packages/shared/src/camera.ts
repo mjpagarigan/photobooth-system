@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OpaqueIdSchema, UtcMillisSchema } from './domain.js';
+import { MAX_FRAME_SLOTS, MIN_FRAME_SLOTS, OpaqueIdSchema, UtcMillisSchema } from './domain.js';
 
 export const CameraAdapterKindSchema = z.enum(['mock', 'sony', 'webcam', 'internal_webcam']);
 export type CameraAdapterKind = z.infer<typeof CameraAdapterKindSchema>;
@@ -79,7 +79,7 @@ export const CaptureRequestSchema = z
   .object({
     sessionId: OpaqueIdSchema,
     captureId: OpaqueIdSchema,
-    shotNumber: z.number().int().min(1).max(10),
+    shotNumber: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS),
     timeoutMs: z.number().int().min(1_000).max(120_000),
   })
   .strict();

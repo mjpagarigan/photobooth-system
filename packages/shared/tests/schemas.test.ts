@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BoothControlsSchema,
+  CaptureSettingsSchema,
   ConfirmUploadResponseSchema,
   CreateUploadRequestSchema,
+  DEFAULT_CAPTURE_SETTINGS,
   FrameLayoutSchema,
+  GalleryItemMetadataSchema,
+  GuestScreenSchema,
   IpcContracts,
+  MAX_FRAME_SLOTS,
   OptionalGoogleFormsUrlSchema,
   RecruitmentButtonTextSchema,
+  SaveCaptureSettingsInputSchema,
+  SessionStateSchema,
   isAllowedGoogleFormsUrl,
+  isCancellableSessionState,
+  isCaptureScreen,
 } from '../src/index.js';
 
 const slots = [1, 2, 3].map((slotIndex) => ({
@@ -172,9 +182,125 @@ describe('shared boundary schemas', () => {
     ).toThrow();
   });
 
-  it('validates recent-gallery limits', () => {
+  it('validates recent-gallery limits and multi-slot photoCount up to MAX_FRAME_SLOTS', () => {
     expect(IpcContracts['gallery:get-recent'].request.parse({ limit: 5 })).toEqual({ limit: 5 });
     expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 0 })).toThrow();
     expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 51 })).toThrow();
+
+    const baseMetadata = {
+      capturedAt: 1_700_000_000_000,
+      photoCount: 4,
+      frameName: '4-Slot Frame',
+      uploadStatus: 'uploaded' as const,
+      cloudExpiresAt: null,
+      printable: true,
+    };
+    expect(GalleryItemMetadataSchema.parse(baseMetadata).photoCount).toBe(4);
+    expect(
+      GalleryItemMetadataSchema.parse({ ...baseMetadata, photoCount: MAX_FRAME_SLOTS }).photoCount,
+    ).toBe(10);
+    expect(() =>
+      GalleryItemMetadataSchema.parse({ ...baseMetadata, photoCount: MAX_FRAME_SLOTS + 1 }),
+    ).toThrow();
+  });
+
+  it('validates capture settings defaults, bounds, and save inputs', () => {
+    expect(CaptureSettingsSchema.parse({})).toEqual(DEFAULT_CAPTURE_SETTINGS);
+    expect(CaptureSettingsSchema.parse({ countdownSeconds: 1, reviewMode: 'continuous' })).toEqual({
+      countdownSeconds: 1,
+      reviewMode: 'continuous',
+    });
+    expect(CaptureSettingsSchema.parse({ countdownSeconds: 30, reviewMode: 'per_shot' })).toEqual({
+      countdownSeconds: 30,
+      reviewMode: 'per_shot',
+    });
+    expect(() => CaptureSettingsSchema.parse({ countdownSeconds: 0 })).toThrow();
+    expect(() => CaptureSettingsSchema.parse({ countdownSeconds: 31 })).toThrow();
+    expect(() => CaptureSettingsSchema.parse({ countdownSeconds: 5.5 })).toThrow();
+    expect(() => CaptureSettingsSchema.parse({ reviewMode: 'manual' })).toThrow();
+
+    expect(
+      SaveCaptureSettingsInputSchema.parse({
+        countdownSeconds: 10,
+        reviewMode: 'per_shot',
+        expectedRevision: 2,
+      }),
+    ).toEqual({ countdownSeconds: 10, reviewMode: 'per_shot', expectedRevision: 2 });
+    expect(() =>
+      SaveCaptureSettingsInputSchema.parse({
+        countdownSeconds: 10,
+        reviewMode: 'per_shot',
+        expectedRevision: -1,
+      }),
+    ).toThrow();
+    expect(() =>
+      SaveCaptureSettingsInputSchema.parse({
+        countdownSeconds: 10,
+        reviewMode: 'per_shot',
+        expectedRevision: 0,
+        extra: true,
+      }),
+    ).toThrow();
+  });
+
+  it('includes shot_review in session state, guest screens, guards, and IPC contracts', () => {
+    expect(SessionStateSchema.parse('shot_review')).toBe('shot_review');
+    expect(GuestScreenSchema.parse('shot_review')).toBe('shot_review');
+
+    expect(isCancellableSessionState('countdown')).toBe(true);
+    expect(isCancellableSessionState('capturing')).toBe(true);
+    expect(isCancellableSessionState('shot_review')).toBe(true);
+    expect(isCancellableSessionState('review')).toBe(true);
+    expect(isCancellableSessionState('processing')).toBe(false);
+    expect(isCancellableSessionState('final')).toBe(false);
+    expect(isCancellableSessionState(null)).toBe(false);
+
+    expect(isCaptureScreen('countdown')).toBe(true);
+    expect(isCaptureScreen('capturing')).toBe(true);
+    expect(isCaptureScreen('shot_review')).toBe(true);
+    expect(isCaptureScreen('review')).toBe(false);
+    expect(isCaptureScreen('attract')).toBe(false);
+
+    expect(
+      BoothControlsSchema.parse({
+        canStart: false,
+        canRetakeAll: false,
+        canAcceptPhotos: false,
+        canRetryUpload: false,
+        canFinish: false,
+      }),
+    ).toMatchObject({ canAcceptShot: false, canRetakeShot: false, canFinishOffline: false });
+
+    expect(IpcContracts['booth:accept-shot'].request.parse({ shotNumber: 1 })).toEqual({
+      shotNumber: 1,
+    });
+    expect(IpcContracts['booth:accept-shot'].request.parse({ shotNumber: 10 })).toEqual({
+      shotNumber: 10,
+    });
+    expect(() => IpcContracts['booth:accept-shot'].request.parse({ shotNumber: 0 })).toThrow();
+    expect(() => IpcContracts['booth:accept-shot'].request.parse({ shotNumber: 11 })).toThrow();
+
+    expect(IpcContracts['booth:retake-shot'].request.parse({ shotNumber: 4 })).toEqual({
+      shotNumber: 4,
+    });
+    expect(() => IpcContracts['booth:retake-shot'].request.parse({ shotNumber: 0 })).toThrow();
+    expect(() =>
+      IpcContracts['booth:retake-shot'].request.parse({ shotNumber: 2, extra: true }),
+    ).toThrow();
+
+    expect(
+      IpcContracts['admin:save-capture-settings'].request.parse({
+        countdownSeconds: 6,
+        reviewMode: 'continuous',
+        expectedRevision: 3,
+      }),
+    ).toEqual({ countdownSeconds: 6, reviewMode: 'continuous', expectedRevision: 3 });
+    expect(() =>
+      IpcContracts['admin:save-capture-settings'].request.parse({
+        countdownSeconds: 31,
+        reviewMode: 'per_shot',
+        expectedRevision: 0,
+      }),
+    ).toThrow();
   });
 });

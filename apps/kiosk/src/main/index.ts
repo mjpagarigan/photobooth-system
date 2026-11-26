@@ -234,7 +234,7 @@ async function startApplication(): Promise<void> {
     uploadQueue,
     qrService,
     {
-      shotCountdownsMs: config.shotCountdownsMs,
+      captureOverride: config.captureOverride,
       cameraPreviewEnabled:
         initialCameraAdapter === 'webcam' || initialCameraAdapter === 'internal_webcam',
       isDualDisplayActive: () => displayManager.isDualActive(),

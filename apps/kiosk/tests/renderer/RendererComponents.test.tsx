@@ -75,6 +75,10 @@ const SETTINGS: AdminSettings = {
     albumShareUrl: null,
     enabled: false,
   },
+  capture: {
+    countdownSeconds: 8,
+    reviewMode: 'per_shot',
+  },
   revision: 4,
 };
 

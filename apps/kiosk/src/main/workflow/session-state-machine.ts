@@ -5,8 +5,12 @@ import { AppError } from '../errors.js';
 export type SessionEvent =
   | 'start'
   | 'countdown_elapsed'
+  | 'capture_shot_ready'
   | 'capture_more'
   | 'capture_complete'
+  | 'retake_shot'
+  | 'accept_shot_more'
+  | 'accept_shot_complete'
   | 'retake_all'
   | 'accept_photos'
   | 'processing_complete'
@@ -32,9 +36,16 @@ const TRANSITIONS = {
     app_interrupted: 'interrupted',
   },
   capturing: {
+    capture_shot_ready: 'shot_review',
     capture_more: 'countdown',
     capture_complete: 'review',
     camera_failed: 'camera_error',
+    app_interrupted: 'interrupted',
+  },
+  shot_review: {
+    retake_shot: 'countdown',
+    accept_shot_more: 'countdown',
+    accept_shot_complete: 'review',
     app_interrupted: 'interrupted',
   },
   review: {
@@ -99,8 +110,12 @@ export function isLegalSessionTransition(
 export const SESSION_EVENTS: readonly SessionEvent[] = [
   'start',
   'countdown_elapsed',
+  'capture_shot_ready',
   'capture_more',
   'capture_complete',
+  'retake_shot',
+  'accept_shot_more',
+  'accept_shot_complete',
   'retake_all',
   'accept_photos',
   'processing_complete',

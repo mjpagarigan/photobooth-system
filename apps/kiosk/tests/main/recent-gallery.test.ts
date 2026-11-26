@@ -201,7 +201,10 @@ describe('recent gallery service', () => {
       });
       const statusByToken = new Map<string, 'unavailable' | 'verification-failed'>([
         [`token-${unavailable.replace(/-/g, '').slice(0, 10)}`.padEnd(43, 'a'), 'unavailable'],
-        [`token-${transient.replace(/-/g, '').slice(0, 10)}`.padEnd(43, 'a'), 'verification-failed'],
+        [
+          `token-${transient.replace(/-/g, '').slice(0, 10)}`.padEnd(43, 'a'),
+          'verification-failed',
+        ],
       ]);
       const service = new RecentGalleryService({
         repository: store.repository,
@@ -210,7 +213,11 @@ describe('recent gallery service', () => {
           readDeliverySecret: (reference: string) => readSecret(store, reference),
         },
         qrService: {
-          render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,should-not-render', expiresAt: '' }),
+          render: () =>
+            Promise.resolve({
+              imageDataUrl: 'data:image/png;base64,should-not-render',
+              expiresAt: '',
+            }),
         },
         imageProcessor: {
           process: () => Promise.reject(new Error('not used')),
@@ -264,7 +271,8 @@ describe('recent gallery service', () => {
           readDeliverySecret: (reference: string) => readSecret(store, reference),
         },
         qrService: {
-          render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+          render: () =>
+            Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
         },
         imageProcessor: {
           process: () => Promise.reject(new Error('not used')),
@@ -373,6 +381,100 @@ describe('recent gallery service', () => {
         status: 'original-booth-required',
         message: 'Recovery requires the original booth.',
       });
+    } finally {
+      store.close();
+    }
+  });
+
+  it('reports 4-slot photoCount from active current-round captures without counting superseded retake attempts', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      for (let s = 1; s <= 4; s += 1) {
+        store.database.raw
+          .prepare(
+            `INSERT INTO frame_slots (frame_id, slot_index, z_index, name, x, y, width, height, crop_mode)
+            VALUES (?, ?, ?, ?, 0, 0, 0.5, 0.5, 'crop-to-fill')`,
+          )
+          .run(frameId, s, s - 1, `Photo ${s}`);
+      }
+
+      const sessionId = randomUUID();
+      store.repository.createSession(sessionId, 5_000_000, frameId, 4, {
+        countdownSeconds: 8,
+        reviewMode: 'per_shot',
+      });
+      store.database.raw
+        .prepare(
+          `UPDATE sessions SET state = 'final', capture_round = 1, capture_count = 4,
+            completed_at = 5_060_000, updated_at = 5_060_000 WHERE id = ?`,
+        )
+        .run(sessionId);
+
+      const insertCapture = store.database.raw.prepare(
+        `INSERT INTO session_assets
+          (id, session_id, kind, retake_round, shot_number, shot_attempt, encrypted_path,
+            content_type, width, height, byte_size, sha256, created_at)
+        VALUES (?, ?, 'capture', ?, ?, ?, ?, 'image/jpeg', 1000, 1000, 100, ?, 1)`,
+      );
+      for (let s = 1; s <= 4; s += 1) {
+        const w = store.vault.write('pending', Buffer.from(`r0-${s}`));
+        insertCapture.run(randomUUID(), sessionId, 0, s, 1, w.relativePath, `${s}`.repeat(64));
+      }
+      for (let s = 1; s <= 4; s += 1) {
+        const attempts = s === 2 ? 3 : 1;
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+          const w = store.vault.write('pending', Buffer.from(`r1-${s}-${attempt}`));
+          insertCapture.run(
+            randomUUID(),
+            sessionId,
+            1,
+            s,
+            attempt,
+            w.relativePath,
+            `${(s + attempt) % 10}`.repeat(64),
+          );
+        }
+      }
+
+      const collageId = randomUUID();
+      const collage = store.vault.write('completed', Buffer.from('collage-4slot'));
+      store.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, shot_attempt, encrypted_path,
+              content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'collage', 1, NULL, 1, ?, 'image/jpeg', 1800, 1200, 200, ?, 1)`,
+        )
+        .run(collageId, sessionId, collage.relativePath, 'e'.repeat(64));
+      store.database.raw
+        .prepare('UPDATE sessions SET collage_asset_id = ? WHERE id = ?')
+        .run(collageId, sessionId);
+
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: { readDeliverySecret: (reference) => readSecret(store, reference) },
+        qrService: {
+          render: () =>
+            Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+        },
+        imageProcessor: {
+          process: () => Promise.reject(new Error('not used')),
+          validateSourceJpeg: () => Promise.reject(new Error('not used')),
+          normalizeFramePng: () => Promise.reject(new Error('not used')),
+          createThumbnail: (bytes) =>
+            Promise.resolve({ bytes: Buffer.from(bytes), width: 600, height: 400 }),
+          close: () => Promise.resolve(),
+        },
+        delivery: { checkPhotoAvailability: () => Promise.resolve('available') },
+      });
+
+      const items = await service.getRecent(20);
+      expect(items).toHaveLength(1);
+      expect(items[0]!.metadata.photoCount).toBe(4);
+      expect(items[0]!.metadata.printable).toBe(true);
     } finally {
       store.close();
     }

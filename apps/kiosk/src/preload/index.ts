@@ -37,6 +37,8 @@ const bridge: GraceBoothBridge = {
   booth: {
     getSnapshot: () => invoke('booth:get-snapshot', {}),
     start: () => invoke('booth:start', {}),
+    acceptShot: (shotNumber) => invoke('booth:accept-shot', { shotNumber }),
+    retakeShot: (shotNumber) => invoke('booth:retake-shot', { shotNumber }),
     retakeAll: () => invoke('booth:retake-all', {}),
     acceptPhotos: (input) => invoke('booth:accept-photos', input),
     retryUpload: () => invoke('booth:retry-upload', {}),
@@ -104,6 +106,7 @@ const bridge: GraceBoothBridge = {
       invoke('admin:change-passcode', { currentPasscode, newPasscode }),
     getSettings: () => invoke('admin:get-settings', {}),
     saveSettings: (input) => invoke('admin:save-settings', input),
+    saveCaptureSettings: (input) => invoke('admin:save-capture-settings', input),
     getGooglePhotosStatus: () => invoke('admin:google-photos:get-status', {}),
     saveGooglePhotosConfig: (config) => invoke('admin:google-photos:save-config', config),
     createGooglePhotosAlbum: (title) => invoke('admin:google-photos:create-album', { title }),

@@ -2,10 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import {
+  MAX_CAPTURE_COUNTDOWN_SECONDS,
+  MIN_CAPTURE_COUNTDOWN_SECONDS,
+  isCancellableSessionState,
   isPrintableFrameSize,
   type BoothSnapshot,
   type CameraAdapter,
   type CaptureResult,
+  type CaptureSettings,
   type GuestErrorCode,
   type QrStationState,
   type SessionPrintRequest,
@@ -15,7 +19,13 @@ import {
 import type { UploadQueue } from '../cloud/upload-queue.js';
 import type { QrService } from '../cloud/qr-service.js';
 import { validateReadyReceipt } from '../cloud/ready-receipt.js';
-import type { LocalRepository, NewAsset, StoredSession } from '../database/repositories.js';
+import type { CapturePolicyOverride } from '../config.js';
+import type {
+  LocalRepository,
+  LocalSettings,
+  NewAsset,
+  StoredSession,
+} from '../database/repositories.js';
 import { AppError, toSafeError } from '../errors.js';
 import type { FrameService } from '../frame/frame-service.js';
 import type { ImageProcessor } from '../image/image-worker-client.js';
@@ -23,10 +33,9 @@ import type { PhotoVault } from '../storage/photo-vault.js';
 import { reduceSessionState, type SessionEvent } from './session-state-machine.js';
 
 const MAX_CAPTURE_BYTES = 50 * 1024 * 1024;
-const CANCELLABLE_STATES: readonly SessionState[] = ['countdown', 'capturing', 'review'];
 
 export type BoothWorkflowOptions = {
-  shotCountdownsMs: readonly [number, number, number];
+  captureOverride?: CapturePolicyOverride | null;
   cameraPreviewEnabled?: boolean;
   isDualDisplayActive: () => boolean;
   now?: () => number;
@@ -54,6 +63,7 @@ export class BoothWorkflow {
   private qrDismissTimer: NodeJS.Timeout | null = null;
   private activeSessionId: string | null = null;
   private countdownEndsAt: number | null = null;
+  private countdownTotalSeconds: number | null = null;
   private countdownTimer: NodeJS.Timeout | null = null;
   private readonly qrBySession = new Map<string, string>();
   private readonly now: () => number;
@@ -94,29 +104,43 @@ export class BoothWorkflow {
     if (recovered?.state === 'ready' || recovered?.state === 'final') {
       await this.handleUploadReady(recovered.id);
     } else if (recovered?.state === 'interrupted') {
-      const currentCaptures = this.repository
-        .listCurrentAssets(recovered.id)
-        .filter((asset) => asset.kind === 'capture');
-      const uploadJob = this.repository.getUploadJobForSession(recovered.id);
-      if (recovered.collageAssetId && uploadJob) {
-        this.transition(recovered, 'resume_upload', {}, this.now());
-      } else if (
-        recovered.captureCount === requiredShotCount(recovered) &&
-        currentCaptures.length === requiredShotCount(recovered)
-      ) {
-        this.transition(recovered, 'resume_processing', {}, this.now());
-        void this.processCollage(recovered.id);
-      } else {
+      if (recovered.lastErrorCode === 'local_asset_unavailable') {
         this.transition(
           recovered,
           'reconcile_partial_capture',
           {
-            lastErrorCode: 'capture_interrupted',
+            lastErrorCode: recovered.lastErrorCode,
             lastErrorMessage:
-              'Capture was interrupted. An operator can restart without deleting prior photos.',
+              recovered.lastErrorMessage ??
+              'A local photo could not be verified. Operator recovery is required.',
           },
           this.now(),
         );
+      } else {
+        const currentCaptures = this.repository
+          .listCurrentAssets(recovered.id)
+          .filter((asset) => asset.kind === 'capture');
+        const uploadJob = this.repository.getUploadJobForSession(recovered.id);
+        if (recovered.collageAssetId && uploadJob) {
+          this.transition(recovered, 'resume_upload', {}, this.now());
+        } else if (
+          recovered.captureCount === requiredShotCount(recovered) &&
+          currentCaptures.length === requiredShotCount(recovered)
+        ) {
+          this.transition(recovered, 'resume_processing', {}, this.now());
+          void this.processCollage(recovered.id);
+        } else {
+          this.transition(
+            recovered,
+            'reconcile_partial_capture',
+            {
+              lastErrorCode: 'capture_interrupted',
+              lastErrorMessage:
+                'Capture was interrupted. An operator can restart without deleting prior photos.',
+            },
+            this.now(),
+          );
+        }
       }
     } else if (recovered?.state === 'processing') {
       void this.processCollage(recovered.id);
@@ -254,12 +278,15 @@ export class BoothWorkflow {
       state: session.state,
       sessionId: session.id,
       shotNumber:
-        session.state === 'countdown' || session.state === 'capturing'
+        session.state === 'countdown' ||
+        session.state === 'capturing' ||
+        session.state === 'shot_review'
           ? Math.min(shotCount, session.captureCount + 1)
           : null,
       captureCount: session.captureCount,
       requiredShotCount: shotCount,
       countdownEndsAt: session.state === 'countdown' ? this.countdownEndsAt : null,
+      countdownTotalSeconds: session.state === 'countdown' ? this.countdownTotalSeconds : null,
       cameraPreviewEnabled,
       media: {
         captureUrls: captures.map((asset) => mediaUrl(asset.id)),
@@ -272,6 +299,9 @@ export class BoothWorkflow {
       },
       controls: {
         canStart: false,
+        canAcceptShot:
+          session.state === 'shot_review' && captures.length === session.captureCount + 1,
+        canRetakeShot: session.state === 'shot_review',
         canRetakeAll: session.state === 'review',
         canAcceptPhotos: session.state === 'review' && session.captureCount === shotCount,
         canRetryUpload: session.state === 'upload_failed',
@@ -283,6 +313,13 @@ export class BoothWorkflow {
       errorCode: guestErrorFor(session),
       message: messageFor(session),
     };
+  }
+
+  refreshIdleSnapshot(): void {
+    const session = this.activeSessionId ? this.repository.getSession(this.activeSessionId) : null;
+    if (!session || session.state === 'attract') {
+      this.emit();
+    }
   }
 
   setCameraPreviewEnabled(enabled: boolean): void {
@@ -297,19 +334,64 @@ export class BoothWorkflow {
         throw new AppError('session_active', 'A photo session is already in progress.');
       }
     }
+    const settings = this.repository.getSettings();
     const activeFrame = this.repository.getActiveFrame();
+    const capturePolicy = resolveSessionCapturePolicy(settings, this.options.captureOverride);
     const session = this.repository.createSession(
       randomUUID(),
       this.now(),
       activeFrame?.id ?? null,
       activeFrame?.slots.length ?? 3,
+      capturePolicy,
     );
     if (reduceSessionState('attract', 'start') !== session.state) {
       throw new AppError('state_conflict', 'The new session state is invalid.');
     }
     this.activeSessionId = session.id;
     if (!(await this.connectCameraFor(session))) return this.getSnapshot();
+    if (!this.isSessionCurrent(session.id)) return this.getSnapshot();
     this.beginCountdown(session);
+    return this.getSnapshot();
+  }
+
+  async acceptShot(shotNumber: number): Promise<BoothSnapshot> {
+    const session = this.requireActive();
+    if (
+      (session.state === 'countdown' && session.captureCount >= shotNumber) ||
+      (session.state === 'review' && shotNumber === session.requiredShotCount)
+    ) {
+      return this.getSnapshot();
+    }
+    if (session.state !== 'shot_review' || shotNumber !== session.captureCount + 1) {
+      throw new AppError(
+        'shot_review_unavailable',
+        'That photo is no longer waiting for confirmation.',
+      );
+    }
+    const next = this.repository.acceptShot(session.id, shotNumber, this.now());
+    if (next.state === 'review') {
+      this.clearCountdown();
+      this.emit();
+      return this.getSnapshot();
+    }
+    if (!(await this.connectCameraFor(next))) return this.getSnapshot();
+    if (!this.isSessionCurrent(next.id)) return this.getSnapshot();
+    this.beginCountdown(next);
+    return this.getSnapshot();
+  }
+
+  async retakeShot(shotNumber: number): Promise<BoothSnapshot> {
+    const session = this.requireActive();
+    if (session.state === 'countdown' && session.captureCount + 1 === shotNumber) {
+      return this.getSnapshot();
+    }
+    if (session.state !== 'shot_review' || shotNumber !== session.captureCount + 1) {
+      throw new AppError('retake_unavailable', 'That photo can no longer be retaken.');
+    }
+    const next = this.repository.retakeShot(session.id, shotNumber, this.now());
+    if (!(await this.connectCameraFor(next))) return this.getSnapshot();
+    if (!this.isSessionCurrent(next.id)) return this.getSnapshot();
+    this.beginCountdown(next);
     return this.getSnapshot();
   }
 
@@ -423,14 +505,10 @@ export class BoothWorkflow {
     const sessionId = this.activeSessionId;
     if (!sessionId) return this.getSnapshot();
     const session = this.repository.getSession(sessionId);
-    if (!session || !CANCELLABLE_STATES.includes(session.state)) {
+    if (!session || !isCancellableSessionState(session.state)) {
       return this.getSnapshot();
     }
-    if (this.countdownTimer) {
-      clearTimeout(this.countdownTimer);
-      this.countdownTimer = null;
-    }
-    this.countdownEndsAt = null;
+    this.clearCountdown();
     this.camera.abortCapture?.();
     // Detach first so an in-flight capture cannot re-attach to a deleted session.
     this.activeSessionId = null;
@@ -457,13 +535,14 @@ export class BoothWorkflow {
       throw new AppError('restart_unavailable', 'This photo session does not need a restart.');
     }
     if (!(await this.connectCameraFor(session))) return this.getSnapshot();
+    if (!this.isSessionCurrent(session.id)) return this.getSnapshot();
     this.beginCountdown(this.repository.startRetakeRound(session.id, this.now()));
     return this.getSnapshot();
   }
 
   async close(): Promise<void> {
     this.closed = true;
-    if (this.countdownTimer) clearTimeout(this.countdownTimer);
+    this.clearCountdown();
     if (this.qrDismissTimer) {
       clearTimeout(this.qrDismissTimer);
       this.qrDismissTimer = null;
@@ -472,26 +551,36 @@ export class BoothWorkflow {
     await Promise.all([this.camera.disconnect(), this.imageProcessor.close()]);
   }
 
+  private isSessionCurrent(sessionId: string): boolean {
+    return !this.closed && this.activeSessionId === sessionId;
+  }
+
+  private clearCountdown(): void {
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.countdownEndsAt = null;
+    this.countdownTotalSeconds = null;
+  }
+
   private beginCountdown(session: StoredSession): void {
     if (session.state !== 'countdown')
       throw new AppError('state_conflict', 'Countdown cannot start now.');
-    if (this.countdownTimer) clearTimeout(this.countdownTimer);
-    const shotCount = requiredShotCount(session);
-    const shotNumber = Math.min(shotCount, session.captureCount + 1);
-    const durationMs =
-      this.options.shotCountdownsMs[shotNumber - 1] ?? this.options.shotCountdownsMs.at(-1);
-    if (durationMs === undefined) {
-      throw new AppError('state_conflict', 'Countdown cannot start now.');
-    }
+    this.clearCountdown();
+    const durationMs = resolveCountdownDurationMs(session, this.options.captureOverride);
+    this.countdownTotalSeconds = Math.max(
+      MIN_CAPTURE_COUNTDOWN_SECONDS,
+      Math.min(MAX_CAPTURE_COUNTDOWN_SECONDS, Math.ceil(durationMs / 1_000)),
+    );
     this.countdownEndsAt = this.now() + durationMs;
     this.countdownTimer = setTimeout(() => void this.captureNext(session.id), durationMs);
     this.emit();
   }
 
   private async captureNext(sessionId: string): Promise<void> {
-    if (this.closed || this.activeSessionId !== sessionId) return;
-    this.countdownTimer = null;
-    this.countdownEndsAt = null;
+    if (!this.isSessionCurrent(sessionId)) return;
+    this.clearCountdown();
     let session = this.repository.requireSession(sessionId);
     try {
       session = this.transition(session, 'countdown_elapsed', {}, this.now());
@@ -505,6 +594,7 @@ export class BoothWorkflow {
       });
       const bytes = await captureBytes(result);
       const metadata = await this.imageProcessor.validateSourceJpeg(bytes);
+      if (!this.isSessionCurrent(sessionId)) return;
       const stored = this.vault.write('pending', bytes);
       const asset: NewAsset = {
         id: captureId,
@@ -525,8 +615,12 @@ export class BoothWorkflow {
         this.vault.delete(stored.relativePath);
         throw error;
       }
-      if (session.state === 'countdown') this.beginCountdown(session);
-      else this.emit();
+      if (session.state === 'countdown') {
+        this.beginCountdown(session);
+      } else {
+        this.clearCountdown();
+        this.emit();
+      }
     } catch (error) {
       const safe = toSafeError(error);
       const current = this.repository.getSession(sessionId);
@@ -710,6 +804,7 @@ export class BoothWorkflow {
   private async connectCameraFor(session: StoredSession): Promise<boolean> {
     try {
       const status = await this.camera.connect();
+      if (!this.isSessionCurrent(session.id)) return false;
       if (status.state !== 'ready' || !status.capabilities.stillCapture) {
         throw new AppError(
           status.code ?? 'camera_unavailable',
@@ -718,9 +813,10 @@ export class BoothWorkflow {
       }
       return true;
     } catch (error) {
+      if (!this.isSessionCurrent(session.id)) return false;
       const safe = toSafeError(error);
-      const current = this.repository.requireSession(session.id);
-      if (current.state === 'countdown') {
+      const current = this.repository.getSession(session.id);
+      if (current?.state === 'countdown') {
         this.transition(
           current,
           'camera_failed',
@@ -760,6 +856,23 @@ export class BoothWorkflow {
   }
 }
 
+function resolveSessionCapturePolicy(
+  persisted: LocalSettings,
+  override: CapturePolicyOverride | null | undefined,
+): CaptureSettings {
+  return {
+    countdownSeconds: persisted.captureCountdownSeconds,
+    reviewMode: override?.reviewMode ?? persisted.captureReviewMode,
+  };
+}
+
+function resolveCountdownDurationMs(
+  session: StoredSession,
+  override: CapturePolicyOverride | null | undefined,
+): number {
+  return override?.countdownMs ?? session.captureCountdownSeconds * 1_000;
+}
+
 function attractSnapshot(cameraPreviewEnabled: boolean, requiredShotCount = 3): BoothSnapshot {
   return {
     screen: 'attract',
@@ -769,10 +882,13 @@ function attractSnapshot(cameraPreviewEnabled: boolean, requiredShotCount = 3): 
     captureCount: 0,
     requiredShotCount,
     countdownEndsAt: null,
+    countdownTotalSeconds: null,
     cameraPreviewEnabled,
     media: { captureUrls: [], collageUrl: null, qrImageUrl: null },
     controls: {
       canStart: true,
+      canAcceptShot: false,
+      canRetakeShot: false,
       canRetakeAll: false,
       canAcceptPhotos: false,
       canRetryUpload: false,
@@ -787,6 +903,7 @@ function attractSnapshot(cameraPreviewEnabled: boolean, requiredShotCount = 3): 
 function screenFor(state: SessionState, qrReady: boolean): BoothSnapshot['screen'] {
   if (state === 'countdown') return 'countdown';
   if (state === 'capturing') return 'capturing';
+  if (state === 'shot_review') return 'shot_review';
   if (state === 'review') return 'review';
   if (
     state === 'processing' ||

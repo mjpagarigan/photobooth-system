@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  CaptureCountdownSecondsSchema,
+  CaptureSettingsSchema,
+  DEFAULT_CAPTURE_SETTINGS,
+} from './capture.js';
+
+export const MIN_FRAME_SLOTS = 1;
+export const MAX_FRAME_SLOTS = 10;
 
 export const OpaqueIdSchema = z.uuid();
 export const UtcMillisSchema = z.number().int().nonnegative();
@@ -14,6 +22,7 @@ export const SessionStateSchema = z.enum([
   'attract',
   'countdown',
   'capturing',
+  'shot_review',
   'review',
   'processing',
   'pending_upload',
@@ -30,6 +39,7 @@ export const GuestScreenSchema = z.enum([
   'attract',
   'countdown',
   'capturing',
+  'shot_review',
   'review',
   'processing',
   'final',
@@ -37,13 +47,39 @@ export const GuestScreenSchema = z.enum([
 ]);
 export type GuestScreen = z.infer<typeof GuestScreenSchema>;
 
+export const CANCELLABLE_SESSION_STATES = [
+  'countdown',
+  'capturing',
+  'shot_review',
+  'review',
+] as const satisfies readonly SessionState[];
+
+export function isCancellableSessionState(
+  state: SessionState | null,
+): state is (typeof CANCELLABLE_SESSION_STATES)[number] {
+  return (
+    state === 'countdown' || state === 'capturing' || state === 'shot_review' || state === 'review'
+  );
+}
+
+export type CaptureScreenPhase = 'countdown' | 'capturing' | 'shot_review';
+
+export function isCaptureScreen(screen: GuestScreen): screen is CaptureScreenPhase {
+  return screen === 'countdown' || screen === 'capturing' || screen === 'shot_review';
+}
+
 export const CropModeSchema = z.enum(['crop-to-fill', 'fit']);
 export type CropMode = z.infer<typeof CropModeSchema>;
 
 export const FrameSlotSchema = z
   .object({
-    slotIndex: z.number().int().min(1).max(10),
-    zIndex: z.number().int().min(0).max(9).default(0),
+    slotIndex: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS),
+    zIndex: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_FRAME_SLOTS - 1)
+      .default(0),
     name: z.string().trim().min(1).max(40),
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
@@ -72,8 +108,8 @@ export type FrameSlot = z.infer<typeof FrameSlotSchema>;
 
 export const FrameLayoutSchema = z
   .array(FrameSlotSchema)
-  .min(1)
-  .max(10)
+  .min(MIN_FRAME_SLOTS)
+  .max(MAX_FRAME_SLOTS)
   .superRefine((slots, context) => {
     const indices = new Set(slots.map((slot) => slot.slotIndex));
     if (
@@ -253,6 +289,7 @@ export const AdminSettingsSchema = z
       albumShareUrl: null,
       enabled: false,
     }),
+    capture: CaptureSettingsSchema.default(DEFAULT_CAPTURE_SETTINGS),
     revision: z.number().int().nonnegative(),
   })
   .strict();
@@ -271,6 +308,8 @@ export type GuestErrorCode = z.infer<typeof GuestErrorCodeSchema>;
 export const BoothControlsSchema = z
   .object({
     canStart: z.boolean(),
+    canAcceptShot: z.boolean().default(false),
+    canRetakeShot: z.boolean().default(false),
     canRetakeAll: z.boolean(),
     canAcceptPhotos: z.boolean(),
     canRetryUpload: z.boolean(),
@@ -281,7 +320,7 @@ export const BoothControlsSchema = z
 
 export const BoothMediaSchema = z
   .object({
-    captureUrls: z.array(z.string().min(1)).max(10),
+    captureUrls: z.array(z.string().min(1)).max(MAX_FRAME_SLOTS),
     collageUrl: z.string().min(1).nullable(),
     frame: FrameSummarySchema.nullable().optional(),
     frames: z.array(FrameSummarySchema).optional(),
@@ -294,10 +333,11 @@ export const BoothSnapshotSchema = z
     screen: GuestScreenSchema,
     state: SessionStateSchema.nullable(),
     sessionId: OpaqueIdSchema.nullable(),
-    shotNumber: z.number().int().min(1).max(10).nullable(),
-    captureCount: z.number().int().min(0).max(10),
-    requiredShotCount: z.number().int().min(1).max(10).optional(),
+    shotNumber: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS).nullable(),
+    captureCount: z.number().int().min(0).max(MAX_FRAME_SLOTS),
+    requiredShotCount: z.number().int().min(MIN_FRAME_SLOTS).max(MAX_FRAME_SLOTS).optional(),
     countdownEndsAt: UtcMillisSchema.nullable(),
+    countdownTotalSeconds: CaptureCountdownSecondsSchema.nullable().optional(),
     cameraPreviewEnabled: z.boolean(),
     media: BoothMediaSchema,
     controls: BoothControlsSchema,
@@ -332,7 +372,7 @@ export type GalleryUploadStatus = z.infer<typeof GalleryUploadStatusSchema>;
 export const GalleryItemMetadataSchema = z
   .object({
     capturedAt: UtcMillisSchema,
-    photoCount: z.number().int().min(0).max(3),
+    photoCount: z.number().int().min(0).max(MAX_FRAME_SLOTS),
     frameName: z.string().max(120).nullable(),
     uploadStatus: GalleryUploadStatusSchema,
     cloudExpiresAt: UtcMillisSchema.nullable(),

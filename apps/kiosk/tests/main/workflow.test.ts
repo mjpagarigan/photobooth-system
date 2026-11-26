@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { fileURLToPath } from 'node:url';
 
 import type {
   CameraAdapter,
@@ -10,14 +11,17 @@ import type {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { assertOperatorBootstrapComplete } from '../../src/main/auth/bootstrap-guard.js';
+import { MockCameraAdapter } from '../../src/main/camera/mock-camera-adapter.js';
 import { RendererFrameBroker } from '../../src/main/camera/renderer-frame-broker.js';
 import { SonyCameraAdapter } from '../../src/main/camera/sony-camera-adapter.js';
 import { WebcamCameraAdapter } from '../../src/main/camera/webcam-camera-adapter.js';
 import type { QrService } from '../../src/main/cloud/qr-service.js';
 import type { UploadQueue } from '../../src/main/cloud/upload-queue.js';
+import type { CapturePolicyOverride } from '../../src/main/config.js';
 import type { StoredFrame } from '../../src/main/database/repositories.js';
 import type { FrameService } from '../../src/main/frame/frame-service.js';
 import type { ImageProcessor } from '../../src/main/image/image-worker-client.js';
+import { RetentionService } from '../../src/main/storage/retention-service.js';
 import { BoothWorkflow } from '../../src/main/workflow/booth-workflow.js';
 import { createTestStore, type TestStore } from './helpers.js';
 
@@ -123,7 +127,7 @@ describe('booth workflow camera recovery', () => {
       queue as unknown as UploadQueue,
       qrService,
       {
-        shotCountdownsMs: [60_000, 60_000, 60_000],
+        captureOverride: { countdownMs: 60_000, reviewMode: 'continuous' },
         isDualDisplayActive: () => false,
         now: () => 2_000,
       },
@@ -281,7 +285,7 @@ describe('booth workflow camera recovery', () => {
       queue as unknown as UploadQueue,
       qrService,
       {
-        shotCountdownsMs: [60_000, 60_000, 60_000],
+        captureOverride: { countdownMs: 60_000, reviewMode: 'continuous' },
         isDualDisplayActive: () => false,
         now: () => 2_000,
       },
@@ -300,7 +304,7 @@ describe('booth workflow camera recovery', () => {
   });
 });
 
-describe('per-shot countdown schedule', () => {
+describe('per-shot capture review and continuous mode', () => {
   const capturingProcessor: ImageProcessor = {
     process: () => Promise.reject(new Error('not used')),
     validateSourceJpeg: () => Promise.resolve({ width: 1_000, height: 1_000 }),
@@ -309,57 +313,526 @@ describe('per-shot countdown schedule', () => {
     close: () => Promise.resolve(),
   };
 
-  it('gives shot 1 an 8-second window and shots 2–3 five seconds each', async () => {
+  function seedActiveFrame(testStore: TestStore, slotCount: number): string {
+    const frameId = randomUUID();
+    const frameVault = testStore.vault.write('frames', Buffer.from(`frame-${slotCount}`));
+    testStore.repository.addFrame(
+      {
+        id: frameId,
+        name: `${slotCount}-Slot Frame`,
+        encryptedPath: frameVault.relativePath,
+        width: 1_800,
+        height: 1_200,
+        byteSize: frameVault.byteSize,
+        sha256: frameVault.sha256,
+        revision: 0,
+        sortOrder: 1,
+        archived: false,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      Array.from({ length: slotCount }, (_, index) => ({
+        slotIndex: index + 1,
+        zIndex: index,
+        name: `Photo ${index + 1}`,
+        x: 0.05,
+        y: 0.05,
+        width: 0.4,
+        height: 0.4,
+        cropMode: 'crop-to-fill' as const,
+      })),
+    );
+    return frameId;
+  }
+
+  it('pauses for guest confirmation after every capture on a 4-slot frame with uniform 8s countdowns and non-destructive single-shot retakes', async () => {
     vi.useFakeTimers();
     try {
-      const clock = 1_000;
+      let clock = 1_000;
       const camera = new BufferCamera();
       ({ store, workflow } = createWorkflow(camera, {
-        shotCountdownsMs: [8_000, 5_000, 5_000],
         now: () => clock,
         imageProcessor: capturingProcessor,
       }));
+      seedActiveFrame(store, 4);
       await workflow.initialize();
 
       const started = await workflow.start();
-      expect(started.countdownEndsAt).toBe(9_000);
+      expect(started).toMatchObject({
+        screen: 'countdown',
+        state: 'countdown',
+        shotNumber: 1,
+        captureCount: 0,
+        requiredShotCount: 4,
+        countdownEndsAt: 9_000,
+        countdownTotalSeconds: 8,
+        controls: { canAcceptShot: false, canRetakeShot: false },
+      });
 
+      clock += 8_000;
       await vi.advanceTimersByTimeAsync(8_000);
-      expect(store.repository.requireSession(started.sessionId!).captureCount).toBe(1);
-      expect(workflow.getSnapshot().countdownEndsAt).toBe(6_000);
+      const afterShot1 = workflow.getSnapshot();
+      expect(afterShot1).toMatchObject({
+        screen: 'shot_review',
+        state: 'shot_review',
+        shotNumber: 1,
+        captureCount: 0,
+        requiredShotCount: 4,
+        countdownEndsAt: null,
+        countdownTotalSeconds: null,
+        controls: { canAcceptShot: true, canRetakeShot: true },
+      });
+      expect(afterShot1.media.captureUrls).toHaveLength(1);
+      const slot1Url = afterShot1.media.captureUrls[0]!;
 
-      await vi.advanceTimersByTimeAsync(5_000);
-      expect(store.repository.requireSession(started.sessionId!).captureCount).toBe(2);
-      expect(workflow.getSnapshot().countdownEndsAt).toBe(6_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(camera.captures).toBe(1);
+      expect(workflow.getSnapshot().state).toBe('shot_review');
 
-      await vi.advanceTimersByTimeAsync(5_000);
-      const finished = store.repository.requireSession(started.sessionId!);
-      expect(finished.captureCount).toBe(3);
-      expect(finished.state).toBe('review');
-      expect(workflow.getSnapshot().countdownEndsAt).toBeNull();
-      expect(camera.captures).toBe(3);
+      clock += 1_000;
+      const afterAccept1 = await workflow.acceptShot(1);
+      expect(afterAccept1).toMatchObject({
+        screen: 'countdown',
+        state: 'countdown',
+        shotNumber: 2,
+        captureCount: 1,
+        countdownEndsAt: clock + 8_000,
+        countdownTotalSeconds: 8,
+      });
+      expect(afterAccept1.media.captureUrls).toEqual([slot1Url]);
+
+      clock += 8_000;
+      await vi.advanceTimersByTimeAsync(8_000);
+      const shot2Attempt1 = workflow.getSnapshot();
+      expect(shot2Attempt1).toMatchObject({
+        screen: 'shot_review',
+        state: 'shot_review',
+        shotNumber: 2,
+        captureCount: 1,
+      });
+      expect(shot2Attempt1.media.captureUrls).toHaveLength(2);
+      expect(shot2Attempt1.media.captureUrls[0]).toBe(slot1Url);
+      const slot2Attempt1Url = shot2Attempt1.media.captureUrls[1]!;
+
+      const retakingSlot2First = await workflow.retakeShot(2);
+      expect(retakingSlot2First).toMatchObject({
+        screen: 'countdown',
+        state: 'countdown',
+        shotNumber: 2,
+        captureCount: 1,
+        countdownTotalSeconds: 8,
+      });
+      expect(retakingSlot2First.media.captureUrls).toEqual([slot1Url]);
+
+      clock += 8_000;
+      await vi.advanceTimersByTimeAsync(8_000);
+      const shot2Attempt2 = workflow.getSnapshot();
+      expect(shot2Attempt2.media.captureUrls[0]).toBe(slot1Url);
+      expect(shot2Attempt2.media.captureUrls[1]).not.toBe(slot2Attempt1Url);
+
+      await workflow.retakeShot(2);
+      clock += 8_000;
+      await vi.advanceTimersByTimeAsync(8_000);
+      const shot2Attempt3 = workflow.getSnapshot();
+      expect(shot2Attempt3.media.captureUrls[0]).toBe(slot1Url);
+      const slot2WinningUrl = shot2Attempt3.media.captureUrls[1]!;
+      expect(slot2WinningUrl).not.toBe(slot2Attempt1Url);
+      expect(store.repository.listAssets(started.sessionId!)).toHaveLength(4);
+
+      await workflow.acceptShot(2);
+      clock += 8_000;
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(workflow.getSnapshot()).toMatchObject({
+        screen: 'shot_review',
+        shotNumber: 3,
+        captureCount: 2,
+      });
+      await workflow.acceptShot(3);
+
+      clock += 8_000;
+      await vi.advanceTimersByTimeAsync(8_000);
+      const shot4Attempt1 = workflow.getSnapshot();
+      expect(shot4Attempt1).toMatchObject({
+        screen: 'shot_review',
+        shotNumber: 4,
+        captureCount: 3,
+      });
+      const slot4FirstUrl = shot4Attempt1.media.captureUrls[3]!;
+
+      await workflow.retakeShot(4);
+      clock += 8_000;
+      await vi.advanceTimersByTimeAsync(8_000);
+      const shot4Attempt2 = workflow.getSnapshot();
+      expect(shot4Attempt2.media.captureUrls[3]).not.toBe(slot4FirstUrl);
+
+      const finalReview = await workflow.acceptShot(4);
+      expect(finalReview).toMatchObject({
+        screen: 'review',
+        state: 'review',
+        shotNumber: null,
+        captureCount: 4,
+        requiredShotCount: 4,
+        countdownEndsAt: null,
+        countdownTotalSeconds: null,
+        controls: {
+          canAcceptShot: false,
+          canRetakeShot: false,
+          canAcceptPhotos: true,
+          canRetakeAll: true,
+        },
+      });
+      expect(finalReview.media.captureUrls).toHaveLength(4);
+      expect(finalReview.media.captureUrls[0]).toBe(slot1Url);
+      expect(finalReview.media.captureUrls[1]).toBe(slot2WinningUrl);
+      expect(finalReview.media.captureUrls[3]).toBe(shot4Attempt2.media.captureUrls[3]);
+      expect(camera.captures).toBe(7);
+      expect(store.repository.listAssets(started.sessionId!)).toHaveLength(7);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('collapses every shot window when the e2e override supplies one duration', async () => {
+  it('handles duplicate acceptShot and retakeShot taps idempotently including concurrent reconnects', async () => {
+    vi.useFakeTimers();
+    try {
+      let releaseConnect: (() => void) | null = null;
+      let connectCount = 0;
+      const camera: CameraAdapter = {
+        connect: () => {
+          connectCount += 1;
+          if (connectCount === 1 || connectCount === 2) {
+            return Promise.resolve(readyStatus());
+          }
+          return new Promise<CameraStatus>((resolve) => {
+            releaseConnect = () => resolve(readyStatus());
+          });
+        },
+        getStatus: () => Promise.resolve(readyStatus()),
+        capture: (request) =>
+          Promise.resolve({
+            kind: 'buffer',
+            captureId: request.captureId,
+            bytes: Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x01, 0x02]),
+            contentType: 'image/jpeg',
+            capturedAt: 1,
+          }),
+        disconnect: () => Promise.resolve(),
+      };
+      ({ store, workflow } = createWorkflow(camera, {
+        now: () => 5_000,
+        imageProcessor: capturingProcessor,
+      }));
+      seedActiveFrame(store, 2);
+      await workflow.initialize();
+
+      await workflow.start();
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(workflow.getSnapshot().state).toBe('shot_review');
+
+      await expect(workflow.acceptShot(2)).rejects.toThrow();
+
+      const firstRetake = workflow.retakeShot(1);
+      const duplicateRetake = workflow.retakeShot(1);
+      expect((await duplicateRetake).state).toBe('countdown');
+      releaseConnect!();
+      const settledRetake = await firstRetake;
+      expect(settledRetake).toMatchObject({ state: 'countdown', shotNumber: 1, captureCount: 0 });
+      const timerDeadline = settledRetake.countdownEndsAt;
+      expect((await workflow.retakeShot(1)).countdownEndsAt).toBe(timerDeadline);
+
+      await vi.advanceTimersByTimeAsync(8_000);
+      const firstAccept = workflow.acceptShot(1);
+      const duplicateAccept = workflow.acceptShot(1);
+      expect((await duplicateAccept).captureCount).toBe(1);
+      releaseConnect!();
+      const settledAccept = await firstAccept;
+      expect(settledAccept).toMatchObject({ state: 'countdown', shotNumber: 2, captureCount: 1 });
+      expect((await workflow.acceptShot(1)).captureCount).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(8_000);
+      const reviewSnap = await workflow.acceptShot(2);
+      expect(reviewSnap.state).toBe('review');
+      expect((await workflow.acceptShot(2)).state).toBe('review');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves shot_review across restart, reconnects camera on guest action, and guards cancel during reconnect', async () => {
+    vi.useFakeTimers();
+    try {
+      const initialCamera = new BufferCamera();
+      ({ store, workflow } = createWorkflow(initialCamera, {
+        now: () => 1_000,
+        imageProcessor: capturingProcessor,
+      }));
+      seedActiveFrame(store, 2);
+      await workflow.initialize();
+
+      const started = await workflow.start();
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(workflow.getSnapshot().state).toBe('shot_review');
+      await workflow.close();
+      workflow = null;
+
+      const retention = new RetentionService(
+        store.repository,
+        store.vault,
+        store.secrets,
+        store.paths,
+      );
+      expect(retention.recoverAfterRestart(2_000)).toEqual({
+        interrupted: 0,
+        missingAssets: 0,
+        corruptAssets: 0,
+      });
+      expect(store.repository.requireSession(started.sessionId!).state).toBe('shot_review');
+
+      let releaseReconnect: (() => void) | null = null;
+      let reconnectCalls = 0;
+      const reconnectingCamera: CameraAdapter = {
+        connect: () => {
+          reconnectCalls += 1;
+          if (reconnectCalls === 1) return Promise.reject(new Error('camera still booting'));
+          return new Promise<CameraStatus>((resolve) => {
+            releaseReconnect = () => resolve(readyStatus());
+          });
+        },
+        getStatus: () => Promise.resolve(readyStatus()),
+        capture: (request) =>
+          Promise.resolve({
+            kind: 'buffer',
+            captureId: request.captureId,
+            bytes: Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x01, 0x02]),
+            contentType: 'image/jpeg',
+            capturedAt: 1,
+          }),
+        disconnect: () => Promise.resolve(),
+      };
+
+      const queue = new FakeUploadQueue();
+      const frameService = {
+        ensureDefaultFrame: () => Promise.resolve(undefined),
+        ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+        getFrameOptions: () => [null, null],
+        getFrameSummaries: () => [],
+        listFrames: () => [],
+        toSummary: (f: StoredFrame) => ({
+          id: f.id,
+          name: f.name,
+          width: f.width,
+          height: f.height,
+          byteSize: f.byteSize,
+          mediaUrl: `grace-booth-media://asset/${f.id}`,
+          slots: f.slots,
+          revision: f.revision,
+        }),
+      } as unknown as FrameService;
+      const qrService = {
+        render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+      } as unknown as QrService;
+
+      workflow = new BoothWorkflow(
+        store.repository,
+        store.vault,
+        reconnectingCamera,
+        frameService,
+        capturingProcessor,
+        queue as unknown as UploadQueue,
+        qrService,
+        { isDualDisplayActive: () => false, now: () => 2_000 },
+      );
+      await workflow.initialize();
+      expect(workflow.getSnapshot()).toMatchObject({
+        screen: 'shot_review',
+        state: 'shot_review',
+        shotNumber: 1,
+        captureCount: 0,
+        controls: { canAcceptShot: true, canRetakeShot: true },
+      });
+
+      const acceptPromise = workflow.acceptShot(1);
+      expect(reconnectCalls).toBe(2);
+
+      const cancelled = workflow.cancelSession();
+      expect(cancelled.screen).toBe('attract');
+      releaseReconnect!();
+      const afterAccept = await acceptPromise;
+      expect(afterAccept.screen).toBe('attract');
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(workflow.getSnapshot().screen).toBe('attract');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('routes interrupted sessions with local_asset_unavailable to camera_error even when all shots were recorded', async () => {
+    ({ store, workflow } = createWorkflow(new SequencedCamera(['ready']), {
+      imageProcessor: capturingProcessor,
+    }));
+    const session = store.repository.createSession(randomUUID(), 1_000, null, 2, {
+      countdownSeconds: 8,
+      reviewMode: 'continuous',
+    });
+    for (let shot = 1; shot <= 2; shot += 1) {
+      const written = store.vault.write('pending', Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      store.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, shot_attempt, encrypted_path,
+              content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'capture', 0, ?, 1, ?, 'image/jpeg', 100, 100, ?, ?, 1)`,
+        )
+        .run(
+          randomUUID(),
+          session.id,
+          shot,
+          written.relativePath,
+          written.byteSize,
+          written.sha256,
+        );
+    }
+    store.database.raw
+      .prepare(
+        `UPDATE sessions SET state = 'interrupted', capture_count = 2,
+          last_error_code = 'local_asset_unavailable',
+          last_error_message = 'A local photo could not be verified.' WHERE id = ?`,
+      )
+      .run(session.id);
+
+    await workflow.initialize();
+    expect(workflow.getSnapshot()).toMatchObject({
+      screen: 'recovery',
+      state: 'camera_error',
+      errorCode: 'capture_failed',
+    });
+    expect(store.repository.requireSession(session.id).lastErrorCode).toBe(
+      'local_asset_unavailable',
+    );
+  });
+
+  it('applies admin capture setting changes to new sessions while locking active sessions', async () => {
+    vi.useFakeTimers();
+    try {
+      const clock = 10_000;
+      const camera = new BufferCamera();
+      ({ store, workflow } = createWorkflow(camera, {
+        now: () => clock,
+        imageProcessor: capturingProcessor,
+      }));
+      await workflow.initialize();
+
+      const first = await workflow.start();
+      expect(first.countdownEndsAt).toBe(18_000);
+      expect(first.countdownTotalSeconds).toBe(8);
+
+      const currentSettings = store.repository.getSettings();
+      store.repository.setCaptureSettings({
+        countdownSeconds: 5,
+        reviewMode: 'continuous',
+        expectedRevision: currentSettings.revision,
+      });
+
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(workflow.getSnapshot().state).toBe('shot_review');
+      const nextShotInFirst = await workflow.acceptShot(1);
+      expect(nextShotInFirst.countdownEndsAt).toBe(18_000);
+      expect(nextShotInFirst.countdownTotalSeconds).toBe(8);
+
+      workflow.cancelSession();
+
+      const second = await workflow.start();
+      expect(second.countdownEndsAt).toBe(15_000);
+      expect(second.countdownTotalSeconds).toBe(5);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(store.repository.requireSession(second.sessionId!)).toMatchObject({
+        state: 'countdown',
+        captureCount: 1,
+      });
+      expect(workflow.getSnapshot().countdownEndsAt).toBe(15_000);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(store.repository.requireSession(second.sessionId!)).toMatchObject({
+        state: 'review',
+        captureCount: 3,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-emits idle attract snapshots on refreshIdleSnapshot without disturbing active sessions', async () => {
+    const camera = new BufferCamera();
+    ({ store, workflow } = createWorkflow(camera, { imageProcessor: capturingProcessor }));
+    await workflow.initialize();
+
+    const emitted: { screen: string; requiredShotCount?: number }[] = [];
+    workflow.subscribe((snap) =>
+      emitted.push({
+        screen: snap.screen,
+        ...(snap.requiredShotCount === undefined
+          ? {}
+          : { requiredShotCount: snap.requiredShotCount }),
+      }),
+    );
+
+    seedActiveFrame(store, 4);
+    workflow.refreshIdleSnapshot();
+    expect(emitted).toEqual([{ screen: 'attract', requiredShotCount: 4 }]);
+
+    emitted.length = 0;
+    await workflow.start();
+    const afterStartCount = emitted.length;
+    workflow.refreshIdleSnapshot();
+    expect(emitted).toHaveLength(afterStartCount);
+  });
+
+  it('collapses every shot window in continuous mode when captureOverride supplies countdownMs', async () => {
     vi.useFakeTimers();
     try {
       const camera = new BufferCamera();
       ({ store, workflow } = createWorkflow(camera, {
-        shotCountdownsMs: [40, 40, 40],
+        captureOverride: { countdownMs: 40, reviewMode: 'continuous' },
         imageProcessor: capturingProcessor,
       }));
       await workflow.initialize();
 
       const started = await workflow.start();
       expect(started.countdownEndsAt).toBe(2_040);
+      expect(started.countdownTotalSeconds).toBe(1);
       await vi.advanceTimersByTimeAsync(40);
       expect(store.repository.requireSession(started.sessionId!).captureCount).toBe(1);
       expect(workflow.getSnapshot().countdownEndsAt).toBe(2_040);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('wraps MockCameraAdapter fixture reads cleanly across slots 1 through 10', async () => {
+    const adapter = new MockCameraAdapter({
+      fixtureDirectory: fileURLToPath(new URL('../../resources/mock', import.meta.url)),
+      delayMs: 0,
+    });
+    await adapter.connect();
+    try {
+      const sessionId = randomUUID();
+      for (let shotNumber = 1; shotNumber <= 10; shotNumber += 1) {
+        const result = await adapter.capture({
+          sessionId,
+          captureId: randomUUID(),
+          shotNumber,
+          timeoutMs: 5_000,
+        });
+        expect(result.kind).toBe('buffer');
+        if (result.kind === 'buffer') {
+          expect(result.bytes.byteLength).toBeGreaterThan(100);
+        }
+      }
+    } finally {
+      await adapter.disconnect();
     }
   });
 });
@@ -373,9 +846,9 @@ describe('guest session cancellation', () => {
     close: () => Promise.resolve(),
   };
 
-  function createCapturingWorkflow() {
+  function createCapturingWorkflow(reviewMode: 'per_shot' | 'continuous' = 'continuous') {
     return createWorkflow(new BufferCamera(), {
-      shotCountdownsMs: [60_000, 60_000, 60_000],
+      captureOverride: { countdownMs: 60_000, reviewMode },
       imageProcessor: capturingProcessor,
     });
   }
@@ -383,7 +856,7 @@ describe('guest session cancellation', () => {
   it('cancel during countdown deletes created assets and vault files and reaches attract', async () => {
     vi.useFakeTimers();
     try {
-      const created = createCapturingWorkflow();
+      const created = createCapturingWorkflow('continuous');
       store = created.store;
       const testStore = created.store;
       const activeWorkflow = (workflow = created.workflow);
@@ -407,10 +880,39 @@ describe('guest session cancellation', () => {
     }
   });
 
+  it('cancel during shot_review purges all capture attempts including superseded retakes', async () => {
+    vi.useFakeTimers();
+    try {
+      const created = createCapturingWorkflow('per_shot');
+      store = created.store;
+      const testStore = created.store;
+      const activeWorkflow = (workflow = created.workflow);
+      await activeWorkflow.initialize();
+
+      const started = await activeWorkflow.start();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await activeWorkflow.retakeShot(1);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(activeWorkflow.getSnapshot().state).toBe('shot_review');
+
+      const assets = testStore.repository.listAssets(started.sessionId!);
+      expect(assets).toHaveLength(2);
+
+      const cancelled = activeWorkflow.cancelSession();
+      expect(cancelled).toMatchObject({ screen: 'attract', state: null, sessionId: null });
+      expect(testStore.repository.getSession(started.sessionId!)).toBeNull();
+      for (const asset of assets) {
+        expect(() => testStore.vault.read(asset.encryptedPath)).toThrow();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('purges only the partial captures; a later session is unaffected', async () => {
     vi.useFakeTimers();
     try {
-      const created = createCapturingWorkflow();
+      const created = createCapturingWorkflow('continuous');
       store = created.store;
       const activeWorkflow = (workflow = created.workflow);
       await activeWorkflow.initialize();
@@ -443,7 +945,7 @@ describe('guest session cancellation', () => {
   it('is idempotent and never deletes a session outside cancellable states', async () => {
     vi.useFakeTimers();
     try {
-      const created = createCapturingWorkflow();
+      const created = createCapturingWorkflow('continuous');
       store = created.store;
       const activeWorkflow = (workflow = created.workflow);
       await activeWorkflow.initialize();
@@ -453,7 +955,6 @@ describe('guest session cancellation', () => {
 
       const started = await activeWorkflow.start();
       await vi.advanceTimersByTimeAsync(60_000);
-      // Force a terminal state behind the workflow's back to prove the guard.
       store.database.raw
         .prepare("UPDATE sessions SET state = 'final' WHERE id = ?")
         .run(started.sessionId!);
@@ -462,7 +963,6 @@ describe('guest session cancellation', () => {
       expect(result.state).toBe('final');
       expect(store.repository.getSession(started.sessionId!)).not.toBeNull();
 
-      // A second immediate cancel after returning to attract stays safe.
       expect(() => activeWorkflow.cancelSession()).not.toThrow();
     } finally {
       vi.useRealTimers();
@@ -479,7 +979,7 @@ describe('guest session cancellation', () => {
       });
       const camera = new WebcamCameraAdapter(broker);
       const created = createWorkflow(camera, {
-        shotCountdownsMs: [1_000, 1_000, 1_000],
+        captureOverride: { countdownMs: 1_000, reviewMode: 'continuous' },
         imageProcessor: capturingProcessor,
       });
       store = created.store;
@@ -489,22 +989,18 @@ describe('guest session cancellation', () => {
       const first = await activeWorkflow.start();
       expect(first.state).toBe('countdown');
 
-      // Countdown expires -> captureNext -> broker.requestFrame() in flight
       await vi.advanceTimersByTimeAsync(1_000);
       expect(lastFrameRequest).not.toBeNull();
 
-      // In flight capture request is pending. Cancel the session!
       const cancelled = activeWorkflow.cancelSession();
       expect(cancelled.screen).toBe('attract');
 
-      // Verify adapter is not busy and can immediately start and capture a new session
       const second = await activeWorkflow.start();
       expect(second.state).toBe('countdown');
       lastFrameRequest = null;
       await vi.advanceTimersByTimeAsync(1_000);
       expect(lastFrameRequest).not.toBeNull();
 
-      // Submit valid frame for the second session
       const validJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x01, 0x02]);
       broker.submitFrame(lastFrameRequest!.captureId, validJpeg);
       await vi.advanceTimersByTimeAsync(0);
@@ -586,7 +1082,7 @@ describe('dual display handoff', () => {
       queue as unknown as UploadQueue,
       qrService,
       {
-        shotCountdownsMs: [0, 0, 0],
+        captureOverride: { countdownMs: 0, reviewMode: 'continuous' },
         now: () => 1_000,
         isDualDisplayActive: () => true,
       },
@@ -718,7 +1214,7 @@ describe('dual display handoff', () => {
       queue as unknown as UploadQueue,
       qrService,
       {
-        shotCountdownsMs: [0, 0, 0],
+        captureOverride: { countdownMs: 0, reviewMode: 'continuous' },
         now: () => currentTime,
         isDualDisplayActive: () => true,
       },
@@ -819,7 +1315,7 @@ describe('dual display handoff', () => {
         queue as unknown as UploadQueue,
         qrService,
         {
-          shotCountdownsMs: [0, 0, 0],
+          captureOverride: { countdownMs: 0, reviewMode: 'continuous' },
           isDualDisplayActive: () => true,
         },
       );
@@ -935,7 +1431,7 @@ describe('print choice at review', () => {
 function createWorkflow(
   camera: CameraAdapter,
   overrides: {
-    shotCountdownsMs?: readonly [number, number, number];
+    captureOverride?: CapturePolicyOverride | null;
     now?: () => number;
     imageProcessor?: ImageProcessor;
     print?: {
@@ -966,8 +1462,8 @@ function createWorkflow(
       height: 3600,
       byteSize: 1000,
       mediaUrl: 'grace-booth-media://asset/test',
-      slots: [],
-      revision: 0,
+      slots: f.slots,
+      revision: f.revision,
     }),
   } as unknown as FrameService;
   const qrService = {
@@ -984,7 +1480,7 @@ function createWorkflow(
       queue as unknown as UploadQueue,
       qrService,
       {
-        shotCountdownsMs: overrides.shotCountdownsMs ?? [60_000, 60_000, 60_000],
+        captureOverride: overrides.captureOverride ?? null,
         isDualDisplayActive: () => false,
         now: overrides.now ?? (() => 2_000),
         ...(overrides.print ? { print: overrides.print } : {}),

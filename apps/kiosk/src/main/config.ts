@@ -1,7 +1,23 @@
-import type { CameraAdapterKind } from '@grace-booth/shared';
+import {
+  CaptureReviewModeSchema,
+  MAX_FRAME_SLOTS,
+  MIN_FRAME_SLOTS,
+  type CameraAdapterKind,
+  type CaptureReviewMode,
+} from '@grace-booth/shared';
 import { z } from 'zod';
 
 import { AppError } from './errors.js';
+
+export type CapturePolicyOverride = {
+  countdownMs?: number | null;
+  reviewMode?: CaptureReviewMode | null;
+};
+
+const E2eCountdownEnvSchema = z.union([
+  z.literal('settings'),
+  z.coerce.number().int().min(10).max(30_000),
+]);
 
 const EnvironmentSchema = z
   .object({
@@ -18,9 +34,15 @@ const EnvironmentSchema = z
       .optional(),
     GRACE_BOOTH_SUPABASE_PUBLISHABLE_KEY: z.string().min(20).max(1_000).optional(),
     GRACE_BOOTH_E2E: z.enum(['0', '1']).default('0'),
-    GRACE_BOOTH_E2E_COUNTDOWN_MS: z.coerce.number().int().min(10).max(5_000).optional(),
+    GRACE_BOOTH_E2E_COUNTDOWN_MS: E2eCountdownEnvSchema.optional(),
+    GRACE_BOOTH_E2E_REVIEW_MODE: CaptureReviewModeSchema.optional(),
     GRACE_BOOTH_E2E_CAMERA_DELAY_MS: z.coerce.number().int().min(0).max(10_000).optional(),
-    GRACE_BOOTH_E2E_CAPTURE_FAIL_SHOT: z.coerce.number().int().min(1).max(3).optional(),
+    GRACE_BOOTH_E2E_CAPTURE_FAIL_SHOT: z.coerce
+      .number()
+      .int()
+      .min(MIN_FRAME_SLOTS)
+      .max(MAX_FRAME_SLOTS)
+      .optional(),
     GRACE_BOOTH_E2E_UPLOAD_FAILURES: z.coerce.number().int().min(0).max(4).optional(),
     GRACE_BOOTH_E2E_CREATE_DELAY_MS: z.coerce.number().int().min(0).max(60_000).optional(),
     GRACE_BOOTH_E2E_UPLOAD_DELAY_MS: z.coerce.number().int().min(0).max(60_000).optional(),
@@ -32,7 +54,7 @@ const EnvironmentSchema = z
 export type RuntimeConfig = {
   cameraAdapter: CameraAdapterKind;
   cloud: { url: string | null; publishableKey: string | null };
-  shotCountdownsMs: readonly [number, number, number];
+  captureOverride: CapturePolicyOverride | null;
   e2e: {
     enabled: boolean;
     cameraDelayMs: number;
@@ -75,10 +97,15 @@ export function loadRuntimeConfig(
     parsed.GRACE_BOOTH_SUPABASE_PUBLISHABLE_KEY ??
     (e2eEnabled ? null : DEFAULT_PROD_SUPABASE_PUBLISHABLE_KEY);
 
-  const e2eCountdownMs = parsed.GRACE_BOOTH_E2E_COUNTDOWN_MS ?? 40;
-  const shotCountdownsMs: readonly [number, number, number] = e2eEnabled
-    ? [e2eCountdownMs, e2eCountdownMs, e2eCountdownMs]
-    : [8_000, 5_000, 5_000];
+  const captureOverride: CapturePolicyOverride | null = e2eEnabled
+    ? {
+        countdownMs:
+          parsed.GRACE_BOOTH_E2E_COUNTDOWN_MS === 'settings'
+            ? null
+            : (parsed.GRACE_BOOTH_E2E_COUNTDOWN_MS ?? 40),
+        reviewMode: parsed.GRACE_BOOTH_E2E_REVIEW_MODE ?? null,
+      }
+    : null;
 
   return {
     cameraAdapter: parsed.GRACE_BOOTH_CAMERA_ADAPTER,
@@ -86,7 +113,7 @@ export function loadRuntimeConfig(
       url: cloudUrl,
       publishableKey: cloudPublishableKey,
     },
-    shotCountdownsMs,
+    captureOverride,
     e2e: {
       enabled: e2eEnabled,
       cameraDelayMs: e2eEnabled ? (parsed.GRACE_BOOTH_E2E_CAMERA_DELAY_MS ?? 10) : 300,

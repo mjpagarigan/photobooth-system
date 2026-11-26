@@ -24,6 +24,8 @@ export const EMPTY_BOOTH_SNAPSHOT: BoothSnapshot = {
   },
   controls: {
     canStart: false,
+    canAcceptShot: false,
+    canRetakeShot: false,
     canRetakeAll: false,
     canAcceptPhotos: false,
     canRetryUpload: false,

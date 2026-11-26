@@ -75,6 +75,10 @@ const SETTINGS: AdminSettings = {
     albumShareUrl: null,
     enabled: false,
   },
+  capture: {
+    countdownSeconds: 8,
+    reviewMode: 'per_shot',
+  },
   revision: 1,
 };
 
@@ -96,6 +100,8 @@ const ATTRACT: BoothSnapshot = {
   media: { captureUrls: [], collageUrl: null, qrImageUrl: null },
   controls: {
     canStart: true,
+    canAcceptShot: false,
+    canRetakeShot: false,
     canRetakeAll: false,
     canAcceptPhotos: false,
     canRetryUpload: false,
@@ -118,6 +124,8 @@ function sessionSnapshot(patch: Partial<BoothSnapshot> = {}): BoothSnapshot {
     media: { captureUrls: [], collageUrl: null, qrImageUrl: null },
     controls: {
       canStart: false,
+      canAcceptShot: false,
+      canRetakeShot: false,
       canRetakeAll: false,
       canAcceptPhotos: false,
       canRetryUpload: false,
@@ -178,6 +186,8 @@ function createBridge(
     booth: {
       getSnapshot: vi.fn().mockResolvedValue(ok(initial)),
       start: startMock,
+      acceptShot: vi.fn().mockResolvedValue(ok(initial)),
+      retakeShot: vi.fn().mockResolvedValue(ok(initial)),
       retakeAll: vi.fn().mockResolvedValue(ok(initial)),
       acceptPhotos: vi.fn<(input: { frameId: string }) => Promise<RpcResult<BoothSnapshot>>>(() =>
         Promise.resolve(ok(initial)),
@@ -291,6 +301,7 @@ function createBridge(
       changePasscode: vi.fn().mockResolvedValue(ok({})),
       getSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
       saveSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
+      saveCaptureSettings: vi.fn().mockResolvedValue(ok(SETTINGS)),
       getDisplays: vi.fn().mockResolvedValue(ok([])),
       swapDisplays: vi.fn().mockResolvedValue(ok([])),
       saveDualDisplaySettings: vi
@@ -545,6 +556,8 @@ describe('App guest flow', () => {
           },
           controls: {
             canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
             canRetakeAll: true,
             canAcceptPhotos: true,
             canRetryUpload: false,
@@ -596,6 +609,8 @@ describe('App guest flow', () => {
           },
           controls: {
             canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
             canRetakeAll: false,
             canAcceptPhotos: false,
             canRetryUpload: false,
@@ -692,6 +707,8 @@ describe('recent gallery', () => {
           },
           controls: {
             canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
             canRetakeAll: false,
             canAcceptPhotos: false,
             canRetryUpload: false,

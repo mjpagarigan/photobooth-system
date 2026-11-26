@@ -45,16 +45,29 @@ function applyMigrations(database: BetterSqlite3.Database, directory: string): v
     .filter((name) => MIGRATION_NAME.test(basename(name)))
     .sort((left, right) => left.localeCompare(right));
   const hasMigration = database.prepare('SELECT 1 FROM _local_migrations WHERE name = ?').pluck();
+  const pending = files.filter((file) => hasMigration.get(file) !== 1);
+  if (pending.length === 0) return;
+
   const recordMigration = database.prepare(
     'INSERT INTO _local_migrations (name, applied_at) VALUES (?, ?)',
   );
 
-  for (const file of files) {
-    if (hasMigration.get(file) === 1) continue;
-    const sql = readFileSync(join(directory, file), 'utf8');
-    database.transaction(() => {
-      database.exec(sql);
-      recordMigration.run(file, Date.now());
-    })();
+  // SQLite requires foreign_keys = OFF outside any transaction so table-rebuild migrations
+  // cannot trigger ON DELETE CASCADE while dropping and renaming parent tables.
+  database.pragma('foreign_keys = OFF');
+  try {
+    for (const file of pending) {
+      const sql = readFileSync(join(directory, file), 'utf8');
+      database.transaction(() => {
+        database.exec(sql);
+        const violations = database.pragma('foreign_key_check') as unknown[];
+        if (violations.length > 0) {
+          throw new Error(`Migration ${file} left ${violations.length} foreign key violation(s).`);
+        }
+        recordMigration.run(file, Date.now());
+      })();
+    }
+  } finally {
+    database.pragma('foreign_keys = ON');
   }
 }
