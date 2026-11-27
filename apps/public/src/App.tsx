@@ -6,7 +6,7 @@ import {
   Skeleton,
   WarningOctagon,
 } from '@grace-booth/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchPhotoDownload,
   fetchPhotoImage,
@@ -21,6 +21,10 @@ type ViewState =
   | { kind: 'loading' }
   | { kind: 'ready'; details: ResolvedPhoto; imageUrl: string }
   | { kind: 'error'; message: string; retryable: boolean };
+
+type DownloadState = 'idle' | 'working' | 'saved' | 'error';
+
+const DOWNLOAD_REVOKE_DELAY_MS = 60_000;
 
 function PageFrame({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
@@ -38,7 +42,6 @@ function LoadingView(): React.JSX.Element {
   return (
     <main
       aria-label="Loading photo"
-      aria-live="polite"
       aria-busy="true"
       className="photo-layout"
       data-state="loading"
@@ -101,18 +104,37 @@ function ReadyView({
   details: ResolvedPhoto;
   imageUrl: string;
 }): React.JSX.Element {
-  const [downloadState, setDownloadState] = useState<'idle' | 'working' | 'error'>('idle');
+  const [downloadState, setDownloadState] = useState<DownloadState>('idle');
+  const pendingDownloadRef = useRef<{ url: string; timerId: number } | null>(null);
+  const isMountedRef = useRef(true);
   const availableUntil = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
       dateStyle: 'long',
-      timeZone: 'UTC',
     }).format(new Date(details.expiresAt));
   }, [details.expiresAt]);
 
+  const clearPendingDownload = useCallback(() => {
+    const pending = pendingDownloadRef.current;
+    if (!pending) return;
+    window.clearTimeout(pending.timerId);
+    URL.revokeObjectURL(pending.url);
+    pendingDownloadRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      clearPendingDownload();
+    };
+  }, [clearPendingDownload]);
+
   async function downloadPhoto(): Promise<void> {
+    clearPendingDownload();
     setDownloadState('working');
     try {
       const blob = await fetchPhotoDownload(token);
+      if (!isMountedRef.current) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -121,10 +143,16 @@ function ReadyView({
       document.body.append(link);
       link.click();
       link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setDownloadState('idle');
+      const timerId = window.setTimeout(() => {
+        URL.revokeObjectURL(url);
+        if (pendingDownloadRef.current?.url === url) {
+          pendingDownloadRef.current = null;
+        }
+      }, DOWNLOAD_REVOKE_DELAY_MS);
+      pendingDownloadRef.current = { url, timerId };
+      setDownloadState('saved');
     } catch {
-      setDownloadState('error');
+      if (isMountedRef.current) setDownloadState('error');
     }
   }
 
@@ -148,6 +176,11 @@ function ReadyView({
         >
           <span>{downloadState === 'working' ? 'Preparing download…' : 'Download photo'}</span>
         </Button>
+        {downloadState === 'saved' ? (
+          <p className="download-feedback" role="status">
+            Download started. Check Downloads or Photos.
+          </p>
+        ) : null}
         <p className="mobile-save-hint">
           On iPhone or iPad, touch and hold the photo to save it to Photos.
         </p>

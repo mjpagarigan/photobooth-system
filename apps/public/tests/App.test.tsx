@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import * as api from '../src/api';
@@ -75,6 +75,41 @@ describe('public photo page', () => {
     expect(api.fetchPhotoDownload).toHaveBeenNthCalledWith(1, token);
     expect(api.fetchPhotoDownload).toHaveBeenNthCalledWith(2, token);
     expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the download blob URL alive past 1000ms, shows download feedback, and revokes it on unmount', async () => {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const previewUrl = 'blob:https://photos.example.test/preview';
+    const downloadUrl = 'blob:https://photos.example.test/download';
+    const createObjectUrl = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValueOnce(previewUrl)
+      .mockReturnValueOnce(downloadUrl);
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL');
+
+    const { unmount } = render(<App />);
+    const button = await screen.findByRole('button', { name: 'Download photo' });
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(button);
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      expect(createObjectUrl).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Download started. Check Downloads or Photos.')).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Download photo' })).toBeEnabled();
+      expect(revokeObjectUrl).not.toHaveBeenCalledWith(downloadUrl);
+
+      unmount();
+      expect(revokeObjectUrl).toHaveBeenCalledWith(downloadUrl);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders the snapshotted recruitment button text', async () => {

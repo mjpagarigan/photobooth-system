@@ -34,6 +34,7 @@ html {
 body {
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   color: var(--color-ink-pure);
   background-color: var(--color-substrate);
@@ -58,10 +59,14 @@ input {
 }
 
 .page-frame {
+  display: flex;
+  flex-direction: column;
   width: min(100%, 480px);
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: 24px 20px 32px;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 
 .site-header {
@@ -88,6 +93,12 @@ input {
   gap: 16px;
 }
 
+.error-layout {
+  flex: 1;
+  justify-content: center;
+  padding-bottom: 32px;
+}
+
 .photo-layout h1 {
   margin: 0;
   font-size: 32px;
@@ -97,7 +108,7 @@ input {
 }
 
 .photo-layout h1 span {
-  color: #86868b;
+  color: #636366;
 }
 
 .photo-layout[data-state='loading'] h1 span {
@@ -116,7 +127,7 @@ input {
   padding: 20px;
   border-radius: var(--radius-xl);
   background: #ffffff;
-  box-shadow: var(--shadow-4);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
 }
 
 .photo-card img {
@@ -128,13 +139,15 @@ input {
 }
 
 .photo-card--loading {
-  height: 360px;
+  align-items: center;
 }
 
 .skeleton-photo {
-  width: 160px;
-  height: 100%;
-  border-radius: var(--radius-sm);
+  width: min(100%, 280px);
+  height: auto;
+  aspect-ratio: 3 / 4;
+  max-height: 55dvh;
+  border-radius: 16px;
 }
 
 .action-stack {
@@ -152,8 +165,17 @@ input {
 }
 
 .secondary-pill {
-  min-height: 44px;
+  min-height: 48px;
+  padding: 0 24px;
   border-radius: var(--radius-full);
+}
+
+.download-feedback {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-success);
+  text-align: center;
 }
 
 .mobile-save-hint {
@@ -187,6 +209,7 @@ input {
   padding: 20px;
   border-radius: var(--radius-lg);
   background: #ffffff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
 }
 
 .recruit-card h2 {
@@ -226,6 +249,7 @@ input {
   padding: 36px 24px 28px;
   border-radius: var(--radius-xl);
   background: #ffffff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
   text-align: center;
 }
 
