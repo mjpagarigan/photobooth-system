@@ -291,9 +291,6 @@ async function startApplication(): Promise<void> {
   uploadQueue.setOfflineDeliveryServer(offlineDeliveryServer);
   await Promise.all([serverManager.start(), offlineDeliveryServer.start()]);
   await workflow.initialize();
-  await printService.start().catch((error: unknown) => {
-    logger.error({ error }, 'print queue failed to start');
-  });
 
   const target = getRendererTarget(app.isPackaged, process.env.ELECTRON_RENDERER_URL);
   const removeIpcHandlers = registerIpcHandlers({
@@ -313,6 +310,10 @@ async function startApplication(): Promise<void> {
     print: printService,
     rendererOrigin: target.origin,
     onNetworkSettingsChanged: () => serverManager.requestReconfigure(),
+  });
+
+  void printService.start().catch((error: unknown) => {
+    logger.error({ error }, 'print queue failed to start');
   });
 
   const { captureWindow } = await displayManager.initialize();

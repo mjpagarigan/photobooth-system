@@ -503,6 +503,53 @@ describe('packaged frame seeding', () => {
       store.close();
     }
   });
+
+  it('skips Sharp normalization when shipped ministry PNG hashes already match', async () => {
+    const store = createTestStore();
+    const normalizeCalls: Uint8Array[] = [];
+    const trackingProcessor: ImageProcessor = {
+      process: () => Promise.reject(new Error('not used')),
+      validateSourceJpeg: () => Promise.reject(new Error('not used')),
+      normalizeFramePng: (bytes) => {
+        normalizeCalls.push(bytes);
+        return Promise.resolve({ bytes: Buffer.from(bytes), width: 1_200, height: 3_600 });
+      },
+      createThumbnail: () => Promise.reject(new Error('not used')),
+      close: () => Promise.resolve(),
+    };
+    const service = new FrameService(
+      store.repository,
+      store.vault,
+      PACKAGED_FRAMES,
+      trackingProcessor,
+    );
+    try {
+      await service.ensureDefaultFrames();
+      await service.ensureMinistryFrames();
+      expect(normalizeCalls.length).toBeGreaterThan(0);
+
+      const firstMinistry = store.repository
+        .listFrames()
+        .find((frame) => frame.name === MINISTRY_FRAMES[0]!.name)!;
+      const editedSlots = firstMinistry.slots.map((slot, index) =>
+        index === 0 ? { ...slot, x: slot.x + 0.005 } : slot,
+      );
+      const edited = service.updateLayout(
+        firstMinistry.id,
+        firstMinistry.name,
+        editedSlots,
+        firstMinistry.revision,
+      );
+
+      normalizeCalls.length = 0;
+      const resynced = await service.ensureMinistryFrames();
+      expect(resynced).toEqual([]);
+      expect(normalizeCalls).toHaveLength(0);
+      expect(store.repository.getFrame(edited.id)?.revision).toBe(edited.revision);
+    } finally {
+      store.close();
+    }
+  });
 });
 
 function fakeProcessor(width: number, height: number): ImageProcessor {

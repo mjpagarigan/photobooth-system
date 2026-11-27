@@ -234,6 +234,8 @@ type PackagedFrameDefinition = {
 };
 
 export class FrameService {
+  private readonly normalizedHashByRawHash = new Map<string, string>();
+
   constructor(
     private readonly repository: LocalRepository,
     private readonly vault: PhotoVault,
@@ -322,14 +324,22 @@ export class FrameService {
       try {
         const filePath = join(framesDir, ministry.file);
         const bytes = await readFile(filePath);
+        const rawSha256 = createHash('sha256').update(bytes).digest('hex');
         if (existing) {
-          const normalized = await this.imageProcessor.normalizeFramePng(bytes);
-          const normalizedSha256 = createHash('sha256').update(normalized.bytes).digest('hex');
           const isUntouchedShippedFrame = existing.revision === 0;
           const isSlotMismatch = JSON.stringify(existing.slots) !== JSON.stringify(ministry.slots);
-          if (isSlotMismatch || existing.sha256 !== normalizedSha256) {
-            // Exact built-in names identify packaged ministry entries across releases. Artwork is
-            // authoritative, while operator-edited slot geometry is preserved on revised rows.
+          const needsSlotUpdate = isUntouchedShippedFrame && isSlotMismatch;
+          const knownNormalizedHash =
+            existing.sha256 === rawSha256
+              ? rawSha256
+              : this.normalizedHashByRawHash.get(rawSha256);
+          if (!needsSlotUpdate && knownNormalizedHash === existing.sha256) {
+            continue;
+          }
+          const normalized = await this.imageProcessor.normalizeFramePng(bytes);
+          const normalizedSha256 = createHash('sha256').update(normalized.bytes).digest('hex');
+          this.normalizedHashByRawHash.set(rawSha256, normalizedSha256);
+          if (needsSlotUpdate || existing.sha256 !== normalizedSha256) {
             seeded.push(
               this.replacePackagedArtwork(
                 existing,
@@ -340,6 +350,7 @@ export class FrameService {
           }
         } else {
           const imported = await this.importLibraryFrame(ministry.name, bytes, ministry.slots);
+          this.normalizedHashByRawHash.set(rawSha256, imported.sha256);
           seeded.push(imported);
         }
       } catch {

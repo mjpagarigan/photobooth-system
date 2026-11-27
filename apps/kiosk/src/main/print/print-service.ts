@@ -68,6 +68,7 @@ export class PrintService extends EventEmitter implements WorkflowPrintPort {
   private readonly now: () => number;
   private readonly tickMs: number;
   private timer: NodeJS.Timeout | null = null;
+  private startPromise: Promise<void> | null = null;
   private activeTick: Promise<void> | null = null;
   private running = false;
   private wakeRequested = false;
@@ -102,17 +103,26 @@ export class PrintService extends EventEmitter implements WorkflowPrintPort {
     return this.adapter.kind;
   }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    if (this.startPromise) return this.startPromise;
     this.stopped = false;
-    this.clearStaging();
-    await this.recover();
-    await this.tick();
+    const run = (async () => {
+      this.clearStaging();
+      await this.recover();
+      if (this.stopped) return;
+      await this.tick();
+    })().finally(() => {
+      if (this.startPromise === run) this.startPromise = null;
+    });
+    this.startPromise = run;
+    return run;
   }
 
   async stop(): Promise<void> {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    await this.startPromise;
     await this.activeTick;
     await this.adapter.close();
   }

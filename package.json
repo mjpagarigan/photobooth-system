@@ -9,7 +9,7 @@
     "pnpm": ">=11.0.0 <12"
   },
   "scripts": {
-    "dev:kiosk": "pnpm --filter @grace-booth/kiosk build && pnpm --filter @grace-booth/kiosk dev",
+    "dev:kiosk": "pnpm --filter @grace-booth/kiosk dev",
     "dev:public": "pnpm --filter @grace-booth/public dev",
     "dev:supabase": "pnpm functions:serve",
     "supabase:start": "supabase start",
