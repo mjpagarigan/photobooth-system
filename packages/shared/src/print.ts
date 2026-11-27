@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { OpaqueIdSchema, UtcMillisSchema } from './domain.js';
+import { OpaqueIdSchema, UtcMillisSchema } from './primitives.js';
 
 /** Landscape 4R (6 × 4 in) expressed as width / height. */
 export const PRINT_4R_ASPECT = 3 / 2;
@@ -55,6 +55,14 @@ export const PrintJobStateSchema = z.enum([
   'cancelled',
 ]);
 export type PrintJobState = z.infer<typeof PrintJobStateSchema>;
+
+export const OPEN_PRINT_STATES = [
+  'waiting_for_photo',
+  'queued',
+  'submitting',
+  'spooled',
+  'needs_attention',
+] as const satisfies readonly PrintJobState[];
 
 export const PrintJobKindSchema = z.enum(['session', 'reprint', 'calibration', 'color_test']);
 export type PrintJobKind = z.infer<typeof PrintJobKindSchema>;
@@ -136,3 +144,178 @@ export type PrinterSettings = z.infer<typeof PrinterSettingsSchema>;
 export const PrintCopiesSchema = z.number().int().min(1).max(MAX_COPIES_PER_REQUEST);
 export const SessionPrintRequestSchema = z.object({ copies: PrintCopiesSchema }).strict();
 export type SessionPrintRequest = z.infer<typeof SessionPrintRequestSchema>;
+
+const PositiveCopyCountSchema = z.number().int().positive();
+const NonNegativeCopyCountSchema = z.number().int().nonnegative();
+const SafePrintDetailSchema = z.string().max(300);
+
+export const SessionPrintOriginSchema = z.enum(['session', 'reprint', 'mixed']);
+export type SessionPrintOrigin = z.infer<typeof SessionPrintOriginSchema>;
+
+export const SessionPrintPauseReasonSchema = z.enum([
+  'offline',
+  'paper_out',
+  'printer_error',
+  'printer_unconfigured',
+  'printer_unknown',
+  'photo_interrupted',
+]);
+export type SessionPrintPauseReason = z.infer<typeof SessionPrintPauseReasonSchema>;
+
+const PreparingPrintStatusSchema = z
+  .object({
+    phase: z.literal('preparing'),
+    origin: SessionPrintOriginSchema,
+    pendingCopies: PositiveCopyCountSchema,
+    totalCopies: PositiveCopyCountSchema,
+  })
+  .strict();
+
+const PrintingPrintStatusSchema = z
+  .object({
+    phase: z.literal('printing'),
+    origin: SessionPrintOriginSchema,
+    stage: z.enum(['queued', 'active']),
+    printedCopies: NonNegativeCopyCountSchema,
+    remainingCopies: PositiveCopyCountSchema,
+    totalCopies: PositiveCopyCountSchema,
+  })
+  .strict();
+
+const PausedPrintStatusSchema = z
+  .object({
+    phase: z.literal('paused'),
+    origin: SessionPrintOriginSchema,
+    reason: SessionPrintPauseReasonSchema,
+    detail: SafePrintDetailSchema,
+    printedCopies: NonNegativeCopyCountSchema,
+    remainingCopies: PositiveCopyCountSchema,
+    totalCopies: PositiveCopyCountSchema,
+  })
+  .strict();
+
+const NeedsAttentionPrintStatusSchema = z
+  .object({
+    phase: z.literal('needs_attention'),
+    origin: SessionPrintOriginSchema,
+    detail: SafePrintDetailSchema,
+    printedCopies: NonNegativeCopyCountSchema,
+    attentionCopies: PositiveCopyCountSchema,
+    remainingCopies: NonNegativeCopyCountSchema,
+    totalCopies: PositiveCopyCountSchema,
+  })
+  .strict();
+
+const CompletedPrintStatusSchema = z
+  .object({
+    phase: z.literal('completed'),
+    origin: SessionPrintOriginSchema,
+    totalCopies: PositiveCopyCountSchema,
+    completedAt: UtcMillisSchema,
+  })
+  .strict();
+
+const PartialPrintStatusSchema = z
+  .object({
+    phase: z.literal('partial'),
+    origin: SessionPrintOriginSchema,
+    printedCopies: PositiveCopyCountSchema,
+    failedCopies: NonNegativeCopyCountSchema,
+    cancelledCopies: NonNegativeCopyCountSchema,
+    totalCopies: z.number().int().min(2),
+    completedAt: UtcMillisSchema,
+  })
+  .strict();
+
+const FailedPrintStatusSchema = z
+  .object({
+    phase: z.literal('failed'),
+    origin: SessionPrintOriginSchema,
+    failedCopies: PositiveCopyCountSchema,
+    cancelledCopies: NonNegativeCopyCountSchema,
+    totalCopies: PositiveCopyCountSchema,
+    detail: SafePrintDetailSchema,
+  })
+  .strict();
+
+const CancelledPrintStatusSchema = z
+  .object({
+    phase: z.literal('cancelled'),
+    origin: SessionPrintOriginSchema,
+    totalCopies: PositiveCopyCountSchema,
+  })
+  .strict();
+
+export const SessionPrintStatusSchema = z
+  .discriminatedUnion('phase', [
+    PreparingPrintStatusSchema,
+    PrintingPrintStatusSchema,
+    PausedPrintStatusSchema,
+    NeedsAttentionPrintStatusSchema,
+    CompletedPrintStatusSchema,
+    PartialPrintStatusSchema,
+    FailedPrintStatusSchema,
+    CancelledPrintStatusSchema,
+  ])
+  .superRefine((status, ctx) => {
+    switch (status.phase) {
+      case 'preparing':
+        if (status.pendingCopies > status.totalCopies) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['pendingCopies'],
+            message: 'pendingCopies cannot exceed totalCopies',
+          });
+        }
+        break;
+      case 'printing':
+      case 'paused':
+        if (status.printedCopies + status.remainingCopies > status.totalCopies) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['remainingCopies'],
+            message: 'printedCopies + remainingCopies cannot exceed totalCopies',
+          });
+        }
+        break;
+      case 'needs_attention':
+        if (
+          status.printedCopies + status.attentionCopies + status.remainingCopies >
+          status.totalCopies
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['attentionCopies'],
+            message: 'copy counts cannot exceed totalCopies',
+          });
+        }
+        break;
+      case 'partial':
+        if (
+          status.failedCopies + status.cancelledCopies < 1 ||
+          status.printedCopies + status.failedCopies + status.cancelledCopies !== status.totalCopies
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['totalCopies'],
+            message: 'partial status requires at least one printed and one non-printed copy',
+          });
+        }
+        break;
+      case 'failed':
+        if (status.failedCopies + status.cancelledCopies !== status.totalCopies) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['failedCopies'],
+            message: 'failedCopies + cancelledCopies must equal totalCopies',
+          });
+        }
+        break;
+      case 'completed':
+      case 'cancelled':
+        break;
+    }
+  });
+
+export type SessionPrintStatus = z.infer<typeof SessionPrintStatusSchema>;
+export type SessionPrintPhase = SessionPrintStatus['phase'];
