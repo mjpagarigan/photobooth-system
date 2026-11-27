@@ -74,14 +74,18 @@ export async function startLocalAdminListener(
   ) as FastifyInstance;
   const secure = options.tls !== null;
   const cookieName = secure ? '__Host-grace_admin' : 'grace_admin_loopback';
+  let boundPort = options.port;
 
   server.addHook('onRequest', async (request, reply) => {
-    const result = validateAdminRequestBoundary(options, {
-      method: request.method,
-      host: request.headers.host,
-      origin: request.headers.origin,
-      remoteAddress: request.raw.socket.remoteAddress,
-    });
+    const result = validateAdminRequestBoundary(
+      { ...options, port: boundPort },
+      {
+        method: request.method,
+        host: request.headers.host,
+        origin: request.headers.origin,
+        remoteAddress: request.raw.socket.remoteAddress,
+      },
+    );
     if (!result.allowed) {
       return reply.code(403).send({ ok: false, message: 'This admin request is not allowed.' });
     }
@@ -241,6 +245,10 @@ export async function startLocalAdminListener(
   );
   try {
     await server.listen({ host: options.host, port: options.port });
+    const address = server.server.address();
+    if (address && typeof address === 'object') {
+      boundPort = address.port;
+    }
     return server;
   } catch (error) {
     await server.close().catch(() => undefined);

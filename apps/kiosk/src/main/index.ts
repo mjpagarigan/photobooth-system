@@ -275,12 +275,18 @@ async function startApplication(): Promise<void> {
         message: 'The local admin listener is starting.',
       },
   };
-  serverManager = new AdminServerManager(serverDependencies, repository, certificates);
+  serverManager = new AdminServerManager(
+    serverDependencies,
+    repository,
+    certificates,
+    undefined,
+    config.e2e.enabled ? 0 : undefined,
+  );
   const offlineDeliveryServer = new OfflineDeliveryServer(
     repository,
     vault,
     secrets,
-    initialSettings.lanPort || 4_310,
+    config.e2e.enabled ? 0 : initialSettings.lanPort || 4_310,
   );
   uploadQueue.setOfflineDeliveryServer(offlineDeliveryServer);
   await Promise.all([serverManager.start(), offlineDeliveryServer.start()]);

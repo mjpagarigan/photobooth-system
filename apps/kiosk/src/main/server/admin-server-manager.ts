@@ -28,13 +28,14 @@ export class AdminServerManager {
     private readonly repository: LocalRepository,
     private readonly certificates: LanCertificateService,
     private readonly startListener: ListenerStarter = startLocalAdminListener,
+    private readonly loopbackPort: number = LOOPBACK_PORT,
   ) {}
 
   async start(): Promise<void> {
     if (!this.loopback) {
       this.loopback = await this.startListener(this.dependencies, {
         host: '127.0.0.1',
-        port: LOOPBACK_PORT,
+        port: this.loopbackPort,
         tls: null,
       });
       this.lanHealth = {

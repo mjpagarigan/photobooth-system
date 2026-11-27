@@ -3,7 +3,15 @@ import { join, relative, resolve } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { PASSCODE, bootstrap, closeKiosk, evidenceDir, launchKiosk, type Kiosk } from './harness';
+import {
+  PASSCODE,
+  bootstrap,
+  closeKiosk,
+  evidenceDir,
+  launchKiosk,
+  waitForReviewScreen,
+  type Kiosk,
+} from './harness';
 
 const ROOT = resolve(__dirname, '../../../..');
 const THEME_CSS = resolve(ROOT, 'packages/ui/src/styles/theme.css');
@@ -279,7 +287,7 @@ test('operator screens carry no Fluent components, icons, or off-palette styles'
     await bootstrap(page);
 
     await page.getByRole('button', { name: 'Start photo session' }).click();
-    await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+    await waitForReviewScreen(page);
     await page.getByRole('button', { name: 'Use these photos' }).click();
     await expect(page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
     await page.getByRole('button', { name: 'Done' }).click();

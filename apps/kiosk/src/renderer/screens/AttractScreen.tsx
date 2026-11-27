@@ -91,9 +91,7 @@ export function AttractScreen({
 
       <section className="attract-hero" aria-labelledby="attract-title">
         <p className="attract-hero__eyebrow">M.A.T. Photobooth</p>
-        <h1 id="attract-title" data-screen-heading tabIndex={-1}>
-          Hello, smile.
-        </h1>
+        <h1 id="attract-title">Hello, smile.</h1>
         <p className="attract-hero__lead">
           {shotWord} {shotCount === 1 ? 'photo' : 'photos'}. One keepsake.
         </p>

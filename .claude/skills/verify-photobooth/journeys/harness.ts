@@ -76,6 +76,41 @@ export async function bootstrap(page: Page): Promise<void> {
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
+export async function waitForReviewScreen(page: Page): Promise<void> {
+  const review = page.getByTestId('review-screen');
+  const anyTarget = page.locator(
+    '[data-testid="shot-review-screen"], [data-testid="review-screen"]',
+  );
+
+  for (let step = 0; step < 12; step += 1) {
+    await anyTarget.first().waitFor({ state: 'visible', timeout: 30_000 });
+    if (await review.isVisible()) {
+      return;
+    }
+    await expect(page.getByTestId('shot-review-image')).toBeVisible();
+    const currentSlot = await page
+      .locator('[data-testid="shot-review-strip"] [aria-current="step"]')
+      .getAttribute('data-slot');
+    await page.getByTestId('shot-review-continue').click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate((slotBefore) => {
+            if (document.querySelector('[data-testid="review-screen"]')) return 'review';
+            const active = document.querySelector(
+              '[data-testid="shot-review-strip"] [aria-current="step"]',
+            );
+            if (!active) return 'capturing';
+            return active.getAttribute('data-slot') !== slotBefore ? 'next-shot' : 'waiting';
+          }, currentSlot),
+        { timeout: 30_000 },
+      )
+      .not.toBe('waiting');
+  }
+
+  await expect(review).toBeVisible({ timeout: 30_000 });
+}
+
 export async function closeKiosk(kiosk: Kiosk | null): Promise<void> {
   if (!kiosk) return;
   try {

@@ -600,7 +600,7 @@ describe('guest screen components', () => {
     expect(screen.getByRole('img', { name: 'Photo 1' })).toHaveAttribute('src', '/capture/one.jpg');
   });
 
-  it('shows capturing feedback during the capturing phase and focusable heading on AttractScreen', () => {
+  it('shows capturing feedback during the capturing phase and focuses Start photo session on AttractScreen', () => {
     render(<CaptureScreen phase="capturing" shotNumber={2} totalShots={3} />);
     expect(screen.getByText('Taking photo…')).toBeVisible();
 
@@ -609,8 +609,8 @@ describe('guest screen components', () => {
       <AttractScreen canStart onOpenAdmin={() => undefined} onStart={() => undefined} />,
     );
     const heading = screen.getByRole('heading', { name: 'Hello, smile.' });
-    expect(heading).toHaveAttribute('data-screen-heading');
-    expect(heading).toHaveAttribute('tabindex', '-1');
+    expect(heading).not.toHaveAttribute('data-screen-heading');
+    expect(screen.getByRole('button', { name: 'Start photo session' })).toHaveFocus();
   });
 });
 

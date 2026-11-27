@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-import { bootstrap, capture, closeKiosk, launchKiosk, type Kiosk } from './harness';
+import {
+  bootstrap,
+  capture,
+  closeKiosk,
+  launchKiosk,
+  waitForReviewScreen,
+  type Kiosk,
+} from './harness';
 
 test('upload failure keeps the photo and Finish offline delivers it', async () => {
   let kiosk: Kiosk | null = null;
@@ -10,7 +17,7 @@ test('upload failure keeps the photo and Finish offline delivers it', async () =
     await bootstrap(page);
 
     await page.getByRole('button', { name: 'Start photo session' }).click();
-    await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+    await waitForReviewScreen(page);
     await page.getByRole('button', { name: 'Use these photos' }).click();
 
     await expect(page.getByTestId('processing-screen')).toHaveAttribute(

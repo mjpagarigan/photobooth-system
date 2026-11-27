@@ -3,7 +3,15 @@ import { resolve } from 'node:path';
 
 import { expect, test } from '@playwright/test';
 
-import { bootstrap, capture, closeKiosk, evidenceDir, launchKiosk, type Kiosk } from './harness';
+import {
+  bootstrap,
+  capture,
+  closeKiosk,
+  evidenceDir,
+  launchKiosk,
+  waitForReviewScreen,
+  type Kiosk,
+} from './harness';
 
 test('guest flow from first launch through Done', async () => {
   let kiosk: Kiosk | null = null;
@@ -23,14 +31,14 @@ test('guest flow from first launch through Done', async () => {
     await expect(page.getByTestId('capture-screen')).toBeVisible();
     await capture(page, 'guest-flow', '03-countdown');
 
-    await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+    await waitForReviewScreen(page);
     await expect(page.locator('[data-testid="collage-option-1"] .photo-slot img')).toHaveCount(3);
     await capture(page, 'guest-flow', '04-review');
 
     await page.getByRole('button', { name: 'Retake all photos' }).click();
     await expect(page.getByTestId('capture-screen')).toBeVisible();
     await capture(page, 'guest-flow', '05-retake-countdown');
-    await expect(page.getByTestId('review-screen')).toBeVisible({ timeout: 30_000 });
+    await waitForReviewScreen(page);
 
     await page.getByTestId('collage-option-2').click();
     await expect(page.getByTestId('collage-option-2')).toHaveAttribute('aria-checked', 'true');
