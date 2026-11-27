@@ -1,13 +1,17 @@
 import { Button, LockKey } from '@grace-booth/ui';
 import { useEffect } from 'react';
 
+import type { SessionPrintStatus as SessionPrintStatusData } from '@grace-booth/shared';
+
 import { Photostrip } from '../components/Photostrip';
+import { SessionPrintStatus } from '../components/SessionPrintStatus';
 
 type FinalQrScreenProps = {
   busy?: boolean;
   collageUrl: string;
   onDone: () => void;
   onOpenRecent?: () => void;
+  printStatus?: SessionPrintStatusData | null | undefined;
   qrImageUrl: string;
 };
 
@@ -16,6 +20,7 @@ export function FinalQrScreen({
   collageUrl,
   onDone,
   onOpenRecent,
+  printStatus,
   qrImageUrl,
 }: FinalQrScreenProps) {
   useEffect(() => {
@@ -56,6 +61,7 @@ export function FinalQrScreen({
               <LockKey aria-hidden="true" />
               Private link, just for you
             </p>
+            <SessionPrintStatus status={printStatus} tone="light" />
           </div>
         </div>
 

@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 
-import type { SessionState } from '@grace-booth/shared';
+import type {
+  SessionPrintStatus as SessionPrintStatusData,
+  SessionState,
+} from '@grace-booth/shared';
+
+import { SessionPrintStatus } from '../components/SessionPrintStatus';
 
 type ProcessingScreenProps = {
   message?: string | null;
   state: SessionState | null;
   onOpenAdmin?: () => void;
   totalShots?: number;
+  printStatus?: SessionPrintStatusData | null | undefined;
 };
 
 type StripSlotRect = {
@@ -111,6 +117,7 @@ const STEPS = [
 export function ProcessingScreen({
   message,
   onOpenAdmin,
+  printStatus,
   state,
   totalShots = 3,
 }: ProcessingScreenProps) {
@@ -188,6 +195,7 @@ export function ProcessingScreen({
             );
           })}
         </ol>
+        <SessionPrintStatus status={printStatus} tone="dark" announce={false} />
       </section>
       <div className="processing-stage" aria-hidden="true">
         <div className="processing-animation" data-testid="processing-animation">

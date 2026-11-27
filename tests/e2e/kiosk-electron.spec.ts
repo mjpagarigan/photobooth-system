@@ -523,6 +523,10 @@ test('4R print with the printer offline: Proceed, queue, then print once when it
     await expect(kiosk.page.getByTestId('printer-indicator')).toContainText('2 copies waiting', {
       timeout: 15_000,
     });
+    const sessionPrintStatus = kiosk.page.getByTestId('session-print-status');
+    await expect(sessionPrintStatus).toBeVisible({ timeout: 15_000 });
+    await expect(sessionPrintStatus).toHaveAttribute('data-print-phase', 'paused');
+    await expect(sessionPrintStatus).toContainText('Printing paused');
     expect(await printHandle(kiosk.app, (handle) => handle.printer.printed.length)).toBe(0);
 
     await printHandle(kiosk.app, (handle) => handle.printer.setStatus('ready'));
@@ -532,8 +536,50 @@ test('4R print with the printer offline: Proceed, queue, then print once when it
       })
       .toBe(2);
     await expect(kiosk.page.getByTestId('printer-indicator')).toHaveCount(0, { timeout: 10_000 });
+    await expect(sessionPrintStatus).toHaveAttribute('data-print-phase', 'completed', {
+      timeout: 10_000,
+    });
+    await expect(sessionPrintStatus).toContainText('Print finished');
     const printed = await printHandle(kiosk.app, (handle) => [...handle.printer.printed]);
     expect(new Set(printed).size).toBe(2);
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
+test('shows session print status when printing is on with a ready printer, and hides it when off', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  try {
+    kiosk = await launchKiosk(userData);
+    await bootstrap(kiosk.page);
+    await printHandle(kiosk.app, (handle) => handle.addLandscape4rFrame());
+
+    await startAndWaitForReview(kiosk.page);
+    await kiosk.page.getByRole('radio', { name: /Landscape 4R/ }).click();
+    await kiosk.page.getByRole('switch', { name: 'Print this photo' }).click();
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    const sessionPrintStatus = kiosk.page.getByTestId('session-print-status');
+    await expect(sessionPrintStatus).toBeVisible({ timeout: 15_000 });
+    await expect(sessionPrintStatus).toHaveAttribute('data-print-phase', 'completed', {
+      timeout: 20_000,
+    });
+    await expect(sessionPrintStatus).toContainText('Print finished');
+    await expect(kiosk.page.getByTestId('printer-indicator')).toHaveCount(0);
+
+    await kiosk.page.getByRole('button', { name: 'Done' }).click();
+    await expect(kiosk.page.getByTestId('attract-screen')).toBeVisible({ timeout: 15_000 });
+
+    await startAndWaitForReview(kiosk.page);
+    await kiosk.page.getByRole('radio', { name: /Landscape 4R/ }).click();
+    await expect(kiosk.page.getByRole('switch', { name: 'Print this photo' })).not.toBeChecked();
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await expect(kiosk.page.getByTestId('session-print-status')).toHaveCount(0);
   } finally {
     await closeKiosk(kiosk?.app);
     await removeUserDataDirectory(userData);

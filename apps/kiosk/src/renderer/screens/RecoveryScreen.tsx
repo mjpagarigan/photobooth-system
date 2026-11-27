@@ -1,6 +1,9 @@
 import { Button, CloudSlash, SpinnerGap, VideoCameraSlash } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
 
+import type { SessionPrintStatus as SessionPrintStatusData } from '@grace-booth/shared';
+
+import { SessionPrintStatus } from '../components/SessionPrintStatus';
 import type { RecoveryVariant } from '../types';
 
 type RecoveryScreenProps = {
@@ -12,6 +15,7 @@ type RecoveryScreenProps = {
   onRestart: () => void;
   onRetryUpload: () => void;
   onFinishOffline?: () => void;
+  printStatus?: SessionPrintStatusData | null | undefined;
   variant: RecoveryVariant;
 };
 
@@ -45,6 +49,7 @@ export function RecoveryScreen({
   onRestart,
   onRetryUpload,
   onFinishOffline,
+  printStatus,
   variant,
 }: RecoveryScreenProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -69,6 +74,7 @@ export function RecoveryScreen({
           {copy.title}
         </h1>
         <p>{message ?? copy.body}</p>
+        <SessionPrintStatus status={printStatus} tone="light" announce={false} />
         {variant === 'camera' ? (
           <div className="recovery-actions recovery-actions--single">
             <Button className="button--recovery-primary" loading={busy} onClick={onRestart}>

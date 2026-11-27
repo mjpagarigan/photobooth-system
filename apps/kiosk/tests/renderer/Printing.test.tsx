@@ -6,9 +6,15 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { AdminSettings, PrinterHealth } from '@grace-booth/shared';
+import type {
+  AdminSettings,
+  PrinterHealth,
+  SessionPrintStatus as SessionPrintStatusData,
+} from '@grace-booth/shared';
 
 import { PrinterIndicator } from '../../src/renderer/components/Printing';
+import { SessionPrintStatus } from '../../src/renderer/components/SessionPrintStatus';
+import { describeSessionPrintStatus } from '../../src/renderer/components/session-print-presentation';
 import { DEFAULT_FRAME_LAYOUT, LOCAL_FIXTURES } from '../../src/renderer/local-fixtures';
 import { ReviewScreen } from '../../src/renderer/screens/ReviewScreen';
 
@@ -176,5 +182,202 @@ describe('printer indicator', () => {
   it('shows copies that need an operator decision even when the printer is ready', () => {
     render(<PrinterIndicator health={health('ready', { attentionCount: 1 })} />);
     expect(screen.getByTestId('printer-indicator')).toHaveTextContent('1 needs a decision');
+  });
+});
+
+describe('session print status', () => {
+  it('renders nothing when printStatus is null or undefined', () => {
+    const { rerender, container } = render(<SessionPrintStatus status={null} />);
+    expect(container).toBeEmptyDOMElement();
+    rerender(<SessionPrintStatus status={undefined} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders every phase with accessible live-region controls and origin-aware copy', () => {
+    const { rerender } = render(
+      <SessionPrintStatus
+        status={{ phase: 'preparing', origin: 'session', pendingCopies: 2, totalCopies: 2 }}
+        tone="dark"
+      />,
+    );
+    const pill = screen.getByTestId('session-print-status');
+    expect(pill).toHaveAttribute('data-print-phase', 'preparing');
+    expect(pill).toHaveAttribute('data-print-origin', 'session');
+    expect(pill).toHaveAttribute('data-tone', 'dark');
+    expect(pill).toHaveAttribute('role', 'status');
+    expect(pill).toHaveAttribute('aria-live', 'polite');
+    expect(pill).toHaveAttribute('aria-atomic', 'true');
+    expect(pill).toHaveTextContent('Preparing 2 copies');
+    expect(pill).toHaveTextContent('Starts once your photo is ready');
+
+    rerender(
+      <SessionPrintStatus
+        status={{
+          phase: 'printing',
+          origin: 'session',
+          stage: 'queued',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        }}
+        announce={false}
+      />,
+    );
+    expect(screen.getByTestId('session-print-status')).not.toHaveAttribute('role');
+    expect(screen.getByTestId('session-print-status')).not.toHaveAttribute('aria-live');
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent(
+      'Waiting to print · 2 copies',
+    );
+
+    rerender(
+      <SessionPrintStatus
+        status={{
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 1,
+          remainingCopies: 2,
+          totalCopies: 3,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent('Printing copy 2 of 3…');
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent('1 finished');
+
+    rerender(
+      <SessionPrintStatus
+        status={{
+          phase: 'paused',
+          origin: 'session',
+          reason: 'paper_out',
+          detail: 'Printer is out of paper.',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent('Printing paused');
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent(
+      'Out of paper · 2 copies waiting',
+    );
+
+    rerender(
+      <SessionPrintStatus
+        status={{
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 2,
+          completedAt: 5_000,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveAttribute(
+      'data-print-phase',
+      'completed',
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent(
+      'Print finished · 2 copies',
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent(
+      'Sent to the printer. Collect from the print tray.',
+    );
+
+    rerender(
+      <SessionPrintStatus
+        status={{
+          phase: 'completed',
+          origin: 'reprint',
+          totalCopies: 1,
+          completedAt: 6_000,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent('Reprint finished');
+  });
+
+  it('covers needs_attention, partial, failed sanitization, cancelled, and all pause reasons', () => {
+    const cases: readonly {
+      status: SessionPrintStatusData;
+      label: string;
+      detail: string | null;
+    }[] = [
+      {
+        status: {
+          phase: 'needs_attention',
+          origin: 'session',
+          detail: 'Uncertain',
+          printedCopies: 0,
+          attentionCopies: 1,
+          remainingCopies: 1,
+          totalCopies: 2,
+        },
+        label: 'Check the print tray',
+        detail: '1 copy needs an operator check in Print queue.',
+      },
+      {
+        status: {
+          phase: 'partial',
+          origin: 'session',
+          printedCopies: 1,
+          failedCopies: 1,
+          cancelledCopies: 1,
+          totalCopies: 3,
+          completedAt: 9_000,
+        },
+        label: '1 of 3 copies printed',
+        detail: '1 failed · 1 cancelled',
+      },
+      {
+        status: {
+          phase: 'failed',
+          origin: 'session',
+          failedCopies: 1,
+          cancelledCopies: 0,
+          totalCopies: 1,
+          detail: 'C:\\Users\\secret\\photo.png failed',
+        },
+        label: 'Print didn’t finish',
+        detail: 'Ask a booth volunteer to check the printer.',
+      },
+      {
+        status: { phase: 'cancelled', origin: 'reprint', totalCopies: 2 },
+        label: 'Reprint cancelled',
+        detail: '2 copies cancelled',
+      },
+      {
+        status: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'photo_interrupted',
+          detail: 'Photo preparation interrupted.',
+          printedCopies: 0,
+          remainingCopies: 1,
+          totalCopies: 1,
+        },
+        label: 'Printing paused',
+        detail: 'Waiting for photo recovery',
+      },
+      {
+        status: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'printer_unknown',
+          detail: '',
+          printedCopies: 0,
+          remainingCopies: 1,
+          totalCopies: 1,
+        },
+        label: 'Printing paused',
+        detail: 'Checking printer status · 1 copy waiting',
+      },
+    ];
+
+    for (const testCase of cases) {
+      expect(describeSessionPrintStatus(testCase.status)).toMatchObject({
+        label: testCase.label,
+        detail: testCase.detail,
+      });
+    }
   });
 });
