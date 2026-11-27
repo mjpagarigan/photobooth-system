@@ -167,7 +167,7 @@ export class DisplayManager {
       fullscreen: this.isPackaged,
       maximizable: true,
       resizable: true,
-      backgroundColor: '#F5F1E8',
+      backgroundColor: view === 'qr-station' ? '#000000' : '#F5F5F7',
       webPreferences: {
         preload: join(this.appPath, 'out', 'preload', 'index.cjs'),
         contextIsolation: true,

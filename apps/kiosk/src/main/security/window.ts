@@ -25,7 +25,7 @@ export async function createKioskWindow(
     fullscreen: isPackaged,
     maximizable: true,
     resizable: true,
-    backgroundColor: '#F5F1E8',
+    backgroundColor: '#F5F5F7',
     webPreferences: {
       preload: join(appPath, 'out', 'preload', 'index.cjs'),
       contextIsolation: true,

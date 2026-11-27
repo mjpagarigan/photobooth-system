@@ -19,29 +19,198 @@ const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ');
 
+export type OAuthCallbackOutcome =
+  | { kind: 'connected'; email: string | null }
+  | { kind: 'error'; title: string; detail: string; hint: string };
+
+const OAUTH_CALLBACK_HEADERS: Readonly<Record<string, string>> = {
+  'content-type': 'text/html; charset=utf-8',
+  'content-security-policy':
+    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+  'cache-control': 'no-store',
+};
+
+const OAUTH_CALLBACK_CSS = `:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: #1d1d1f;
+  background: #f5f5f7;
+  -webkit-font-smoothing: antialiased;
+}
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  min-height: 100dvh;
+  background: #f5f5f7;
+  color: #1d1d1f;
+}
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+main {
+  width: min(100%, 440px);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 28px 32px;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+.brand {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #636366;
+}
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+}
+.badge--success {
+  background: #e3f5e7;
+  color: #1b6f30;
+}
+.badge--error {
+  background: #ffecee;
+  color: #d70015;
+}
+.badge svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+h1 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  color: #1d1d1f;
+}
+.detail {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #424245;
+  overflow-wrap: anywhere;
+}
+.detail strong {
+  color: #1d1d1f;
+  font-weight: 600;
+}
+.hint {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #636366;
+}
+@media (forced-colors: active) {
+  .card, .badge {
+    border: 1px solid CanvasText;
+  }
+}`;
+
+const CHECK_ICON_SVG =
+  `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4.5 4.5L19 7.5"/></svg>`;
+const ALERT_ICON_SVG =
+  `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16" r="0.8" fill="currentColor" stroke="none"/></svg>`;
+
+export function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+export function renderOAuthCallbackPage(outcome: OAuthCallbackOutcome): string {
+  const isConnected = outcome.kind === 'connected';
+  const pageTitle = isConnected
+    ? 'Google Photos Connected · M.A.T. Photobooth'
+    : `${escapeHtml(outcome.title)} · M.A.T. Photobooth`;
+  const heading = isConnected ? 'Google Photos Connected' : escapeHtml(outcome.title);
+  const badgeClass = isConnected ? 'badge badge--success' : 'badge badge--error';
+  const iconSvg = isConnected ? CHECK_ICON_SVG : ALERT_ICON_SVG;
+  const sectionRole = isConnected ? '' : ' role="alert"';
+  const detailHtml = isConnected
+    ? `<p class="detail">Successfully authorized account:<br /><strong>${
+      escapeHtml(outcome.email || 'Google Account')
+    }</strong></p>`
+    : `<p class="detail">${escapeHtml(outcome.detail)}</p>`;
+  const hintText = isConnected
+    ? 'You can now close this window and return to M.A.T. Photobooth Admin settings.'
+    : escapeHtml(outcome.hint);
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#f5f5f7" />
+  <title>${pageTitle}</title>
+  <style>${OAUTH_CALLBACK_CSS}</style>
+</head>
+<body>
+  <main>
+    <section class="card"${sectionRole}>
+      <p class="brand">M.A.T. Photobooth</p>
+      <div class="${badgeClass}" aria-hidden="true">${iconSvg}</div>
+      <h1>${heading}</h1>
+      ${detailHtml}
+      <p class="hint">${hintText}</p>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function oauthCallbackResponse(outcome: OAuthCallbackOutcome, status: number): Response {
+  return new Response(renderOAuthCallbackPage(outcome), {
+    status,
+    headers: OAUTH_CALLBACK_HEADERS,
+  });
+}
+
 export async function handler(request: Request): Promise<Response> {
   const correlationId = requestId();
   const url = new URL(request.url);
 
-  // 1. Handle OAuth 2.0 Web Redirect Callback (GET /functions/v1/google-photos-auth?code=...)
   if (request.method === 'GET') {
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
 
     if (error) {
-      return new Response(
-        `<!DOCTYPE html>
-<html>
-<head><title>Google Photos Authorization Failed</title><style>body{font-family:sans-serif;background:#09090b;color:#f4f4f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}div{text-align:center;background:#18181b;padding:2.5rem;border-radius:1rem;border:1px solid #ef4444;max-width:440px;}</style></head>
-<body>
-<div>
-<h2 style="color:#ef4444;margin-top:0;">✕ Authorization Failed</h2>
-<p style="color:#a1a1aa;">${error}</p>
-<p style="color:#71717a;font-size:0.875rem;">Please close this window and try again in Kiosk Admin.</p>
-</div>
-</body>
-</html>`,
-        { headers: { 'content-type': 'text/html; charset=utf-8' }, status: 400 },
+      return oauthCallbackResponse(
+        {
+          kind: 'error',
+          title: 'Authorization Failed',
+          detail: error,
+          hint: 'Please close this window and try again in Kiosk Admin.',
+        },
+        400,
       );
     }
     if (!code && !error) {
@@ -117,35 +286,17 @@ export async function handler(request: Request): Promise<Response> {
           });
         }
 
-        return new Response(
-          `<!DOCTYPE html>
-<html>
-<head><title>Google Photos Connected</title><style>body{font-family:system-ui,-apple-system,sans-serif;background:#09090b;color:#f4f4f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}div{text-align:center;background:#18181b;padding:2.5rem;border-radius:1rem;border:1px solid #27272a;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);max-width:440px;}h2{color:#22c55e;margin-top:0;}p{color:#d4d4d8;font-size:1rem;line-height:1.5;}.sub{color:#a1a1aa;font-size:0.875rem;margin-top:1.5rem;}</style></head>
-<body>
-<div>
-<h2>✓ Google Photos Connected!</h2>
-<p>Successfully authorized account:<br><strong style="color:#ffffff;">${email || 'Google Account'}</strong></p>
-<p class="sub">You can now return to the Photobooth Kiosk Admin settings.</p>
-</div>
-</body>
-</html>`,
-          { headers: { 'content-type': 'text/html; charset=utf-8' }, status: 200 },
-        );
+        return oauthCallbackResponse({ kind: 'connected', email }, 200);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Token exchange failed';
-        return new Response(
-          `<!DOCTYPE html>
-<html>
-<head><title>Connection Error</title><style>body{font-family:sans-serif;background:#09090b;color:#f4f4f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}div{text-align:center;background:#18181b;padding:2.5rem;border-radius:1rem;border:1px solid #ef4444;max-width:440px;}</style></head>
-<body>
-<div>
-<h2 style="color:#ef4444;margin-top:0;">✕ Connection Error</h2>
-<p style="color:#a1a1aa;">${msg}</p>
-<p style="color:#71717a;font-size:0.875rem;">Please close this window and try again.</p>
-</div>
-</body>
-</html>`,
-          { headers: { 'content-type': 'text/html; charset=utf-8' }, status: 500 },
+        return oauthCallbackResponse(
+          {
+            kind: 'error',
+            title: 'Connection Error',
+            detail: msg,
+            hint: 'Please close this window and try again.',
+          },
+          500,
         );
       }
     }

@@ -15,7 +15,7 @@ export class QrService {
         errorCorrectionLevel: 'M',
         margin: 4,
         width: 440,
-        color: { dark: '#0b1f47', light: '#ffffff' },
+        color: { dark: '#1d1d1f', light: '#ffffff' },
       }),
       expiresAt: receipt.expiresAt,
     };

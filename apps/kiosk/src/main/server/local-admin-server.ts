@@ -305,7 +305,7 @@ const ADMIN_HTML = `<!doctype html>
 <button id="refreshButton" class="pill">Refresh status</button></section>
 <p id="message" role="status" aria-live="polite"></p></main><script src="/admin.js"></script></body></html>`;
 
-const ADMIN_CSS = `:root{font-family:-apple-system,BlinkMacSystemFont,"Inter Variable","Segoe UI",system-ui,sans-serif;color:#1d1d1f;background:#f5f5f7;color-scheme:light;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}body{margin:0;min-height:100dvh}
+const ADMIN_CSS = `:root{font-family:-apple-system,BlinkMacSystemFont,"Inter Variable",system-ui,sans-serif;color:#1d1d1f;background:#f5f5f7;color-scheme:light;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}[hidden]{display:none !important}body{margin:0;min-height:100dvh}
 .bar{display:flex;align-items:center;justify-content:space-between;height:52px;padding:0 max(20px,calc(50% - 340px));background:rgba(251,251,253,.8);backdrop-filter:saturate(180%) blur(20px);box-shadow:0 1px 0 #e8e8ed;font-size:14px;font-weight:600}
 main{width:min(680px,100%);margin:0 auto;padding:40px 20px 56px}
 h1{margin:0;font-size:clamp(32px,6vw,48px);line-height:1.08;font-weight:700;letter-spacing:-.03em}h1 span{color:#86868b}
