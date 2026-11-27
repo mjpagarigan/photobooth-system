@@ -1,6 +1,6 @@
 {
   "name": "grace-booth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Offline-first Grace Booth kiosk and private Supabase delivery service",
   "packageManager": "pnpm@11.19.0",
