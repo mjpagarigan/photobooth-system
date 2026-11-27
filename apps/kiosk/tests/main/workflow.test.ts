@@ -141,6 +141,7 @@ describe('booth workflow camera recovery', () => {
 
     const finished = await workflow.finishOffline();
     expect(finished.state).toBe('final');
+    expect(finished.deliveryMode).toBe('offline');
   });
 
   it('accepts the chosen library frame by id and composites with its artwork', async () => {
@@ -1491,6 +1492,7 @@ function createWorkflow(
 
 class FakeUploadQueue extends EventEmitter {
   testStore?: TestStore;
+  private offlineCompleted = false;
 
   start(): void {
     return undefined;
@@ -1502,6 +1504,7 @@ class FakeUploadQueue extends EventEmitter {
     return undefined;
   }
   completeOffline(sessionId: string): Promise<void> {
+    this.offlineCompleted = true;
     if (this.testStore) {
       this.testStore.database.raw
         .prepare("UPDATE sessions SET state = 'ready', public_secret_ref = 'sec-1' WHERE id = ?")
@@ -1530,7 +1533,7 @@ class FakeUploadQueue extends EventEmitter {
         status: 'ready',
         readyAt: new Date(readyAt).toISOString(),
         expiresAt: new Date(expiresAt).toISOString(),
-        publicPageOrigin: 'https://test',
+        publicPageOrigin: this.offlineCompleted ? 'http://192.168.1.10:4310' : 'https://test',
         publicPath: '/photo',
       },
     };

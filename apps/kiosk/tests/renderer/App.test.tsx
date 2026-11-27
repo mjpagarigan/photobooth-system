@@ -1417,6 +1417,7 @@ describe('countdown calculation and per-shot review flow', () => {
     const offlineFinal = sessionSnapshot({
       screen: 'final',
       state: 'final',
+      deliveryMode: 'offline',
       media: {
         captureUrls: [],
         collageUrl: 'grace-booth-media://asset/collage',

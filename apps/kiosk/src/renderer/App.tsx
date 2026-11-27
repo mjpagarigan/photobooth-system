@@ -44,7 +44,7 @@ import { useNikonLivePreview } from './hooks/useNikonLivePreview';
 import { LOCAL_FIXTURES } from './local-fixtures';
 import { AttractScreen } from './screens/AttractScreen';
 import { CaptureScreen } from './screens/CaptureScreen';
-import { FinalQrScreen, type FinalDeliveryMode } from './screens/FinalQrScreen';
+import { FinalQrScreen } from './screens/FinalQrScreen';
 import { ProcessingScreen } from './screens/ProcessingScreen';
 import { RecoveryScreen } from './screens/RecoveryScreen';
 import { ReviewScreen } from './screens/ReviewScreen';
@@ -77,26 +77,6 @@ function dialogToneForScreen(screen: GuestScreen | null, loading: boolean): Dial
     return 'light';
   }
   return DARK_GUEST_SCREENS.has(screen) ? 'dark' : 'light';
-}
-
-function finalDeliveryModeFor(
-  snapshot: BoothSnapshot,
-  offlineFinalSessionId: string | null,
-): FinalDeliveryMode {
-  if (
-    snapshot.sessionId !== null &&
-    offlineFinalSessionId !== null &&
-    snapshot.sessionId === offlineFinalSessionId
-  ) {
-    return 'offline';
-  }
-  if (
-    snapshot.message &&
-    /\b(?:offline|local(?:\s+wi-?fi|\s+network)?)\b/i.test(snapshot.message)
-  ) {
-    return 'offline';
-  }
-  return 'cloud';
 }
 
 function getBridge(): GraceBoothBridge | null {
@@ -197,7 +177,6 @@ export function App() {
     error: string | null;
   }>({ open: false, busy: false, items: [], error: null });
   const [repairingSessionId, setRepairingSessionId] = useState<string | null>(null);
-  const [offlineFinalSessionId, setOfflineFinalSessionId] = useState<string | null>(null);
   const [visualSeed, setVisualSeed] = useState<VisualSeedPayload | null>(null);
   const livePrinterHealth = usePrinterHealth();
   const printerHealth = visualSeed?.printerHealth ?? livePrinterHealth;
@@ -464,46 +443,9 @@ export function App() {
   );
 
   const startGuestSession = useCallback(() => {
-    setOfflineFinalSessionId(null);
     prepareAudio();
     void runGuestCommand((bridge) => bridge.booth.start());
   }, [prepareAudio, runGuestCommand]);
-
-  const finishOfflineSession = useCallback(async () => {
-    if (visualSeed) {
-      return;
-    }
-    const bridge = getBridge();
-    if (!bridge) {
-      setGuestError('The booth controls are unavailable. Ask an operator for help.');
-      return;
-    }
-    // Set before awaiting because main emits the final snapshot before the RPC resolves.
-    const targetSessionId = snapshot.sessionId;
-    setOfflineFinalSessionId(targetSessionId);
-    setGuestBusy(true);
-    setGuestError(null);
-    try {
-      const result = await bridge.booth.finishOffline();
-      if (result.ok) {
-        setOfflineFinalSessionId(result.data.sessionId ?? targetSessionId);
-        setSnapshot(result.data);
-      } else {
-        setOfflineFinalSessionId(null);
-        setGuestError(
-          safeGuestMessage(
-            result.error.message,
-            'That action could not be completed. Please try again.',
-          ),
-        );
-      }
-    } catch {
-      setOfflineFinalSessionId(null);
-      setGuestError('That action could not be completed. Please try again.');
-    } finally {
-      setGuestBusy(false);
-    }
-  }, [snapshot.sessionId, visualSeed]);
 
   const acceptShot = useCallback(
     (shotNumber: number) => {
@@ -1328,11 +1270,8 @@ export function App() {
           busy={guestBusy}
           cloudRetentionDays={adminSettings?.cloudRetentionDays ?? 30}
           collageUrl={snapshot.media.collageUrl}
-          deliveryMode={finalDeliveryModeFor(snapshot, offlineFinalSessionId)}
-          onDone={() => {
-            setOfflineFinalSessionId(null);
-            void runGuestCommand((bridge) => bridge.booth.done());
-          }}
+          deliveryMode={snapshot.deliveryMode ?? 'cloud'}
+          onDone={() => void runGuestCommand((bridge) => bridge.booth.done())}
           onOpenRecent={() => void openRecentGallery()}
           qrImageUrl={snapshot.media.qrImageUrl}
         />
@@ -1355,7 +1294,7 @@ export function App() {
         onOpenAdmin={() => void beginProtectedAction('admin')}
         onRestart={() => void beginProtectedAction('restart')}
         onRetryUpload={() => void runGuestCommand((bridge) => bridge.booth.retryUpload())}
-        onFinishOffline={() => void finishOfflineSession()}
+        onFinishOffline={() => void runGuestCommand((bridge) => bridge.booth.finishOffline())}
         variant={variant}
       />
     );
@@ -1367,14 +1306,12 @@ export function App() {
     camera.videoRef,
     cameraZoomPercent,
     countdownSeconds,
-    finishOfflineSession,
     guestBusy,
     guestError,
     loading,
     nikonPreview.frameUrl,
     nikonPreview.ready,
     nikonPreviewEnabled,
-    offlineFinalSessionId,
     openRecentGallery,
     printerHealth,
     retakeAll,

@@ -1,9 +1,10 @@
+import type { DeliveryMode } from '@grace-booth/shared';
 import { Button, LockKey, WifiHigh } from '@grace-booth/ui';
 import { useEffect } from 'react';
 
 import { Photostrip } from '../components/Photostrip';
 
-export type FinalDeliveryMode = 'cloud' | 'offline';
+export type FinalDeliveryMode = DeliveryMode;
 
 type FinalDeliveryCopy = {
   eyebrow: string;

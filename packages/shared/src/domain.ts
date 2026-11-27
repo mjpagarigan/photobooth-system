@@ -328,6 +328,9 @@ export const BoothMediaSchema = z
   })
   .strict();
 
+export const DeliveryModeSchema = z.enum(['cloud', 'offline']);
+export type DeliveryMode = z.infer<typeof DeliveryModeSchema>;
+
 export const BoothSnapshotSchema = z
   .object({
     screen: GuestScreenSchema,
@@ -339,6 +342,7 @@ export const BoothSnapshotSchema = z
     countdownEndsAt: UtcMillisSchema.nullable(),
     countdownTotalSeconds: CaptureCountdownSecondsSchema.nullable().optional(),
     cameraPreviewEnabled: z.boolean(),
+    deliveryMode: DeliveryModeSchema.optional(),
     media: BoothMediaSchema,
     controls: BoothControlsSchema,
     errorCode: GuestErrorCodeSchema.nullable(),

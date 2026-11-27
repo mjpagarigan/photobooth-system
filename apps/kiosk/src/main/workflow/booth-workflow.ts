@@ -10,6 +10,7 @@ import {
   type CameraAdapter,
   type CaptureResult,
   type CaptureSettings,
+  type DeliveryMode,
   type GuestErrorCode,
   type QrStationState,
   type SessionPrintRequest,
@@ -66,6 +67,7 @@ export class BoothWorkflow {
   private countdownTotalSeconds: number | null = null;
   private countdownTimer: NodeJS.Timeout | null = null;
   private readonly qrBySession = new Map<string, string>();
+  private readonly deliveryModeBySession = new Map<string, DeliveryMode>();
   private readonly now: () => number;
   private closed = false;
 
@@ -269,6 +271,7 @@ export class BoothWorkflow {
       ? (assets.find((asset) => asset.id === session.collageAssetId) ?? null)
       : null;
     const qrImageUrl = this.qrBySession.get(session.id) ?? null;
+    const deliveryMode = this.deliveryModeBySession.get(session.id);
     const selectedFrame = session.selectedFrameId
       ? (this.repository.getFrame(session.selectedFrameId) ?? null)
       : this.repository.getActiveFrame();
@@ -288,6 +291,7 @@ export class BoothWorkflow {
       countdownEndsAt: session.state === 'countdown' ? this.countdownEndsAt : null,
       countdownTotalSeconds: session.state === 'countdown' ? this.countdownTotalSeconds : null,
       cameraPreviewEnabled,
+      ...(deliveryMode ? { deliveryMode } : {}),
       media: {
         captureUrls: captures.map((asset) => mediaUrl(asset.id)),
         collageUrl: collage ? mediaUrl(collage.id) : null,
@@ -488,6 +492,7 @@ export class BoothWorkflow {
     }
     this.transition(session, 'done', { completedAt: this.now() }, this.now());
     this.qrBySession.delete(session.id);
+    this.deliveryModeBySession.delete(session.id);
     this.activeSessionId = null;
     this.emit();
     return attractSnapshot(
@@ -513,6 +518,7 @@ export class BoothWorkflow {
     // Detach first so an in-flight capture cannot re-attach to a deleted session.
     this.activeSessionId = null;
     this.qrBySession.delete(sessionId);
+    this.deliveryModeBySession.delete(sessionId);
     for (const asset of this.repository.listAssets(sessionId)) {
       try {
         this.vault.delete(asset.encryptedPath);
@@ -780,6 +786,10 @@ export class BoothWorkflow {
     const receipt = validateReadyReceipt(secret.photoSessionId, secret.publicToken, secret.ready);
     const qr = await this.qrService.render(receipt);
     this.qrBySession.set(sessionId, qr.imageDataUrl);
+    this.deliveryModeBySession.set(
+      sessionId,
+      receipt.publicPageOrigin.startsWith('http://') ? 'offline' : 'cloud',
+    );
     const current = this.repository.requireSession(sessionId);
     if (current.state === 'ready') {
       this.transition(current, 'qr_ready', {}, this.now());
