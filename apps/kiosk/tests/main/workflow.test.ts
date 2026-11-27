@@ -3,11 +3,14 @@ import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
 import type {
+  BoothSnapshot,
   CameraAdapter,
   CameraStatus,
   CaptureRequest,
   CaptureResult,
+  QrStationState,
 } from '@grace-booth/shared';
+import sharp from 'sharp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { assertOperatorBootstrapComplete } from '../../src/main/auth/bootstrap-guard.js';
@@ -18,9 +21,15 @@ import { WebcamCameraAdapter } from '../../src/main/camera/webcam-camera-adapter
 import type { QrService } from '../../src/main/cloud/qr-service.js';
 import type { UploadQueue } from '../../src/main/cloud/upload-queue.js';
 import type { CapturePolicyOverride } from '../../src/main/config.js';
+import { PrintRepository } from '../../src/main/database/print-repository.js';
 import type { StoredFrame } from '../../src/main/database/repositories.js';
 import type { FrameService } from '../../src/main/frame/frame-service.js';
 import type { ImageProcessor } from '../../src/main/image/image-worker-client.js';
+import {
+  MOCK_PRINTER_NAME,
+  MockPrinterAdapter,
+} from '../../src/main/print/mock-printer-adapter.js';
+import { PrintService, type WorkflowPrintPort } from '../../src/main/print/print-service.js';
 import { RetentionService } from '../../src/main/storage/retention-service.js';
 import { BoothWorkflow } from '../../src/main/workflow/booth-workflow.js';
 import { createTestStore, type TestStore } from './helpers.js';
@@ -1394,10 +1403,13 @@ describe('print choice at review', () => {
 
   it('queues the chosen copies only for a landscape 4R frame', async () => {
     const requests: [string, number][] = [];
-    const print = {
+    const print: WorkflowPrintPort = {
       requestSessionPrint: (sessionId: string, copies: number) =>
         requests.push([sessionId, copies]),
       attachSessionPhoto: () => undefined,
+      discardWaitingSessionPrint: () => undefined,
+      getSessionPrintStatus: () => null,
+      subscribeSessionChanges: () => () => undefined,
     };
     ({ store, workflow } = createWorkflow(new SequencedCamera(['ready']), { print }));
     const strip = insertFrame(store, 1_200, 3_600);
@@ -1415,9 +1427,12 @@ describe('print choice at review', () => {
 
   it('does not print when printing is left off (the default)', async () => {
     const requests: unknown[] = [];
-    const print = {
+    const print: WorkflowPrintPort = {
       requestSessionPrint: (...args: unknown[]) => requests.push(args),
       attachSessionPhoto: () => undefined,
+      discardWaitingSessionPrint: () => undefined,
+      getSessionPrintStatus: () => null,
+      subscribeSessionChanges: () => () => undefined,
     };
     ({ store, workflow } = createWorkflow(new SequencedCamera(['ready']), { print }));
     const fourR = insertFrame(store, 3_600, 2_400);
@@ -1425,6 +1440,440 @@ describe('print choice at review', () => {
     await workflow.initialize();
     workflow.acceptPhotos(fourR);
     expect(requests).toEqual([]);
+  });
+
+  it('projects live print transitions, health pauses, reprints, and deduplication on single display', async () => {
+    const testStore = createTestStore();
+    store = testStore;
+    const queue = new FakeUploadQueue();
+    queue.testStore = testStore;
+
+    const prints = new PrintRepository(testStore.database);
+    const printer = new MockPrinterAdapter({ outputDirectory: null, printDurationMs: 40 });
+    const settings = prints.getPrinterSettings();
+    prints.updatePrinterSettings({
+      printerName: MOCK_PRINTER_NAME,
+      paperRawKind: 127,
+      paperName: '102 x 152 mm (4 x 6 in)',
+      timeoutSeconds: 240,
+      expectedRevision: settings.revision,
+    });
+    const printService = new PrintService(
+      prints,
+      testStore.repository,
+      testStore.vault,
+      testStore.paths,
+      printer,
+      { tickMs: 1_000_000 },
+    );
+    await printService.start();
+
+    try {
+      const collageBytes = await sharp({
+        create: { width: 1_800, height: 1_200, channels: 3, background: { r: 24, g: 80, b: 140 } },
+      })
+        .jpeg()
+        .toBuffer();
+      let resolveProcess: (() => void) | null = null;
+      const imageProcessor: ImageProcessor = {
+        process: () =>
+          new Promise((resolve) => {
+            resolveProcess = () =>
+              resolve({
+                bytes: collageBytes,
+                width: 1_800,
+                height: 1_200,
+                byteSize: collageBytes.byteLength,
+                timing: { validationMs: 1, slotsMs: 1, compositeMs: 1, totalMs: 3 },
+              });
+          }),
+        validateSourceJpeg: () => Promise.resolve({ width: 1_000, height: 1_000 }),
+        normalizeFramePng: () => Promise.reject(new Error('not used')),
+        createThumbnail: () => Promise.reject(new Error('not used')),
+        close: () => Promise.resolve(),
+      };
+      const frameService = {
+        ensureDefaultFrame: () => Promise.resolve(undefined),
+        ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+        getFrameOptions: () => [null, null],
+        getFrameSummaries: () => [],
+        listFrames: () => [],
+        toSummary: (f: StoredFrame) => ({
+          id: f.id,
+          name: f.name,
+          width: f.width,
+          height: f.height,
+          byteSize: f.byteSize,
+          mediaUrl: `grace-booth-media://asset/${f.id}`,
+          slots: f.slots,
+          revision: f.revision,
+        }),
+      } as unknown as FrameService;
+      const qrService = {
+        render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+      } as unknown as QrService;
+
+      workflow = new BoothWorkflow(
+        testStore.repository,
+        testStore.vault,
+        new SequencedCamera(['ready']),
+        frameService,
+        imageProcessor,
+        queue as unknown as UploadQueue,
+        qrService,
+        {
+          isDualDisplayActive: () => false,
+          now: () => 2_000,
+          print: printService,
+        },
+      );
+
+      const fourR = insertFrame(testStore, 1_800, 1_200);
+      const sessionId = reviewSession(testStore);
+      const written = testStore.vault.write('pending', collageBytes);
+      testStore.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'capture', 0, 1, ?, 'image/jpeg', 1800, 1200, ?, ?, 1)`,
+        )
+        .run(randomUUID(), sessionId, written.relativePath, written.byteSize, written.sha256);
+
+      await workflow.initialize();
+      expect(workflow.getSnapshot().printStatus).toBeNull();
+
+      const emitted: BoothSnapshot[] = [];
+      workflow.subscribe((snap) => emitted.push(snap));
+
+      const accepted = workflow.acceptPhotos(fourR, { copies: 1 });
+      expect(accepted.printStatus).toEqual({
+        phase: 'preparing',
+        origin: 'session',
+        pendingCopies: 1,
+        totalCopies: 1,
+      });
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0]).toEqual(accepted);
+
+      printer.setStatus('offline');
+      await printService.runQueuePass();
+      resolveProcess!();
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      expect(workflow.getSnapshot().printStatus).toMatchObject({
+        phase: 'paused',
+        origin: 'session',
+        reason: 'offline',
+        remainingCopies: 1,
+        totalCopies: 1,
+      });
+
+      await queue.completeOffline(sessionId);
+      expect(workflow.getSnapshot()).toMatchObject({
+        screen: 'final',
+        printStatus: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'offline',
+        },
+      });
+
+      emitted.length = 0;
+      printer.setStatus('ready');
+      await printService.runQueuePass();
+      expect(workflow.getSnapshot().printStatus).toEqual({
+        phase: 'printing',
+        origin: 'session',
+        stage: 'active',
+        printedCopies: 0,
+        remainingCopies: 1,
+        totalCopies: 1,
+      });
+      expect(emitted).toHaveLength(1);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await printService.runQueuePass();
+      expect(workflow.getSnapshot().printStatus).toMatchObject({
+        phase: 'completed',
+        origin: 'session',
+        totalCopies: 1,
+      });
+
+      printService.reprint(sessionId, 1);
+      expect(workflow.getSnapshot().printStatus).toEqual({
+        phase: 'printing',
+        origin: 'reprint',
+        stage: 'queued',
+        printedCopies: 0,
+        remainingCopies: 1,
+        totalCopies: 1,
+      });
+
+      await workflow.close();
+      const countAfterClose = emitted.length;
+      printer.setStatus('offline');
+      await printService.runQueuePass();
+      expect(emitted).toHaveLength(countAfterClose);
+    } finally {
+      await printService.stop();
+    }
+  });
+
+  it('avoids Screen 1 processing flash in dual display and hydrates completed prints onto Screen 2', async () => {
+    const testStore = createTestStore();
+    store = testStore;
+    const queue = new FakeUploadQueue();
+    queue.testStore = testStore;
+
+    const prints = new PrintRepository(testStore.database);
+    const printer = new MockPrinterAdapter({ outputDirectory: null, printDurationMs: 40 });
+    const settings = prints.getPrinterSettings();
+    prints.updatePrinterSettings({
+      printerName: MOCK_PRINTER_NAME,
+      paperRawKind: 127,
+      paperName: '102 x 152 mm (4 x 6 in)',
+      timeoutSeconds: 240,
+      expectedRevision: settings.revision,
+    });
+    const printService = new PrintService(
+      prints,
+      testStore.repository,
+      testStore.vault,
+      testStore.paths,
+      printer,
+      { tickMs: 1_000_000 },
+    );
+    await printService.start();
+
+    try {
+      const collageBytes = await sharp({
+        create: { width: 1_800, height: 1_200, channels: 3, background: { r: 24, g: 80, b: 140 } },
+      })
+        .jpeg()
+        .toBuffer();
+      const imageProcessor: ImageProcessor = {
+        process: () =>
+          Promise.resolve({
+            bytes: collageBytes,
+            width: 1_800,
+            height: 1_200,
+            byteSize: collageBytes.byteLength,
+            timing: { validationMs: 1, slotsMs: 1, compositeMs: 1, totalMs: 3 },
+          }),
+        validateSourceJpeg: () => Promise.resolve({ width: 1_000, height: 1_000 }),
+        normalizeFramePng: () => Promise.reject(new Error('not used')),
+        createThumbnail: () => Promise.reject(new Error('not used')),
+        close: () => Promise.resolve(),
+      };
+      const frameService = {
+        ensureDefaultFrame: () => Promise.resolve(undefined),
+        ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+        getFrameOptions: () => [null, null],
+        getFrameSummaries: () => [],
+        listFrames: () => [],
+        toSummary: (f: StoredFrame) => ({
+          id: f.id,
+          name: f.name,
+          width: f.width,
+          height: f.height,
+          byteSize: f.byteSize,
+          mediaUrl: `grace-booth-media://asset/${f.id}`,
+          slots: f.slots,
+          revision: f.revision,
+        }),
+      } as unknown as FrameService;
+      const qrService = {
+        render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+      } as unknown as QrService;
+
+      workflow = new BoothWorkflow(
+        testStore.repository,
+        testStore.vault,
+        new SequencedCamera(['ready']),
+        frameService,
+        imageProcessor,
+        queue as unknown as UploadQueue,
+        qrService,
+        {
+          isDualDisplayActive: () => true,
+          now: () => 2_000,
+          print: printService,
+        },
+      );
+
+      const fourR = insertFrame(testStore, 1_800, 1_200);
+      const sessionId = reviewSession(testStore);
+      const written = testStore.vault.write('pending', collageBytes);
+      testStore.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'capture', 0, 1, ?, 'image/jpeg', 1800, 1200, ?, ?, 1)`,
+        )
+        .run(randomUUID(), sessionId, written.relativePath, written.byteSize, written.sha256);
+
+      await workflow.initialize();
+
+      const screen1Emissions: BoothSnapshot[] = [];
+      const qrEmissions: QrStationState[] = [];
+      workflow.subscribe((snap) => screen1Emissions.push(snap));
+      workflow.subscribeQrStation((state) => qrEmissions.push(state));
+
+      const afterAccept = workflow.acceptPhotos(fourR, { copies: 1 });
+      expect(afterAccept).toMatchObject({ screen: 'attract', printStatus: null });
+      expect(screen1Emissions.map((snap) => snap.screen)).toEqual(['attract']);
+
+      for (let pass = 0; pass < 6; pass += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await printService.runQueuePass();
+        if (printService.getSessionPrintStatus(sessionId)?.phase === 'completed') break;
+      }
+
+      await queue.completeOffline(sessionId);
+      expect(workflow.getQrStationState()).toMatchObject({
+        status: 'active',
+        sessionId,
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 1,
+        },
+      });
+
+      qrEmissions.length = 0;
+      printService.reprint(sessionId, 1);
+      expect(workflow.getQrStationState().printStatus).toEqual({
+        phase: 'printing',
+        origin: 'reprint',
+        stage: 'queued',
+        printedCopies: 0,
+        remainingCopies: 1,
+        totalCopies: 1,
+      });
+      expect(qrEmissions).toHaveLength(1);
+
+      const dismissed = workflow.dismissQrStation(sessionId);
+      expect(dismissed.printStatus).toBeNull();
+      expect(screen1Emissions.some((snap) => snap.screen === 'processing')).toBe(false);
+    } finally {
+      await printService.stop();
+    }
+  });
+
+  it('marks waiting copies photo_interrupted on processing failure and discards them on restartSession', async () => {
+    const testStore = createTestStore();
+    store = testStore;
+    const queue = new FakeUploadQueue();
+    queue.testStore = testStore;
+
+    const prints = new PrintRepository(testStore.database);
+    const printer = new MockPrinterAdapter({ outputDirectory: null, printDurationMs: 40 });
+    const settings = prints.getPrinterSettings();
+    prints.updatePrinterSettings({
+      printerName: MOCK_PRINTER_NAME,
+      paperRawKind: 127,
+      paperName: '102 x 152 mm (4 x 6 in)',
+      timeoutSeconds: 240,
+      expectedRevision: settings.revision,
+    });
+    const printService = new PrintService(
+      prints,
+      testStore.repository,
+      testStore.vault,
+      testStore.paths,
+      printer,
+      { tickMs: 1_000_000 },
+    );
+    await printService.start();
+
+    try {
+      const imageProcessor: ImageProcessor = {
+        process: () => Promise.reject(new Error('collage exploded')),
+        validateSourceJpeg: () => Promise.resolve({ width: 1_000, height: 1_000 }),
+        normalizeFramePng: () => Promise.reject(new Error('not used')),
+        createThumbnail: () => Promise.reject(new Error('not used')),
+        close: () => Promise.resolve(),
+      };
+      const frameService = {
+        ensureDefaultFrame: () => Promise.resolve(undefined),
+        ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+        getFrameOptions: () => [null, null],
+        getFrameSummaries: () => [],
+        listFrames: () => [],
+        toSummary: (f: StoredFrame) => ({
+          id: f.id,
+          name: f.name,
+          width: f.width,
+          height: f.height,
+          byteSize: f.byteSize,
+          mediaUrl: `grace-booth-media://asset/${f.id}`,
+          slots: f.slots,
+          revision: f.revision,
+        }),
+      } as unknown as FrameService;
+      const qrService = {
+        render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+      } as unknown as QrService;
+
+      workflow = new BoothWorkflow(
+        testStore.repository,
+        testStore.vault,
+        new SequencedCamera(['ready', 'ready']),
+        frameService,
+        imageProcessor,
+        queue as unknown as UploadQueue,
+        qrService,
+        {
+          captureOverride: { countdownMs: 60_000, reviewMode: 'continuous' },
+          isDualDisplayActive: () => false,
+          now: () => 2_000,
+          print: printService,
+        },
+      );
+
+      const fourR = insertFrame(testStore, 1_800, 1_200);
+      const sessionId = reviewSession(testStore);
+      const written = testStore.vault.write('pending', Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      testStore.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'capture', 0, 1, ?, 'image/jpeg', 1000, 1000, ?, ?, 1)`,
+        )
+        .run(randomUUID(), sessionId, written.relativePath, written.byteSize, written.sha256);
+
+      await workflow.initialize();
+      workflow.acceptPhotos(fourR, { copies: 2 });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      expect(workflow.getSnapshot()).toMatchObject({
+        screen: 'recovery',
+        state: 'interrupted',
+        printStatus: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'photo_interrupted',
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+
+      const restartEmissions: BoothSnapshot[] = [];
+      workflow.subscribe((snap) => restartEmissions.push(snap));
+
+      const restarted = await workflow.restartSession(sessionId);
+      expect(restarted).toMatchObject({
+        screen: 'countdown',
+        state: 'countdown',
+        printStatus: null,
+      });
+      expect(restartEmissions).toHaveLength(1);
+      expect(restartEmissions[0]).toEqual(restarted);
+      expect(prints.listJobsForSession(sessionId)).toEqual([]);
+      expect(printService.getSessionPrintStatus(sessionId)).toBeNull();
+    } finally {
+      await printService.stop();
+    }
   });
 });
 
@@ -1434,10 +1883,7 @@ function createWorkflow(
     captureOverride?: CapturePolicyOverride | null;
     now?: () => number;
     imageProcessor?: ImageProcessor;
-    print?: {
-      requestSessionPrint(sessionId: string, copies: number): unknown;
-      attachSessionPhoto(sessionId: string, assetId: string): void;
-    };
+    print?: WorkflowPrintPort;
   } = {},
 ): { store: TestStore; workflow: BoothWorkflow } {
   const testStore = createTestStore();

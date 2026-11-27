@@ -1,16 +1,20 @@
 import { randomUUID } from 'node:crypto';
 
-import type {
-  PrinterAdapterKind,
-  PrinterSettings,
-  PrintJobKind,
-  PrintJobState,
-  PrintJobSummary,
+import {
+  OPEN_PRINT_STATES,
+  PrintJobKindSchema,
+  PrintJobStateSchema,
+  type PrinterAdapterKind,
+  type PrinterSettings,
+  type PrintJobKind,
+  type PrintJobState,
+  type PrintJobSummary,
 } from '@grace-booth/shared';
-import { PrintJobKindSchema, PrintJobStateSchema } from '@grace-booth/shared';
 
 import { AppError } from '../errors.js';
 import type { BoothDatabase } from './database.js';
+
+export { OPEN_PRINT_STATES };
 
 export type StoredPrinterSettings = PrinterSettings & {
   iccProfilePath: string | null;
@@ -41,14 +45,6 @@ export type StoredPrintJob = {
   updatedAt: number;
 };
 
-/** States in which a copy has not reached a final outcome yet. */
-export const OPEN_PRINT_STATES: readonly PrintJobState[] = [
-  'waiting_for_photo',
-  'queued',
-  'submitting',
-  'spooled',
-  'needs_attention',
-];
 const CANCELLABLE_STATES: readonly PrintJobState[] = [
   'waiting_for_photo',
   'queued',
@@ -219,6 +215,25 @@ export class PrintRepository {
         WHERE session_id = ? AND kind = 'session' AND state = 'waiting_for_photo'`,
       )
       .run(assetId, now, sessionId).changes;
+  }
+
+  listJobsForSession(sessionId: string): StoredPrintJob[] {
+    return this.database.raw
+      .prepare(
+        `${JOB_SELECT} WHERE session_id = ?
+        ORDER BY created_at, request_id, copy_index`,
+      )
+      .all(sessionId)
+      .map((row) => mapJob(row as Record<string, unknown>));
+  }
+
+  discardWaitingForSession(sessionId: string): number {
+    return this.database.raw
+      .prepare(
+        `DELETE FROM print_jobs
+        WHERE session_id = ? AND kind = 'session' AND state = 'waiting_for_photo'`,
+      )
+      .run(sessionId).changes;
   }
 
   listWaitingSessionIds(): string[] {

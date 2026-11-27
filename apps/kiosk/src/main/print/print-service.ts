@@ -9,6 +9,7 @@ import {
   type PrinterStatusKind,
   type PrinterSummary,
   type PrintJobSummary,
+  type SessionPrintStatus,
 } from '@grace-booth/shared';
 
 import type { LocalRepository } from '../database/repositories.js';
@@ -29,6 +30,12 @@ import {
   type PrintRenderOptions,
 } from './print-renderer.js';
 import { PrintNotSubmittedError, type PrinterAdapter } from './printer-adapter.js';
+import {
+  deriveSessionPrintStatus,
+  printerBlockerFromHealth,
+  type SessionPrintChangeEvent,
+  type SessionPrintDeriveOptions,
+} from './session-print-status.js';
 
 const TICK_MS = 3_000;
 const NOT_SUBMITTED_BACKOFF_MS = 30_000;
@@ -40,16 +47,28 @@ export type PrintServiceOptions = {
   tickMs?: number;
 };
 
+export type WorkflowPrintPort = {
+  requestSessionPrint(sessionId: string, copies: number): unknown;
+  attachSessionPhoto(sessionId: string, assetId: string): void;
+  discardWaitingSessionPrint(sessionId: string): void;
+  getSessionPrintStatus(
+    sessionId: string,
+    options?: SessionPrintDeriveOptions,
+  ): SessionPrintStatus | null;
+  subscribeSessionChanges(listener: (event: SessionPrintChangeEvent) => void): () => void;
+};
+
 type JobProblem = { status: PrinterStatusKind; message: string } | null;
 
 /**
  * The print queue. Copies go to the spooler one at a time, so a printer that stops mid-request
  * leaves every remaining copy visible and cancellable in Grace Booth instead of inside Windows.
  */
-export class PrintService extends EventEmitter {
+export class PrintService extends EventEmitter implements WorkflowPrintPort {
   private readonly now: () => number;
   private readonly tickMs: number;
   private timer: NodeJS.Timeout | null = null;
+  private activeTick: Promise<void> | null = null;
   private running = false;
   private wakeRequested = false;
   private stopped = true;
@@ -94,6 +113,7 @@ export class PrintService extends EventEmitter {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    await this.activeTick;
     await this.adapter.close();
   }
 
@@ -118,11 +138,30 @@ export class PrintService extends EventEmitter {
 
   /** One queue pass, awaited. Used by tests and the native self-test. */
   async runQueuePass(): Promise<void> {
+    if (this.activeTick) await this.activeTick;
     await this.tick();
   }
 
   listJobs(): PrintJobSummary[] {
     return this.prints.listJobsForOperator().map(printJobSummary);
+  }
+
+  getSessionPrintStatus(
+    sessionId: string,
+    options?: SessionPrintDeriveOptions,
+  ): SessionPrintStatus | null {
+    return deriveSessionPrintStatus(
+      this.prints.listJobsForSession(sessionId),
+      printerBlockerFromHealth(this.health),
+      options,
+    );
+  }
+
+  subscribeSessionChanges(listener: (event: SessionPrintChangeEvent) => void): () => void {
+    this.on('session-change', listener);
+    return () => {
+      this.off('session-change', listener);
+    };
   }
 
   // ---- requests ----------------------------------------------------------------------------
@@ -134,12 +173,23 @@ export class PrintService extends EventEmitter {
       this.now(),
     );
     this.refreshHealth();
+    this.emitSessionChange(sessionId);
     return jobs.map(printJobSummary);
   }
 
   /** Called once the finished photo for a session exists. */
   attachSessionPhoto(sessionId: string, assetId: string): void {
-    if (this.prints.attachSessionPhoto(sessionId, assetId, this.now()) > 0) this.wake();
+    if (this.prints.attachSessionPhoto(sessionId, assetId, this.now()) > 0) {
+      this.emitSessionChange(sessionId);
+      this.wake();
+    }
+  }
+
+  discardWaitingSessionPrint(sessionId: string): void {
+    if (this.prints.discardWaitingForSession(sessionId) > 0) {
+      this.refreshHealth();
+      this.emitSessionChange(sessionId);
+    }
   }
 
   reprint(sessionId: string, copies: number): PrintJobSummary[] {
@@ -158,6 +208,7 @@ export class PrintService extends EventEmitter {
       { kind: 'reprint', sessionId, sourceAssetId: asset.id, copies },
       this.now(),
     );
+    this.emitSessionChange(sessionId);
     this.wake();
     return jobs.map(printJobSummary);
   }
@@ -183,6 +234,7 @@ export class PrintService extends EventEmitter {
     }
     const cancelled = this.prints.cancel(jobId, this.now());
     this.refreshHealth();
+    this.emitSessionChange(cancelled.sessionId);
     this.wake();
     return printJobSummary(cancelled);
   }
@@ -190,6 +242,7 @@ export class PrintService extends EventEmitter {
   resolve(jobId: string, resolution: 'print_again' | 'printed'): PrintJobSummary {
     const job = this.prints.resolve(jobId, resolution, this.now());
     this.refreshHealth();
+    this.emitSessionChange(job.sessionId);
     this.wake();
     return printJobSummary(job);
   }
@@ -272,8 +325,11 @@ export class PrintService extends EventEmitter {
   private async recover(): Promise<void> {
     for (const sessionId of this.prints.listWaitingSessionIds()) {
       const session = this.repository.getSession(sessionId);
-      if (session?.collageAssetId) {
-        this.prints.attachSessionPhoto(sessionId, session.collageAssetId, this.now());
+      if (
+        session?.collageAssetId &&
+        this.prints.attachSessionPhoto(sessionId, session.collageAssetId, this.now()) > 0
+      ) {
+        this.emitSessionChange(sessionId);
       }
     }
     for (const job of this.prints.listJobsInState(['submitting'])) {
@@ -286,17 +342,26 @@ export class PrintService extends EventEmitter {
           UNCERTAIN_MESSAGE,
           this.now(),
         );
+      this.emitSessionChange(job.sessionId);
     }
   }
 
-  private async tick(): Promise<void> {
-    if (this.stopped || this.running) return;
+  private tick(): Promise<void> {
+    if (this.stopped || this.running) return this.activeTick ?? Promise.resolve();
+    const run = this.runTick();
+    this.activeTick = run;
+    return run;
+  }
+
+  private async runTick(): Promise<void> {
     this.running = true;
     this.timer = null;
     try {
       const settings = this.prints.getPrinterSettings();
       const problem = await this.followSpooledJobs(settings);
+      if (!this.isRunning()) return;
       const queueStatus = await this.queueStatus(settings);
+      if (!this.isRunning()) return;
       const status = problem ?? queueStatus;
       if (
         settings.printerName &&
@@ -307,14 +372,17 @@ export class PrintService extends EventEmitter {
         const next = this.prints.nextQueuedJob();
         if (next) await this.submit(next, settings);
       }
+      if (!this.isRunning()) return;
       this.setHealth(settings, problem ?? (await this.queueStatus(settings)));
     } catch (error) {
+      if (!this.isRunning()) return;
       this.setHealth(this.prints.getPrinterSettings(), {
         status: 'unknown',
         message: toSafeError(error).safeMessage,
       });
     } finally {
       this.running = false;
+      this.activeTick = null;
       if (this.isRunning()) {
         const delay = this.wakeRequested ? 0 : this.tickMs;
         this.wakeRequested = false;
@@ -332,6 +400,7 @@ export class PrintService extends EventEmitter {
       if (probe === null) continue;
       if (!probe.found || probe.printed) {
         this.prints.markPrinted(job.id, this.now());
+        this.emitSessionChange(job.sessionId);
         continue;
       }
       if (probe.problem) {
@@ -367,6 +436,7 @@ export class PrintService extends EventEmitter {
     } catch (error) {
       const safe = toSafeError(error);
       this.prints.markFailed(job.id, safe.code, safe.safeMessage, this.now());
+      this.emitSessionChange(job.sessionId);
       return;
     }
     const imagePath = join(this.paths.printStaging, `${job.documentKey}.png`);
@@ -377,6 +447,7 @@ export class PrintService extends EventEmitter {
         { printerName, paperRawKind: settings.paperRawKind, paperName: settings.paperName },
         this.now(),
       );
+      this.emitSessionChange(submitting.sessionId);
       try {
         const result = await this.adapter.submit({
           printerName,
@@ -386,10 +457,12 @@ export class PrintService extends EventEmitter {
           imagePath,
         });
         this.prints.markSpooled(job.id, result.spoolerJobId, this.now());
+        this.emitSessionChange(job.sessionId);
         this.lastSubmitError = null;
       } catch (error) {
         if (error instanceof PrintNotSubmittedError) {
           this.prints.returnToQueue(job.id, error.code, error.message, this.now());
+          this.emitSessionChange(job.sessionId);
           this.notSubmittedUntil = this.now() + NOT_SUBMITTED_BACKOFF_MS;
           this.lastSubmitError = error.message;
           return;
@@ -404,6 +477,7 @@ export class PrintService extends EventEmitter {
             this.now(),
           );
         }
+        this.emitSessionChange(job.sessionId);
       }
     } finally {
       rmSync(imagePath, { force: true });
@@ -479,14 +553,28 @@ export class PrintService extends EventEmitter {
   }
 
   private publish(next: PrinterHealth): void {
-    const changed =
+    const healthDetailsChanged =
       next.status !== this.health.status ||
       next.printerName !== this.health.printerName ||
-      next.message !== this.health.message ||
+      next.message !== this.health.message;
+    const changed =
+      healthDetailsChanged ||
       next.queuedCount !== this.health.queuedCount ||
       next.attentionCount !== this.health.attentionCount;
     this.health = next;
     if (changed) this.emit('health', next);
+    if (healthDetailsChanged) {
+      this.emit('session-change', { scope: 'health' } satisfies SessionPrintChangeEvent);
+    }
+  }
+
+  private emitSessionChange(sessionId: string | null): void {
+    if (sessionId) {
+      this.emit('session-change', {
+        scope: 'session',
+        sessionId,
+      } satisfies SessionPrintChangeEvent);
+    }
   }
 
   private clearStaging(): void {

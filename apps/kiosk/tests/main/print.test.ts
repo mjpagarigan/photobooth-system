@@ -16,6 +16,7 @@ import {
   renderPhotoPage,
 } from '../../src/main/print/print-renderer.js';
 import { PrintService } from '../../src/main/print/print-service.js';
+import type { SessionPrintChangeEvent } from '../../src/main/print/session-print-status.js';
 import { createTestStore, type TestStore } from './helpers.js';
 
 // Driver data read from this machine's printers on 2026-11-13 (see docs/PRINTING_DESIGN.md).
@@ -155,11 +156,14 @@ afterEach(async () => {
 });
 
 async function createHarness(
-  options: { photo?: { width: number; height: number } } = {},
+  options: { photo?: { width: number; height: number }; printDurationMs?: number } = {},
 ): Promise<Harness> {
   const store = createTestStore();
   const prints = new PrintRepository(store.database);
-  const printer = new MockPrinterAdapter({ outputDirectory: null, printDurationMs: 1 });
+  const printer = new MockPrinterAdapter({
+    outputDirectory: null,
+    printDurationMs: options.printDurationMs ?? 1,
+  });
   const settings = prints.getPrinterSettings();
   prints.updatePrinterSettings({
     printerName: MOCK_PRINTER_NAME,
@@ -435,5 +439,122 @@ describe('print queue', () => {
     expect(timed.getHealth()).toMatchObject({ status: 'error' });
     expect(timed.getHealth().message).toMatch(/longer than expected/);
     expect(prints.requireJob(job!.id).state).toBe('spooled');
+  });
+
+  it('lists every job for a session without truncation and discards only waiting session rows', async () => {
+    const { prints, sessionId, assetId } = await createHarness();
+    const otherSessionId = randomUUID();
+    harness!.store.repository.createSession(otherSessionId, 1_000);
+
+    const sessionJobs = prints.createRequest({
+      kind: 'session',
+      sessionId,
+      sourceAssetId: null,
+      copies: 2,
+    });
+    const reprintJobs = prints.createRequest({
+      kind: 'reprint',
+      sessionId,
+      sourceAssetId: assetId,
+      copies: 1,
+    });
+    for (let index = 0; index < 35; index += 1) {
+      const [other] = prints.createRequest({
+        kind: 'reprint',
+        sessionId: otherSessionId,
+        sourceAssetId: assetId,
+        copies: 1,
+      });
+      prints.cancel(other!.id);
+    }
+
+    expect(prints.listJobsForSession(sessionId).map((job) => job.id)).toEqual([
+      ...sessionJobs.map((job) => job.id),
+      ...reprintJobs.map((job) => job.id),
+    ]);
+
+    expect(prints.discardWaitingForSession(sessionId)).toBe(2);
+    expect(prints.discardWaitingForSession(sessionId)).toBe(0);
+    expect(prints.listJobsForSession(sessionId).map((job) => job.id)).toEqual(
+      reprintJobs.map((job) => job.id),
+    );
+  });
+
+  it('emits session-change events and tracks live session print status through pauses, completion, and reprints', async () => {
+    const { service, printer, sessionId, assetId } = await createHarness({ printDurationMs: 40 });
+    await service.start();
+
+    const events: SessionPrintChangeEvent[] = [];
+    const unsubscribe = service.subscribeSessionChanges((event) => events.push(event));
+
+    expect(service.getSessionPrintStatus(sessionId)).toBeNull();
+
+    service.requestSessionPrint(sessionId, 2);
+    expect(service.getSessionPrintStatus(sessionId)).toEqual({
+      phase: 'preparing',
+      origin: 'session',
+      pendingCopies: 2,
+      totalCopies: 2,
+    });
+    expect(events).toContainEqual({ scope: 'session', sessionId });
+
+    printer.setStatus('offline');
+    await service.runQueuePass();
+    expect(events).toContainEqual({ scope: 'health' });
+
+    service.attachSessionPhoto(sessionId, assetId);
+    expect(service.getSessionPrintStatus(sessionId)).toMatchObject({
+      phase: 'paused',
+      origin: 'session',
+      reason: 'offline',
+      printedCopies: 0,
+      remainingCopies: 2,
+      totalCopies: 2,
+    });
+
+    printer.setStatus('ready');
+    await service.runQueuePass();
+    expect(service.getSessionPrintStatus(sessionId)).toEqual({
+      phase: 'printing',
+      origin: 'session',
+      stage: 'active',
+      printedCopies: 0,
+      remainingCopies: 2,
+      totalCopies: 2,
+    });
+
+    for (let pass = 0; pass < 6; pass += 1) {
+      await settle(50);
+      await service.runQueuePass();
+      if (service.getSessionPrintStatus(sessionId)?.phase === 'completed') break;
+    }
+    expect(service.getSessionPrintStatus(sessionId)).toMatchObject({
+      phase: 'completed',
+      origin: 'session',
+      totalCopies: 2,
+    });
+
+    service.reprint(sessionId, 1);
+    expect(service.getSessionPrintStatus(sessionId)).toEqual({
+      phase: 'printing',
+      origin: 'reprint',
+      stage: 'queued',
+      printedCopies: 0,
+      remainingCopies: 1,
+      totalCopies: 1,
+    });
+
+    for (let pass = 0; pass < 4; pass += 1) {
+      await settle(50);
+      await service.runQueuePass();
+      if (service.getSessionPrintStatus(sessionId)?.phase === 'completed') break;
+    }
+    expect(service.getSessionPrintStatus(sessionId)).toMatchObject({
+      phase: 'completed',
+      origin: 'reprint',
+      totalCopies: 1,
+    });
+
+    unsubscribe();
   });
 });
