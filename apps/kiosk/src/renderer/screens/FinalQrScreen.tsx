@@ -1,8 +1,12 @@
-import type { DeliveryMode } from '@grace-booth/shared';
+import type {
+  DeliveryMode,
+  SessionPrintStatus as SessionPrintStatusData,
+} from '@grace-booth/shared';
 import { Button, LockKey, WifiHigh } from '@grace-booth/ui';
 import { useEffect } from 'react';
 
 import { Photostrip } from '../components/Photostrip';
+import { SessionPrintStatus } from '../components/SessionPrintStatus';
 
 export type FinalDeliveryMode = DeliveryMode;
 
@@ -35,6 +39,7 @@ type FinalQrScreenProps = {
   deliveryMode?: FinalDeliveryMode;
   onDone: () => void;
   onOpenRecent?: () => void;
+  printStatus?: SessionPrintStatusData | null | undefined;
   qrImageUrl: string;
 };
 
@@ -45,6 +50,7 @@ export function FinalQrScreen({
   deliveryMode = 'cloud',
   onDone,
   onOpenRecent,
+  printStatus,
   qrImageUrl,
 }: FinalQrScreenProps) {
   useEffect(() => {
@@ -88,6 +94,7 @@ export function FinalQrScreen({
               <DetailIcon aria-hidden="true" />
               {copy.detail}
             </p>
+            <SessionPrintStatus status={printStatus} tone="light" />
           </div>
         </div>
 

@@ -4,12 +4,14 @@ import {
   CaptureSettingsSchema,
   DEFAULT_CAPTURE_SETTINGS,
 } from './capture.js';
+import { OpaqueIdSchema, UtcMillisSchema } from './primitives.js';
+import { SessionPrintStatusSchema } from './print.js';
+
+export { OpaqueIdSchema, UtcMillisSchema };
 
 export const MIN_FRAME_SLOTS = 1;
 export const MAX_FRAME_SLOTS = 10;
 
-export const OpaqueIdSchema = z.uuid();
-export const UtcMillisSchema = z.number().int().nonnegative();
 export const DEFAULT_RECRUITMENT_BUTTON_TEXT = 'Join a ministry';
 export const RecruitmentButtonTextSchema = z
   .string()
@@ -226,6 +228,7 @@ export const QrStationStateSchema = z
     durationSeconds: z.number().int().positive(),
     message: z.string().nullable(),
     canRetryUpload: z.boolean().default(false),
+    printStatus: SessionPrintStatusSchema.nullable().optional(),
   })
   .strict();
 export type QrStationState = z.infer<typeof QrStationStateSchema>;
@@ -347,6 +350,7 @@ export const BoothSnapshotSchema = z
     controls: BoothControlsSchema,
     errorCode: GuestErrorCodeSchema.nullable(),
     message: z.string().max(300).nullable(),
+    printStatus: SessionPrintStatusSchema.nullable().optional(),
   })
   .strict();
 export type BoothSnapshot = z.infer<typeof BoothSnapshotSchema>;

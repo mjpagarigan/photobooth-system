@@ -8,9 +8,11 @@ import type {
   PrintJobState,
   PrintJobSummary,
 } from '@grace-booth/shared';
-import { MAX_COPIES_PER_REQUEST } from '@grace-booth/shared';
+import { MAX_COPIES_PER_REQUEST, OPEN_PRINT_STATES } from '@grace-booth/shared';
 
 import { isPrinterReady } from '../hooks/usePrinterHealth';
+
+const OPEN_PRINT_STATE_SET: ReadonlySet<PrintJobState> = new Set(OPEN_PRINT_STATES);
 
 function getBridge(): GraceBoothBridge | null {
   return window.graceBooth ?? null;
@@ -220,9 +222,7 @@ export function PrintQueuePanel({ health }: { health: PrinterHealth | null }) {
     }
   };
 
-  const open = jobs.filter((job) =>
-    ['waiting_for_photo', 'queued', 'submitting', 'spooled', 'needs_attention'].includes(job.state),
-  );
+  const open = jobs.filter((job) => OPEN_PRINT_STATE_SET.has(job.state));
   const recent = jobs.filter((job) => !open.includes(job)).slice(0, 10);
 
   return (

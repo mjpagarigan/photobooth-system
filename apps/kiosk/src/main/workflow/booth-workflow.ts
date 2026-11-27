@@ -14,6 +14,7 @@ import {
   type GuestErrorCode,
   type QrStationState,
   type SessionPrintRequest,
+  type SessionPrintStatus,
   type SessionState,
 } from '@grace-booth/shared';
 
@@ -30,6 +31,11 @@ import type {
 import { AppError, toSafeError } from '../errors.js';
 import type { FrameService } from '../frame/frame-service.js';
 import type { ImageProcessor } from '../image/image-worker-client.js';
+import type { WorkflowPrintPort } from '../print/print-service.js';
+import {
+  isSameSessionPrintStatus,
+  type SessionPrintChangeEvent,
+} from '../print/session-print-status.js';
 import type { PhotoVault } from '../storage/photo-vault.js';
 import { reduceSessionState, type SessionEvent } from './session-state-machine.js';
 
@@ -41,10 +47,7 @@ export type BoothWorkflowOptions = {
   isDualDisplayActive: () => boolean;
   now?: () => number;
   /** The print queue. Absent in builds or tests without printing. */
-  print?: {
-    requestSessionPrint(sessionId: string, copies: number): unknown;
-    attachSessionPhoto(sessionId: string, assetId: string): void;
-  };
+  print?: WorkflowPrintPort;
 };
 
 export class BoothWorkflow {
@@ -59,6 +62,7 @@ export class BoothWorkflow {
     durationSeconds: 45,
     message: null,
     canRetryUpload: false,
+    printStatus: null,
   };
   private latestQrStationSession: { createdAt: number; sessionId: string } | null = null;
   private qrDismissTimer: NodeJS.Timeout | null = null;
@@ -69,6 +73,9 @@ export class BoothWorkflow {
   private readonly qrBySession = new Map<string, string>();
   private readonly deliveryModeBySession = new Map<string, DeliveryMode>();
   private readonly now: () => number;
+  private unsubscribePrint: (() => void) | null;
+  private lastEmittedActivePrintStatus: SessionPrintStatus | null = null;
+  private suppressingPrintBroadcast = false;
   private closed = false;
 
   constructor(
@@ -89,6 +96,8 @@ export class BoothWorkflow {
       this.handleUploadAuthRequired(sessionId),
     );
     uploadQueue.on('retry', (sessionId: string) => this.emitIfActive(sessionId));
+    this.unsubscribePrint =
+      options.print?.subscribeSessionChanges((event) => this.handlePrintChange(event)) ?? null;
   }
 
   async initialize(): Promise<void> {
@@ -186,6 +195,7 @@ export class BoothWorkflow {
       durationSeconds: 45,
       message: null,
       canRetryUpload: false,
+      printStatus: null,
     };
     this.emitQrStation();
     return this.qrStationState;
@@ -211,6 +221,7 @@ export class BoothWorkflow {
       durationSeconds: duration,
       message: null,
       canRetryUpload: false,
+      printStatus: this.options.print?.getSessionPrintStatus(item.sessionId) ?? null,
     };
     if (this.qrDismissTimer) {
       clearTimeout(this.qrDismissTimer);
@@ -245,6 +256,7 @@ export class BoothWorkflow {
       durationSeconds: duration,
       message: 'Upload failed. Ask an operator for help or try another photo session.',
       canRetryUpload: false,
+      printStatus: this.options.print?.getSessionPrintStatus(session.id) ?? null,
     };
     if (this.qrDismissTimer) clearTimeout(this.qrDismissTimer);
     this.qrDismissTimer = setTimeout(() => this.dismissQrStation(session.id), duration * 1000);
@@ -316,6 +328,7 @@ export class BoothWorkflow {
       },
       errorCode: guestErrorFor(session),
       message: messageFor(session),
+      printStatus: this.projectPrintStatus(session),
     };
   }
 
@@ -436,23 +449,24 @@ export class BoothWorkflow {
         );
       }
     }
-    this.transition(
-      session,
-      'accept_photos',
-      {
-        selectedOption: 1,
-        selectedFrameId: chosenFrame.id,
-      },
-      this.now(),
-    );
-    if (print) this.options.print?.requestSessionPrint(session.id, print.copies);
-    const dualActive = this.isDualDisplayActive();
-    if (dualActive) {
-      this.activeSessionId = null;
-      this.emit();
-    } else {
-      this.emit();
-    }
+    const dualActive = this.withoutPrintBroadcast(() => {
+      this.transition(
+        session,
+        'accept_photos',
+        {
+          selectedOption: 1,
+          selectedFrameId: chosenFrame.id,
+        },
+        this.now(),
+      );
+      const isDual = this.isDualDisplayActive();
+      if (isDual) {
+        this.activeSessionId = null;
+      }
+      if (print) this.options.print?.requestSessionPrint(session.id, print.copies);
+      return isDual;
+    });
+    this.emit();
     void this.processCollage(session.id);
     return dualActive
       ? attractSnapshot(
@@ -542,12 +556,19 @@ export class BoothWorkflow {
     }
     if (!(await this.connectCameraFor(session))) return this.getSnapshot();
     if (!this.isSessionCurrent(session.id)) return this.getSnapshot();
-    this.beginCountdown(this.repository.startRetakeRound(session.id, this.now()));
+    const restarted = this.withoutPrintBroadcast(() => {
+      const next = this.repository.startRetakeRound(session.id, this.now());
+      this.options.print?.discardWaitingSessionPrint(session.id);
+      return next;
+    });
+    this.beginCountdown(restarted);
     return this.getSnapshot();
   }
 
   async close(): Promise<void> {
     this.closed = true;
+    this.unsubscribePrint?.();
+    this.unsubscribePrint = null;
     this.clearCountdown();
     if (this.qrDismissTimer) {
       clearTimeout(this.qrDismissTimer);
@@ -852,6 +873,54 @@ export class BoothWorkflow {
     return this.repository.transitionSession(session.id, [session.state], next, patch, now);
   }
 
+  private projectPrintStatus(session: StoredSession): SessionPrintStatus | null {
+    if (!canSessionHavePrintStatus(session.state)) return null;
+    return (
+      this.options.print?.getSessionPrintStatus(session.id, {
+        sessionInterrupted: session.state === 'interrupted',
+      }) ?? null
+    );
+  }
+
+  private withoutPrintBroadcast<T>(action: () => T): T {
+    this.suppressingPrintBroadcast = true;
+    try {
+      return action();
+    } finally {
+      this.suppressingPrintBroadcast = false;
+    }
+  }
+
+  private handlePrintChange(event: SessionPrintChangeEvent): void {
+    if (this.closed || this.suppressingPrintBroadcast) return;
+
+    if (
+      this.activeSessionId &&
+      (event.scope === 'health' || event.sessionId === this.activeSessionId)
+    ) {
+      const session = this.repository.getSession(this.activeSessionId);
+      if (session && canSessionHavePrintStatus(session.state)) {
+        const next = this.projectPrintStatus(session);
+        if (!isSameSessionPrintStatus(this.lastEmittedActivePrintStatus, next)) {
+          this.emit();
+        }
+      }
+    }
+
+    const qrSessionId = this.qrStationState.sessionId;
+    if (
+      qrSessionId &&
+      this.qrStationState.status !== 'idle' &&
+      (event.scope === 'health' || event.sessionId === qrSessionId)
+    ) {
+      const next = this.options.print?.getSessionPrintStatus(qrSessionId) ?? null;
+      if (!isSameSessionPrintStatus(this.qrStationState.printStatus ?? null, next)) {
+        this.qrStationState = { ...this.qrStationState, printStatus: next };
+        this.emitQrStation();
+      }
+    }
+  }
+
   private emitIfActive(sessionId: string): void {
     if (this.activeSessionId === sessionId) this.emit();
   }
@@ -862,8 +931,21 @@ export class BoothWorkflow {
 
   private emit(): void {
     const snapshot = this.getSnapshot();
+    this.lastEmittedActivePrintStatus = snapshot.printStatus ?? null;
     for (const listener of this.listeners) listener(snapshot);
   }
+}
+
+function canSessionHavePrintStatus(state: SessionState): boolean {
+  return (
+    state === 'processing' ||
+    state === 'pending_upload' ||
+    state === 'uploading' ||
+    state === 'ready' ||
+    state === 'final' ||
+    state === 'upload_failed' ||
+    state === 'interrupted'
+  );
 }
 
 function resolveSessionCapturePolicy(
@@ -907,6 +989,7 @@ function attractSnapshot(cameraPreviewEnabled: boolean, requiredShotCount = 3): 
     },
     errorCode: null,
     message: null,
+    printStatus: null,
   };
 }
 

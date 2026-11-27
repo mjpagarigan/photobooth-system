@@ -34,6 +34,7 @@ export const EMPTY_BOOTH_SNAPSHOT: BoothSnapshot = {
   },
   errorCode: null,
   message: null,
+  printStatus: null,
 };
 
 export function recoveryVariantFor(

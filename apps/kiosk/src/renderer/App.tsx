@@ -1253,6 +1253,7 @@ export function App() {
             'Your finished photo is being prepared safely.',
           )}
           onOpenAdmin={() => void beginProtectedAction('admin')}
+          printStatus={snapshot.printStatus ?? null}
           state={snapshot.state}
           totalShots={snapshot.requiredShotCount ?? 3}
         />
@@ -1273,6 +1274,7 @@ export function App() {
           deliveryMode={snapshot.deliveryMode ?? 'cloud'}
           onDone={() => void runGuestCommand((bridge) => bridge.booth.done())}
           onOpenRecent={() => void openRecentGallery()}
+          printStatus={snapshot.printStatus ?? null}
           qrImageUrl={snapshot.media.qrImageUrl}
         />
       );
@@ -1295,6 +1297,7 @@ export function App() {
         onRestart={() => void beginProtectedAction('restart')}
         onRetryUpload={() => void runGuestCommand((bridge) => bridge.booth.retryUpload())}
         onFinishOffline={() => void runGuestCommand((bridge) => bridge.booth.finishOffline())}
+        printStatus={snapshot.printStatus ?? null}
         variant={variant}
       />
     );

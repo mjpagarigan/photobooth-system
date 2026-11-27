@@ -35,10 +35,15 @@ export type VisualFixtureMode =
   | 'review'
   | 'review-4-slot'
   | 'processing'
+  | 'processing-printing'
   | 'uploading-backoff'
   | 'final'
+  | 'final-printing'
+  | 'final-printed'
+  | 'final-print-paused'
   | 'recovery-camera'
   | 'recovery-upload'
+  | 'recovery-upload-printed'
   | 'recovery-interrupted'
   | 'admin-frame'
   | 'admin-frame-error'
@@ -52,6 +57,11 @@ export type VisualFixtureMode =
   | 'operator-restart'
   | 'camera-setup'
   | 'recent-gallery';
+
+export type QrStationVisualFixtureMode =
+  | 'qr-station-active'
+  | 'qr-station-printing'
+  | 'qr-station-printed';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FRAME_ID = '22222222-2222-4222-8222-222222222222';
@@ -224,6 +234,7 @@ const BASE_SNAPSHOT: BoothSnapshot = {
   },
   errorCode: null,
   message: null,
+  printStatus: null,
 };
 
 type SnapshotUpdate = Omit<Partial<BoothSnapshot>, 'controls' | 'media'> & {
@@ -356,7 +367,28 @@ function buildFourSlotFrameOverlay(): string {
   return canvas.toDataURL('image/png');
 }
 
-export async function createQrStationVisualState(): Promise<QrStationState> {
+export async function createQrStationVisualState(
+  mode: QrStationVisualFixtureMode = 'qr-station-active',
+): Promise<QrStationState> {
+  const printStatus: QrStationState['printStatus'] =
+    mode === 'qr-station-printing'
+      ? {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        }
+      : mode === 'qr-station-printed'
+        ? {
+            phase: 'completed',
+            origin: 'session',
+            totalCopies: 2,
+            completedAt: 1_786_883_400_000,
+          }
+        : null;
+
   return {
     status: 'active',
     sessionId: SESSION_ID,
@@ -366,6 +398,7 @@ export async function createQrStationVisualState(): Promise<QrStationState> {
     durationSeconds: 45,
     message: null,
     canRetryUpload: false,
+    printStatus,
   };
 }
 
@@ -459,6 +492,22 @@ export async function createVisualSeedPayload(
         message: 'Adding your three photos to the CCF Alabang frame.',
       });
       break;
+    case 'processing-printing':
+      snapshot = withSession({
+        screen: 'processing',
+        state: 'processing',
+        shotNumber: null,
+        captureCount: 3,
+        media: { captureUrls: CAPTURE_URLS, collageUrl: null, qrImageUrl: null },
+        message: 'Adding your three photos to the CCF Alabang frame.',
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+      break;
     case 'uploading-backoff':
       snapshot = withSession({
         screen: 'processing',
@@ -484,6 +533,74 @@ export async function createVisualSeedPayload(
         controls: { canFinish: true },
       });
       break;
+    case 'final-printing':
+      snapshot = withSession({
+        screen: 'final',
+        state: 'final',
+        shotNumber: null,
+        captureCount: 3,
+        media: {
+          captureUrls: CAPTURE_URLS,
+          collageUrl: await buildReadyCollage(),
+          frame: DEFAULT_FRAME,
+          qrImageUrl: await buildReadyQr(),
+        },
+        controls: { canFinish: true },
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 1,
+          remainingCopies: 1,
+          totalCopies: 2,
+        },
+      });
+      break;
+    case 'final-printed':
+      snapshot = withSession({
+        screen: 'final',
+        state: 'final',
+        shotNumber: null,
+        captureCount: 3,
+        media: {
+          captureUrls: CAPTURE_URLS,
+          collageUrl: await buildReadyCollage(),
+          frame: DEFAULT_FRAME,
+          qrImageUrl: await buildReadyQr(),
+        },
+        controls: { canFinish: true },
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 2,
+          completedAt: 1_786_883_400_000,
+        },
+      });
+      break;
+    case 'final-print-paused':
+      snapshot = withSession({
+        screen: 'final',
+        state: 'final',
+        shotNumber: null,
+        captureCount: 3,
+        media: {
+          captureUrls: CAPTURE_URLS,
+          collageUrl: await buildReadyCollage(),
+          frame: DEFAULT_FRAME,
+          qrImageUrl: await buildReadyQr(),
+        },
+        controls: { canFinish: true },
+        printStatus: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'paper_out',
+          detail: 'Printer is out of paper.',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+      break;
     case 'recovery-camera':
       snapshot = withSession({
         screen: 'recovery',
@@ -501,6 +618,23 @@ export async function createVisualSeedPayload(
         message: 'Your photo is safe on this booth. Try the secure upload again.',
         media: { captureUrls: CAPTURE_URLS, collageUrl: '/mock/photo-3.jpg', qrImageUrl: null },
         controls: { canRetryUpload: true },
+      });
+      break;
+    case 'recovery-upload-printed':
+      snapshot = withSession({
+        screen: 'recovery',
+        state: 'upload_failed',
+        captureCount: 3,
+        errorCode: 'upload_failed',
+        message: 'Your photo is safe on this booth. Try the secure upload again.',
+        media: { captureUrls: CAPTURE_URLS, collageUrl: '/mock/photo-3.jpg', qrImageUrl: null },
+        controls: { canRetryUpload: true },
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 1,
+          completedAt: 1_786_883_400_000,
+        },
       });
       break;
     case 'recovery-interrupted':

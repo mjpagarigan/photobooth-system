@@ -5,6 +5,7 @@ import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth
 
 import { Photostrip } from '../components/Photostrip';
 import { PrinterIndicator } from '../components/Printing';
+import { SessionPrintStatus } from '../components/SessionPrintStatus';
 import { usePrinterHealth } from '../hooks/usePrinterHealth';
 import { RecentGallery } from '../components/RecentGallery';
 import { LOCAL_FIXTURES } from '../local-fixtures';
@@ -22,6 +23,7 @@ const DEFAULT_QR_STATE: QrStationState = {
   durationSeconds: 45,
   message: null,
   canRetryUpload: false,
+  printStatus: null,
 };
 
 export function QrStationScreen(): React.ReactElement {
@@ -36,12 +38,15 @@ export function QrStationScreen(): React.ReactElement {
 
   // Subscribe to QR station state
   useEffect(() => {
+    const visualMode = new URLSearchParams(window.location.search).get('visual');
     if (
       import.meta.env.DEV &&
-      new URLSearchParams(window.location.search).get('visual') === 'qr-station-active'
+      (visualMode === 'qr-station-active' ||
+        visualMode === 'qr-station-printing' ||
+        visualMode === 'qr-station-printed')
     ) {
       void import('../visual-fixtures').then(async ({ createQrStationVisualState }) => {
-        setStationState(await createQrStationVisualState());
+        setStationState(await createQrStationVisualState(visualMode));
       });
       return;
     }
@@ -170,6 +175,7 @@ export function QrStationScreen(): React.ReactElement {
             Photo delivery unavailable
           </h1>
           <p>{stationState.message ?? 'Ask an operator for help or try another photo session.'}</p>
+          <SessionPrintStatus status={stationState.printStatus} tone="dark" />
           <Button
             className="button--station-done"
             loading={dismissing}
@@ -224,6 +230,7 @@ export function QrStationScreen(): React.ReactElement {
             You’re all set. <span>Scan to take it home.</span>
           </h1>
           <p>Available for 30 days</p>
+          <SessionPrintStatus status={stationState.printStatus} tone="dark" />
           <div className="qr-station__code">
             <img src={stationState.qrImageUrl} alt="QR code for photo download" draggable="false" />
           </div>

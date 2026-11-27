@@ -575,6 +575,117 @@ test('review fits and remains accessible at large desktop viewport', async ({ pa
   expect(seriousOrCritical).toEqual([]);
 });
 
+const SESSION_PRINT_VISUAL_CASES = [
+  {
+    name: 'processing-printing at 1366x768',
+    url: '/?visual=processing-printing',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'preparing',
+    reducedMotion: true,
+    qrAlt: null,
+  },
+  {
+    name: 'final-printing at 1366x768',
+    url: '/?visual=final-printing',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'printing',
+    reducedMotion: false,
+    qrAlt: 'QR code for your private photo download',
+  },
+  {
+    name: 'final-printing at 1280x720',
+    url: '/?visual=final-printing',
+    viewport: { width: 1_280, height: 720 },
+    phase: 'printing',
+    reducedMotion: false,
+    qrAlt: 'QR code for your private photo download',
+  },
+  {
+    name: 'final-printed at 1366x768',
+    url: '/?visual=final-printed',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'completed',
+    reducedMotion: false,
+    qrAlt: 'QR code for your private photo download',
+  },
+  {
+    name: 'final-print-paused at 1366x768',
+    url: '/?visual=final-print-paused',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'paused',
+    reducedMotion: false,
+    qrAlt: 'QR code for your private photo download',
+  },
+  {
+    name: 'recovery-upload-printed at 1366x768',
+    url: '/?visual=recovery-upload-printed',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'completed',
+    reducedMotion: false,
+    qrAlt: null,
+  },
+  {
+    name: 'qr-station-printing at 1920x1080',
+    url: '/?view=qr-station&visual=qr-station-printing',
+    viewport: { width: 1_920, height: 1_080 },
+    phase: 'printing',
+    reducedMotion: false,
+    qrAlt: 'QR code for photo download',
+  },
+  {
+    name: 'qr-station-printed at 1920x1080',
+    url: '/?view=qr-station&visual=qr-station-printed',
+    viewport: { width: 1_920, height: 1_080 },
+    phase: 'completed',
+    reducedMotion: false,
+    qrAlt: 'QR code for photo download',
+  },
+] as const;
+
+for (const visualCase of SESSION_PRINT_VISUAL_CASES) {
+  test(`session print status ${visualCase.name} fits and remains accessible`, async ({ page }) => {
+    if (visualCase.reducedMotion) {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+    }
+    await page.setViewportSize(visualCase.viewport);
+    await page.goto(visualCase.url);
+
+    const status = page.getByTestId('session-print-status');
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute('data-print-phase', visualCase.phase);
+    await waitForVisualAssets(page);
+    await expectNoPageOverflow(page);
+
+    if (visualCase.qrAlt !== null) {
+      const qrMetrics = await page
+        .getByRole('img', { name: visualCase.qrAlt })
+        .evaluate((image: HTMLImageElement) => {
+          const rect = image.getBoundingClientRect();
+          return {
+            height: rect.height,
+            naturalHeight: image.naturalHeight,
+            naturalWidth: image.naturalWidth,
+            unobstructed:
+              document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) ===
+              image,
+            width: rect.width,
+          };
+        });
+      expect(qrMetrics.width).toBeGreaterThanOrEqual(180);
+      expect(qrMetrics.height).toBe(qrMetrics.width);
+      expect(qrMetrics.naturalWidth).toBeGreaterThanOrEqual(300);
+      expect(qrMetrics.naturalHeight).toBe(qrMetrics.naturalWidth);
+      expect(qrMetrics.unobstructed).toBe(true);
+    }
+
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    const seriousOrCritical = accessibility.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+    );
+    expect(seriousOrCritical).toEqual([]);
+  });
+}
+
 async function waitForVisualAssets(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(async () => {
     await document.fonts.ready;

@@ -1499,4 +1499,168 @@ describe('countdown calculation and per-shot review flow', () => {
     );
     expect(harness.getRecentMock).toHaveBeenCalledTimes(2);
   });
+
+  it('displays live session print status across processing, final, and upload recovery screens', async () => {
+    const harness = createBridge();
+    window.graceBooth = harness.bridge;
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'processing',
+          state: 'processing',
+          captureCount: 3,
+          printStatus: {
+            phase: 'preparing',
+            origin: 'session',
+            pendingCopies: 2,
+            totalCopies: 2,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('processing-screen');
+    const processingStatus = screen.getByTestId('session-print-status');
+    expect(processingStatus).toHaveAttribute('data-print-phase', 'preparing');
+    expect(processingStatus).toHaveAttribute('data-tone', 'dark');
+    expect(processingStatus).not.toHaveAttribute('role');
+    expect(processingStatus).toHaveTextContent('Preparing 2 copies');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'final',
+          state: 'final',
+          captureCount: 3,
+          media: {
+            captureUrls: [],
+            collageUrl: 'grace-booth-media://asset/collage',
+            qrImageUrl: 'grace-booth-media://asset/qr',
+          },
+          controls: {
+            canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: true,
+          },
+          printStatus: {
+            phase: 'printing',
+            origin: 'session',
+            stage: 'active',
+            printedCopies: 0,
+            remainingCopies: 2,
+            totalCopies: 2,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('final-screen');
+    const printingStatus = screen.getByTestId('session-print-status');
+    expect(printingStatus).toHaveAttribute('data-print-phase', 'printing');
+    expect(printingStatus).toHaveAttribute('data-tone', 'light');
+    expect(printingStatus).toHaveAttribute('role', 'status');
+    expect(printingStatus).toHaveTextContent('Printing copy 1 of 2…');
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'final',
+          state: 'final',
+          captureCount: 3,
+          media: {
+            captureUrls: [],
+            collageUrl: 'grace-booth-media://asset/collage',
+            qrImageUrl: 'grace-booth-media://asset/qr',
+          },
+          controls: {
+            canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: true,
+          },
+          printStatus: {
+            phase: 'completed',
+            origin: 'session',
+            totalCopies: 2,
+            completedAt: 5_000,
+          },
+        }),
+      ),
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveAttribute(
+      'data-print-phase',
+      'completed',
+    );
+    expect(screen.getByTestId('session-print-status')).toHaveTextContent(
+      'Print finished · 2 copies',
+    );
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'final',
+          state: 'final',
+          captureCount: 3,
+          media: {
+            captureUrls: [],
+            collageUrl: 'grace-booth-media://asset/collage',
+            qrImageUrl: 'grace-booth-media://asset/qr',
+          },
+          controls: {
+            canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: true,
+          },
+          printStatus: null,
+        }),
+      ),
+    );
+    expect(screen.queryByTestId('session-print-status')).not.toBeInTheDocument();
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'recovery',
+          state: 'upload_failed',
+          errorCode: 'upload_failed',
+          controls: {
+            canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: true,
+            canFinishOffline: true,
+            canFinish: false,
+          },
+          printStatus: {
+            phase: 'completed',
+            origin: 'session',
+            totalCopies: 1,
+            completedAt: 6_000,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('recovery-upload');
+    const recoveryPrintStatus = screen.getByTestId('session-print-status');
+    expect(recoveryPrintStatus).toHaveAttribute('data-print-phase', 'completed');
+    expect(recoveryPrintStatus).not.toHaveAttribute('role');
+    expect(recoveryPrintStatus).toHaveTextContent('Print finished');
+  });
 });

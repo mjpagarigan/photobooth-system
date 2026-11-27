@@ -150,9 +150,7 @@ describe('guest screen components', () => {
       },
     };
     const user = userEvent.setup();
-    render(
-      <RecentGallery items={[item]} onClose={() => undefined} operator={false} tone="dark" />,
-    );
+    render(<RecentGallery items={[item]} onClose={() => undefined} operator={false} tone="dark" />);
 
     expect(screen.getByRole('dialog')).toHaveAttribute('data-tone', 'dark');
     expect(screen.queryByText('Uploaded')).not.toBeInTheDocument();
@@ -611,6 +609,57 @@ describe('guest screen components', () => {
     const heading = screen.getByRole('heading', { name: 'Hello, smile.' });
     expect(heading).not.toHaveAttribute('data-screen-heading');
     expect(screen.getByRole('button', { name: 'Start photo session' })).toHaveFocus();
+  });
+
+  it('wires SessionPrintStatus into ProcessingScreen, FinalQrScreen, and RecoveryScreen without duplicating live regions', () => {
+    const { rerender } = render(
+      <ProcessingScreen
+        state="processing"
+        printStatus={{ phase: 'preparing', origin: 'session', pendingCopies: 1, totalCopies: 1 }}
+      />,
+    );
+    const processingPill = screen.getByTestId('session-print-status');
+    expect(processingPill).toHaveAttribute('data-tone', 'dark');
+    expect(processingPill).not.toHaveAttribute('role');
+    expect(processingPill).toHaveTextContent('Preparing to print');
+
+    rerender(<ProcessingScreen state="processing" printStatus={null} />);
+    expect(screen.queryByTestId('session-print-status')).not.toBeInTheDocument();
+
+    rerender(
+      <FinalQrScreen
+        collageUrl="/mock/photo-1.jpg"
+        onDone={() => undefined}
+        qrImageUrl="data:image/png;base64,AA=="
+        printStatus={{ phase: 'completed', origin: 'session', totalCopies: 1, completedAt: 1_000 }}
+      />,
+    );
+    const finalPill = screen.getByTestId('session-print-status');
+    expect(finalPill).toHaveAttribute('data-tone', 'light');
+    expect(finalPill).toHaveAttribute('role', 'status');
+    expect(finalPill).toHaveTextContent('Print finished');
+
+    rerender(
+      <RecoveryScreen
+        onOpenAdmin={() => undefined}
+        onRestart={() => undefined}
+        onRetryUpload={() => undefined}
+        variant="upload"
+        printStatus={{
+          phase: 'paused',
+          origin: 'session',
+          reason: 'offline',
+          detail: 'Printer offline.',
+          printedCopies: 0,
+          remainingCopies: 1,
+          totalCopies: 1,
+        }}
+      />,
+    );
+    const recoveryPill = screen.getByTestId('session-print-status');
+    expect(recoveryPill).toHaveAttribute('data-tone', 'light');
+    expect(recoveryPill).not.toHaveAttribute('role');
+    expect(recoveryPill).toHaveTextContent('Printing paused');
   });
 });
 
@@ -1083,9 +1132,9 @@ describe('PasscodeDialog tone and validation attributes', () => {
     const confirmInput = screen.getByLabelText('Confirm passcode');
     expect(confirmInput).toHaveAttribute('aria-invalid', 'true');
     expect(confirmInput.getAttribute('aria-describedby')?.split(/\s+/)).toContain(alert.id);
-    expect(screen.getByLabelText('Passcode').getAttribute('aria-describedby')?.split(/\s+/)).toContain(
-      alert.id,
-    );
+    expect(
+      screen.getByLabelText('Passcode').getAttribute('aria-describedby')?.split(/\s+/),
+    ).toContain(alert.id);
   });
 });
 
