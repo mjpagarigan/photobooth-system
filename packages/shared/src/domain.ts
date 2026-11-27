@@ -218,6 +218,9 @@ export const DisplayInfoSchema = z
   .strict();
 export type DisplayInfo = z.infer<typeof DisplayInfoSchema>;
 
+export const DeliveryModeSchema = z.enum(['cloud', 'offline']);
+export type DeliveryMode = z.infer<typeof DeliveryModeSchema>;
+
 export const QrStationStateSchema = z
   .object({
     status: z.enum(['idle', 'active', 'error']),
@@ -228,6 +231,8 @@ export const QrStationStateSchema = z
     durationSeconds: z.number().int().positive(),
     message: z.string().nullable(),
     canRetryUpload: z.boolean().default(false),
+    canFinishOffline: z.boolean().default(false),
+    deliveryMode: DeliveryModeSchema.optional(),
     printStatus: SessionPrintStatusSchema.nullable().optional(),
   })
   .strict();
@@ -330,9 +335,6 @@ export const BoothMediaSchema = z
     qrImageUrl: z.string().min(1).nullable(),
   })
   .strict();
-
-export const DeliveryModeSchema = z.enum(['cloud', 'offline']);
-export type DeliveryMode = z.infer<typeof DeliveryModeSchema>;
 
 export const BoothSnapshotSchema = z
   .object({

@@ -1,4 +1,4 @@
-import { Button, WarningCircle } from '@grace-booth/ui';
+import { Button, WarningCircle, WifiHigh } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
@@ -23,6 +23,7 @@ const DEFAULT_QR_STATE: QrStationState = {
   durationSeconds: 45,
   message: null,
   canRetryUpload: false,
+  canFinishOffline: false,
   printStatus: null,
 };
 
@@ -31,12 +32,13 @@ export function QrStationScreen(): React.ReactElement {
   const printerHealth = usePrinterHealth();
   const [secondsRemaining, setSecondsRemaining] = useState<number>(45);
   const [dismissing, setDismissing] = useState(false);
+  const [recoveryAction, setRecoveryAction] = useState<'retry' | 'offline' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<GalleryItem[]>([]);
   const [recentBusy, setRecentBusy] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
 
-  // Subscribe to QR station state
   useEffect(() => {
     const visualMode = new URLSearchParams(window.location.search).get('visual');
     if (
@@ -60,6 +62,7 @@ export function QrStationScreen(): React.ReactElement {
 
     const unsubscribe = bridge.qrStation.subscribe((state) => {
       setStationState(state);
+      setActionError(null);
     });
 
     return () => {
@@ -67,7 +70,6 @@ export function QrStationScreen(): React.ReactElement {
     };
   }, []);
 
-  // Countdown timer for active QR display
   useEffect(() => {
     if (stationState.status === 'idle' || !stationState.expiresAt) {
       return;
@@ -86,10 +88,13 @@ export function QrStationScreen(): React.ReactElement {
     };
   }, [stationState.status, stationState.expiresAt]);
 
+  const actionBusy = dismissing || recoveryAction !== null;
+
   const handleDismiss = useCallback(async () => {
     const bridge = getBridge();
-    if (!bridge || dismissing) return;
+    if (!bridge || actionBusy) return;
     setDismissing(true);
+    setActionError(null);
     try {
       const result = await bridge.qrStation.dismiss(stationState.sessionId);
       if (result.ok) {
@@ -98,7 +103,45 @@ export function QrStationScreen(): React.ReactElement {
     } finally {
       setDismissing(false);
     }
-  }, [dismissing, stationState.sessionId]);
+  }, [actionBusy, stationState.sessionId]);
+
+  const handleRetryUpload = useCallback(async () => {
+    const bridge = getBridge();
+    if (!bridge || actionBusy || !stationState.sessionId) return;
+    setRecoveryAction('retry');
+    setActionError(null);
+    try {
+      const result = await bridge.qrStation.retryUpload(stationState.sessionId);
+      if (result.ok) {
+        setStationState(result.data);
+      } else {
+        setActionError(result.error.message || 'Could not retry upload right now.');
+      }
+    } catch {
+      setActionError('Could not retry upload right now.');
+    } finally {
+      setRecoveryAction(null);
+    }
+  }, [actionBusy, stationState.sessionId]);
+
+  const handleFinishOffline = useCallback(async () => {
+    const bridge = getBridge();
+    if (!bridge || actionBusy || !stationState.sessionId) return;
+    setRecoveryAction('offline');
+    setActionError(null);
+    try {
+      const result = await bridge.qrStation.finishOffline(stationState.sessionId);
+      if (result.ok) {
+        setStationState(result.data);
+      } else {
+        setActionError(result.error.message || 'Could not switch to local Wi-Fi delivery.');
+      }
+    } catch {
+      setActionError('Could not switch to local Wi-Fi delivery.');
+    } finally {
+      setRecoveryAction(null);
+    }
+  }, [actionBusy, stationState.sessionId]);
 
   const openRecentGallery = useCallback(async () => {
     const bridge = getBridge();
@@ -129,6 +172,11 @@ export function QrStationScreen(): React.ReactElement {
     return Math.max(0, Math.min(100, (secondsRemaining / stationState.durationSeconds) * 100));
   }, [stationState.status, stationState.durationSeconds, secondsRemaining]);
 
+  const holdingForPrint =
+    stationState.expiresAt === null &&
+    (stationState.printStatus?.phase === 'preparing' ||
+      stationState.printStatus?.phase === 'printing');
+
   const recentButton = (
     <button
       className="operator-access recent-access qr-station__recent"
@@ -152,16 +200,24 @@ export function QrStationScreen(): React.ReactElement {
   ) : null;
 
   const printerIndicator = <PrinterIndicator health={printerHealth} />;
-  const timer = (
-    <div className="qr-station__timer">
+  const timer = holdingForPrint ? (
+    <div className="qr-station__timer" data-timer-state="holding">
+      <span>Holding while printing</span>
+    </div>
+  ) : stationState.expiresAt !== null ? (
+    <div className="qr-station__timer" data-timer-state="counting">
       <span>Clears in {secondsRemaining}s</span>
       <div className="qr-station__timer-bar" aria-hidden="true">
         <div className="qr-station__timer-progress" style={{ width: `${progressPercentage}%` }} />
       </div>
     </div>
-  );
+  ) : null;
 
   if (stationState.status === 'error') {
+    const showRetry = Boolean(stationState.sessionId && stationState.canRetryUpload);
+    const showOffline = Boolean(stationState.sessionId && stationState.canFinishOffline);
+    const hasRecoveryActions = showRetry || showOffline;
+
     return (
       <main className="screen screen--qr-station qr-station--error" data-testid="qr-station-error">
         <div className="qr-station__corner">
@@ -176,13 +232,43 @@ export function QrStationScreen(): React.ReactElement {
           </h1>
           <p>{stationState.message ?? 'Ask an operator for help or try another photo session.'}</p>
           <SessionPrintStatus status={stationState.printStatus} tone="dark" />
-          <Button
-            className="button--station-done"
-            loading={dismissing}
-            onClick={() => void handleDismiss()}
-          >
-            Done
-          </Button>
+          {actionError ? (
+            <p className="qr-station__action-error" role="alert">
+              {actionError}
+            </p>
+          ) : null}
+          <div className="qr-station__actions">
+            {showOffline ? (
+              <Button
+                className="button--station-secondary"
+                disabled={actionBusy}
+                loading={recoveryAction === 'offline'}
+                onClick={() => void handleFinishOffline()}
+                variant="secondary"
+              >
+                Finish offline
+              </Button>
+            ) : null}
+            {showRetry ? (
+              <Button
+                className="button--station-primary"
+                disabled={actionBusy}
+                loading={recoveryAction === 'retry'}
+                onClick={() => void handleRetryUpload()}
+              >
+                Retry upload
+              </Button>
+            ) : null}
+            <Button
+              className={hasRecoveryActions ? 'button--station-secondary' : 'button--station-done'}
+              disabled={actionBusy}
+              loading={dismissing}
+              onClick={() => void handleDismiss()}
+              variant={hasRecoveryActions ? 'secondary' : 'default'}
+            >
+              Done
+            </Button>
+          </div>
         </section>
         {recentGallery}
       </main>
@@ -211,6 +297,8 @@ export function QrStationScreen(): React.ReactElement {
     );
   }
 
+  const isOfflineDelivery = stationState.deliveryMode === 'offline';
+
   return (
     <main className="screen screen--qr-station qr-station--active" data-testid="qr-station-active">
       <div className="qr-station__corner">
@@ -229,7 +317,14 @@ export function QrStationScreen(): React.ReactElement {
           <h1 id="qr-station-title" data-screen-heading tabIndex={-1}>
             You’re all set. <span>Scan to take it home.</span>
           </h1>
-          <p>Available for 30 days</p>
+          {isOfflineDelivery ? (
+            <p className="qr-station__delivery" data-delivery-mode="offline">
+              <WifiHigh aria-hidden="true" size={20} weight="bold" />
+              <span>Local Wi-Fi · Connect your phone to the booth Wi-Fi, then scan</span>
+            </p>
+          ) : (
+            <p data-delivery-mode="cloud">Available for 30 days</p>
+          )}
           <SessionPrintStatus status={stationState.printStatus} tone="dark" />
           <div className="qr-station__code">
             <img src={stationState.qrImageUrl} alt="QR code for photo download" draggable="false" />

@@ -9,6 +9,18 @@ import type { GraceBoothBridge, QrStationState } from '@grace-booth/shared';
 
 import { QrStationScreen } from '../../src/renderer/screens/QrStationScreen';
 
+const IDLE_STATE: QrStationState = {
+  status: 'idle',
+  sessionId: null,
+  collageUrl: null,
+  qrImageUrl: null,
+  expiresAt: null,
+  durationSeconds: 45,
+  message: null,
+  canRetryUpload: false,
+  canFinishOffline: false,
+};
+
 describe('QrStationScreen', () => {
   let mockBridge: {
     qrStation: Mocked<GraceBoothBridge['qrStation']>;
@@ -20,29 +32,19 @@ describe('QrStationScreen', () => {
       qrStation: {
         getState: vi.fn().mockResolvedValue({
           ok: true,
-          data: {
-            status: 'idle',
-            sessionId: null,
-            collageUrl: null,
-            qrImageUrl: null,
-            expiresAt: null,
-            durationSeconds: 45,
-            message: null,
-            canRetryUpload: false,
-          },
+          data: IDLE_STATE,
         }),
         dismiss: vi.fn().mockResolvedValue({
           ok: true,
-          data: {
-            status: 'idle',
-            sessionId: null,
-            collageUrl: null,
-            qrImageUrl: null,
-            expiresAt: null,
-            durationSeconds: 45,
-            message: null,
-            canRetryUpload: false,
-          },
+          data: IDLE_STATE,
+        }),
+        retryUpload: vi.fn().mockResolvedValue({
+          ok: true,
+          data: IDLE_STATE,
+        }),
+        finishOffline: vi.fn().mockResolvedValue({
+          ok: true,
+          data: IDLE_STATE,
         }),
         subscribe: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -93,6 +95,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 90,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
 
@@ -130,6 +133,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: 'Upload failed. Ask an operator for help.',
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
 
@@ -157,6 +161,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
 
@@ -185,6 +190,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: 'Upload failed. Ask an operator for help.',
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
 
@@ -207,6 +213,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
 
@@ -232,6 +239,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
     mockBridge.qrStation.dismiss.mockReturnValue(
@@ -260,6 +268,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
       },
     });
     expect(await screen.findByTestId('qr-station-idle')).toBeVisible();
@@ -282,6 +291,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
         printStatus: {
           phase: 'printing',
           origin: 'session',
@@ -313,6 +323,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: null,
         canRetryUpload: false,
+        canFinishOffline: false,
         printStatus: {
           phase: 'completed',
           origin: 'session',
@@ -340,6 +351,7 @@ describe('QrStationScreen', () => {
         durationSeconds: 45,
         message: 'Upload failed. Ask an operator for help.',
         canRetryUpload: false,
+        canFinishOffline: false,
         printStatus: {
           phase: 'completed',
           origin: 'session',
@@ -351,5 +363,134 @@ describe('QrStationScreen', () => {
 
     expect(screen.getByTestId('qr-station-error')).toBeInTheDocument();
     expect(screen.getByTestId('session-print-status')).toHaveTextContent('Print finished');
+  });
+
+  it('shows holding state while printing and local Wi-Fi delivery copy for offline receipts', async () => {
+    let stationListener: ((state: QrStationState) => void) | null = null;
+    mockBridge.qrStation.subscribe.mockImplementation((listener) => {
+      stationListener = listener;
+      return vi.fn();
+    });
+    mockBridge.qrStation.getState.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'active',
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: 'data:image/png;base64,mockqr',
+        expiresAt: null,
+        durationSeconds: 45,
+        message: null,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        deliveryMode: 'offline',
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      },
+    });
+
+    render(<QrStationScreen />);
+
+    await screen.findByTestId('qr-station-active');
+    expect(screen.getByText('Holding while printing')).toBeVisible();
+    expect(screen.queryByText(/clears in/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Local Wi-Fi · Connect your phone to the booth Wi-Fi, then scan'),
+    ).toBeVisible();
+    expect(screen.queryByText('Available for 30 days')).not.toBeInTheDocument();
+
+    act(() => {
+      stationListener?.({
+        status: 'active',
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: 'data:image/png;base64,mockqr',
+        expiresAt: Date.now() + 45_000,
+        durationSeconds: 45,
+        message: null,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        deliveryMode: 'offline',
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 2,
+          completedAt: 5_000,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/clears in 45s/i)).toBeVisible();
+    });
+    expect(screen.queryByText('Holding while printing')).not.toBeInTheDocument();
+  });
+
+  it('wires Retry upload and Finish offline recovery actions in error state', async () => {
+    const user = userEvent.setup();
+    const sessionId = '11111111-1111-4111-8111-111111111111';
+    mockBridge.qrStation.getState.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'error',
+        sessionId,
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: null,
+        expiresAt: Date.now() + 45_000,
+        durationSeconds: 45,
+        message: 'Your photo is safe on this booth.',
+        canRetryUpload: true,
+        canFinishOffline: true,
+      },
+    });
+    mockBridge.qrStation.retryUpload.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'error',
+        sessionId,
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: null,
+        expiresAt: Date.now() + 45_000,
+        durationSeconds: 45,
+        message: 'Retrying cloud upload…',
+        canRetryUpload: false,
+        canFinishOffline: true,
+      },
+    });
+    mockBridge.qrStation.finishOffline.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'active',
+        sessionId,
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: 'data:image/png;base64,mockqr',
+        expiresAt: Date.now() + 45_000,
+        durationSeconds: 45,
+        message: null,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        deliveryMode: 'offline',
+      },
+    });
+
+    render(<QrStationScreen />);
+
+    await screen.findByTestId('qr-station-error');
+    await user.click(screen.getByRole('button', { name: 'Retry upload' }));
+    expect(mockBridge.qrStation.retryUpload.mock.calls).toEqual([[sessionId]]);
+    expect(await screen.findByText('Retrying cloud upload…')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Finish offline' }));
+    expect(mockBridge.qrStation.finishOffline.mock.calls).toEqual([[sessionId]]);
+    expect(await screen.findByTestId('qr-station-active')).toBeVisible();
+    expect(
+      screen.getByText('Local Wi-Fi · Connect your phone to the booth Wi-Fi, then scan'),
+    ).toBeVisible();
   });
 });

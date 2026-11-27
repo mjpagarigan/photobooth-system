@@ -94,6 +94,12 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
   register('qr-station:dismiss', (_event, input) =>
     dependencies.workflow.dismissQrStation(input?.sessionId),
   );
+  register('qr-station:retry-upload', (_event, input) =>
+    dependencies.workflow.retryQrStationUpload(input.sessionId),
+  );
+  register('qr-station:finish-offline', (_event, input) =>
+    dependencies.workflow.finishQrStationOffline(input.sessionId),
+  );
   register('admin:google-photos:get-status', async (event) => {
     requireAdmin(event);
     const localSettings = dependencies.repository.getSettings();

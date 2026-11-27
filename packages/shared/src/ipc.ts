@@ -175,6 +175,22 @@ export const IpcContracts = {
       .default({}),
     response: rpcResultSchema(QrStationStateSchema),
   },
+  'qr-station:retry-upload': {
+    request: z
+      .object({
+        sessionId: OpaqueIdSchema,
+      })
+      .strict(),
+    response: rpcResultSchema(QrStationStateSchema),
+  },
+  'qr-station:finish-offline': {
+    request: z
+      .object({
+        sessionId: OpaqueIdSchema,
+      })
+      .strict(),
+    response: rpcResultSchema(QrStationStateSchema),
+  },
   'gallery:get-recent': {
     request: z
       .object({
@@ -535,6 +551,8 @@ export type GraceBoothBridge = {
   qrStation: {
     getState(): Promise<RpcResult<QrStationState>>;
     dismiss(sessionId?: string | null): Promise<RpcResult<QrStationState>>;
+    retryUpload(sessionId: string): Promise<RpcResult<QrStationState>>;
+    finishOffline(sessionId: string): Promise<RpcResult<QrStationState>>;
     subscribe(listener: (state: QrStationState) => void): () => void;
   };
   gallery: {

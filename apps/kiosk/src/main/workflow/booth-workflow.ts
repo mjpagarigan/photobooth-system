@@ -62,6 +62,7 @@ export class BoothWorkflow {
     durationSeconds: 45,
     message: null,
     canRetryUpload: false,
+    canFinishOffline: false,
     printStatus: null,
   };
   private latestQrStationSession: { createdAt: number; sessionId: string } | null = null;
@@ -195,10 +196,70 @@ export class BoothWorkflow {
       durationSeconds: 45,
       message: null,
       canRetryUpload: false,
+      canFinishOffline: false,
       printStatus: null,
     };
     this.emitQrStation();
     return this.qrStationState;
+  }
+
+  retryQrStationUpload(sessionId: string): QrStationState {
+    if (this.qrStationState.status !== 'error' || this.qrStationState.sessionId !== sessionId) {
+      return this.qrStationState;
+    }
+    const session = this.repository.getSession(sessionId);
+    if (session?.state !== 'upload_failed') {
+      throw new AppError('upload_not_retryable', 'The upload does not need a retry.');
+    }
+    const job = this.repository.getUploadJobForSession(session.id);
+    if (!job) throw new AppError('upload_job_missing', 'The upload job could not be found.');
+    this.repository.retryUpload(job.id, this.now());
+    const duration = this.repository.getSettings().qrDismissSeconds || 45;
+    const printStatus = this.options.print?.getSessionPrintStatus(session.id) ?? null;
+    this.qrStationState = {
+      ...this.qrStationState,
+      expiresAt: this.applyQrStationTimer(session.id, duration, printStatus),
+      durationSeconds: duration,
+      message: 'Retrying cloud upload…',
+      canRetryUpload: false,
+      canFinishOffline: true,
+      printStatus,
+    };
+    this.emitQrStation();
+    this.uploadQueue.wake();
+    return this.qrStationState;
+  }
+
+  async finishQrStationOffline(sessionId: string): Promise<QrStationState> {
+    if (this.qrStationState.status !== 'error' || this.qrStationState.sessionId !== sessionId) {
+      return this.qrStationState;
+    }
+    const session = this.repository.getSession(sessionId);
+    if (!session || (session.state !== 'upload_failed' && session.state !== 'pending_upload')) {
+      throw new AppError('offline_delivery_unavailable', 'Finish offline is not available now.');
+    }
+    await this.uploadQueue.completeOffline(session.id);
+    await this.handleUploadReady(session.id);
+    return this.qrStationState;
+  }
+
+  private applyQrStationTimer(
+    sessionId: string,
+    durationSeconds: number,
+    printStatus: SessionPrintStatus | null,
+  ): number | null {
+    if (this.qrDismissTimer) {
+      clearTimeout(this.qrDismissTimer);
+      this.qrDismissTimer = null;
+    }
+    if (isQrStationPrintActive(printStatus)) {
+      return null;
+    }
+    const expiresAt = this.now() + durationSeconds * 1000;
+    this.qrDismissTimer = setTimeout(() => {
+      this.dismissQrStation(sessionId);
+    }, durationSeconds * 1000);
+    return expiresAt;
   }
 
   private presentQrStationItem(item: {
@@ -206,12 +267,14 @@ export class BoothWorkflow {
     createdAt: number;
     collageUrl: string | null;
     qrImageUrl: string;
+    deliveryMode: DeliveryMode;
   }): void {
     if (!this.canPresentQrStationSession(item.sessionId, item.createdAt)) return;
     this.latestQrStationSession = { sessionId: item.sessionId, createdAt: item.createdAt };
     const settings = this.repository.getSettings();
     const duration = settings.qrDismissSeconds || 45;
-    const expiresAt = this.now() + duration * 1000;
+    const printStatus = this.options.print?.getSessionPrintStatus(item.sessionId) ?? null;
+    const expiresAt = this.applyQrStationTimer(item.sessionId, duration, printStatus);
     this.qrStationState = {
       status: 'active',
       sessionId: item.sessionId,
@@ -221,15 +284,10 @@ export class BoothWorkflow {
       durationSeconds: duration,
       message: null,
       canRetryUpload: false,
-      printStatus: this.options.print?.getSessionPrintStatus(item.sessionId) ?? null,
+      canFinishOffline: false,
+      deliveryMode: item.deliveryMode,
+      printStatus,
     };
-    if (this.qrDismissTimer) {
-      clearTimeout(this.qrDismissTimer);
-      this.qrDismissTimer = null;
-    }
-    this.qrDismissTimer = setTimeout(() => {
-      this.dismissQrStation(item.sessionId);
-    }, duration * 1000);
     this.emitQrStation();
   }
 
@@ -245,21 +303,29 @@ export class BoothWorkflow {
   private presentQrStationError(session: StoredSession, collageUrl: string | null): void {
     if (!this.canPresentQrStationSession(session.id, session.createdAt)) return;
     this.latestQrStationSession = { sessionId: session.id, createdAt: session.createdAt };
+    const current = this.repository.getSession(session.id) ?? session;
+    const job = this.repository.getUploadJobForSession(current.id);
+    const canRetryUpload = current.state === 'upload_failed' && job !== null;
+    const canFinishOffline =
+      current.state === 'upload_failed' || current.state === 'pending_upload';
     const duration = this.repository.getSettings().qrDismissSeconds || 45;
-    const expiresAt = this.now() + duration * 1000;
+    const printStatus = this.options.print?.getSessionPrintStatus(current.id) ?? null;
+    const expiresAt = this.applyQrStationTimer(current.id, duration, printStatus);
     this.qrStationState = {
       status: 'error',
-      sessionId: session.id,
+      sessionId: current.id,
       collageUrl,
       qrImageUrl: null,
       expiresAt,
       durationSeconds: duration,
-      message: 'Upload failed. Ask an operator for help or try another photo session.',
-      canRetryUpload: false,
-      printStatus: this.options.print?.getSessionPrintStatus(session.id) ?? null,
+      message:
+        canRetryUpload || canFinishOffline
+          ? 'Your photo is safe on this booth. Retry upload, or finish offline over the booth’s network.'
+          : 'Upload failed. Ask an operator for help or try another photo session.',
+      canRetryUpload,
+      canFinishOffline,
+      printStatus,
     };
-    if (this.qrDismissTimer) clearTimeout(this.qrDismissTimer);
-    this.qrDismissTimer = setTimeout(() => this.dismissQrStation(session.id), duration * 1000);
     this.emitQrStation();
   }
 
@@ -807,10 +873,10 @@ export class BoothWorkflow {
     const receipt = validateReadyReceipt(secret.photoSessionId, secret.publicToken, secret.ready);
     const qr = await this.qrService.render(receipt);
     this.qrBySession.set(sessionId, qr.imageDataUrl);
-    this.deliveryModeBySession.set(
-      sessionId,
-      receipt.publicPageOrigin.startsWith('http://') ? 'offline' : 'cloud',
-    );
+    const deliveryMode: DeliveryMode = receipt.publicPageOrigin.startsWith('http://')
+      ? 'offline'
+      : 'cloud';
+    this.deliveryModeBySession.set(sessionId, deliveryMode);
     const current = this.repository.requireSession(sessionId);
     if (current.state === 'ready') {
       this.transition(current, 'qr_ready', {}, this.now());
@@ -822,6 +888,7 @@ export class BoothWorkflow {
       createdAt: session.createdAt,
       collageUrl: collage ? mediaUrl(collage.id) : null,
       qrImageUrl: qr.imageDataUrl,
+      deliveryMode,
     };
     this.presentQrStationItem(item);
     this.emitIfActive(sessionId);
@@ -914,8 +981,23 @@ export class BoothWorkflow {
       (event.scope === 'health' || event.sessionId === qrSessionId)
     ) {
       const next = this.options.print?.getSessionPrintStatus(qrSessionId) ?? null;
-      if (!isSameSessionPrintStatus(this.qrStationState.printStatus ?? null, next)) {
-        this.qrStationState = { ...this.qrStationState, printStatus: next };
+      const wasActive = isQrStationPrintActive(this.qrStationState.printStatus);
+      const isNowActive = isQrStationPrintActive(next);
+      const needsTimerUpdate =
+        wasActive !== isNowActive || (!isNowActive && this.qrStationState.expiresAt === null);
+      if (!isSameSessionPrintStatus(this.qrStationState.printStatus ?? null, next) || needsTimerUpdate) {
+        const duration =
+          this.qrStationState.durationSeconds ||
+          this.repository.getSettings().qrDismissSeconds ||
+          45;
+        const expiresAt = needsTimerUpdate
+          ? this.applyQrStationTimer(qrSessionId, duration, next)
+          : this.qrStationState.expiresAt;
+        this.qrStationState = {
+          ...this.qrStationState,
+          printStatus: next,
+          expiresAt,
+        };
         this.emitQrStation();
       }
     }
@@ -934,6 +1016,10 @@ export class BoothWorkflow {
     this.lastEmittedActivePrintStatus = snapshot.printStatus ?? null;
     for (const listener of this.listeners) listener(snapshot);
   }
+}
+
+function isQrStationPrintActive(status: SessionPrintStatus | null | undefined): boolean {
+  return status?.phase === 'preparing' || status?.phase === 'printing';
 }
 
 function canSessionHavePrintStatus(state: SessionState): boolean {

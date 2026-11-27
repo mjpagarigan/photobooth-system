@@ -394,10 +394,12 @@ export async function createQrStationVisualState(
     sessionId: SESSION_ID,
     collageUrl: await buildReadyCollage(),
     qrImageUrl: await buildReadyQr(),
-    expiresAt: Date.now() + 45_000,
+    expiresAt: mode === 'qr-station-printing' ? null : Date.now() + 45_000,
     durationSeconds: 45,
     message: null,
     canRetryUpload: false,
+    canFinishOffline: false,
+    deliveryMode: 'cloud',
     printStatus,
   };
 }

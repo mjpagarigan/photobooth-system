@@ -81,6 +81,8 @@ const bridge: GraceBoothBridge = {
   qrStation: {
     getState: () => invoke('qr-station:get-state', {}),
     dismiss: (sessionId?: string | null) => invoke('qr-station:dismiss', { sessionId }),
+    retryUpload: (sessionId) => invoke('qr-station:retry-upload', { sessionId }),
+    finishOffline: (sessionId) => invoke('qr-station:finish-offline', { sessionId }),
     subscribe: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
         const parsed = QrStationEventSchema.safeParse(value);

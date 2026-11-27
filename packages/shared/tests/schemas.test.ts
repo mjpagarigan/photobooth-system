@@ -86,13 +86,45 @@ describe('shared boundary schemas', () => {
     expect(() => OptionalGoogleFormsUrlSchema.parse('http://insecure.org')).toThrow();
   });
 
-  it('validates QrStationState with the session-aware dismiss contract', () => {
+  it('validates QrStationState with the session-aware dismiss and recovery contracts', () => {
     expect(
       IpcContracts['qr-station:dismiss'].request.parse({
         sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
       }),
     ).toEqual({ sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022' });
     expect(IpcContracts['qr-station:dismiss'].request.parse({})).toEqual({});
+    expect(
+      IpcContracts['qr-station:retry-upload'].request.parse({
+        sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
+      }),
+    ).toEqual({ sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022' });
+    expect(
+      IpcContracts['qr-station:finish-offline'].request.parse({
+        sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
+      }),
+    ).toEqual({ sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022' });
+    expect(
+      IpcContracts['qr-station:get-state'].response.parse({
+        ok: true,
+        data: {
+          status: 'active',
+          sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
+          collageUrl: 'grace-booth-media://asset/collage',
+          qrImageUrl: 'data:image/png;base64,AA==',
+          expiresAt: null,
+          durationSeconds: 45,
+          message: null,
+          deliveryMode: 'offline',
+        },
+      }),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        canRetryUpload: false,
+        canFinishOffline: false,
+        deliveryMode: 'offline',
+      },
+    });
   });
 
   it('accepts a trimmed Unicode recruitment label and rejects invalid button text', () => {
