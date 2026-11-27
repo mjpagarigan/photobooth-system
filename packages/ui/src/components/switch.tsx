@@ -9,8 +9,7 @@ export const Switch = forwardRef<
   return (
     <BaseSwitch.Root
       className={cn(
-        'peer inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-0 focus-visible:shadow-[0_0_0_3px_#0066cc] disabled:cursor-not-allowed disabled:border-[#aeaeb2] disabled:bg-[#e8e8ed]',
-        'border-[#636366] bg-white hover:border-[#1d1d1f] data-[checked]:border-primary data-[checked]:bg-primary data-[checked]:hover:bg-[#0071e3]',
+        'peer inline-flex h-[28px] w-[48px] shrink-0 cursor-pointer items-center rounded-full border-0 bg-[#e5e5ea] p-[2px] transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[checked]:bg-[#34c759] data-[checked]:hover:bg-[#2eb850] disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       ref={ref}
@@ -18,8 +17,7 @@ export const Switch = forwardRef<
     >
       <BaseSwitch.Thumb
         className={cn(
-          'pointer-events-none block size-3.5 rounded-full transition-transform',
-          'translate-x-0.5 bg-[#636366] data-[checked]:translate-x-[22px] data-[checked]:bg-white group-disabled:bg-[#aeaeb2]',
+          'pointer-events-none block size-[24px] translate-x-0 rounded-full bg-white shadow-[var(--shadow-switch-thumb)] transition-transform data-[checked]:translate-x-[20px]',
         )}
       />
     </BaseSwitch.Root>

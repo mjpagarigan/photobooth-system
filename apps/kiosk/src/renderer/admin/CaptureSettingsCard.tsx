@@ -1,4 +1,5 @@
 import {
+  Button,
   Camera,
   CheckCircle,
   Field,
@@ -22,8 +23,6 @@ import type {
   SaveCaptureSettingsInput,
 } from '@grace-booth/shared';
 import { MAX_CAPTURE_COUNTDOWN_SECONDS, MIN_CAPTURE_COUNTDOWN_SECONDS } from '@grace-booth/shared';
-
-import { Button } from '../components/Button';
 
 const REVIEW_MODE_ITEMS: readonly { label: string; value: CaptureReviewMode }[] = [
   { label: 'Review every photo (Recommended)', value: 'per_shot' },

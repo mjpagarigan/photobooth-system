@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogPopup,
   AlertDialogTitle,
-  Button as CossButton,
+  Button,
   Field,
   FieldDescription,
   FieldLabel,
@@ -45,7 +45,6 @@ import {
   ToolbarSeparator,
 } from '@grace-booth/ui';
 
-import { Button } from '../components/Button';
 import { LOCAL_FIXTURES, mockPhotoFor } from '../local-fixtures';
 import { fitFrameWithin } from './frame-editor-layout';
 
@@ -298,7 +297,7 @@ export function FrameEditor({
           <ToolbarGroup>
             <ToolbarButton
               render={
-                <CossButton
+                <Button
                   data-testid="frame-add"
                   disabled={busy}
                   icon={<FilePng aria-hidden="true" weight="bold" />}
@@ -315,7 +314,7 @@ export function FrameEditor({
           <ToolbarGroup>
             <ToolbarButton
               render={
-                <CossButton
+                <Button
                   disabled={!selectedFrame || busy}
                   icon={<FloppyDisk aria-hidden="true" weight="bold" />}
                   loading={busy}
@@ -351,7 +350,7 @@ export function FrameEditor({
                 {item.active ? <span className="status-badge status-badge--success">Active</span> : null}
               </button>
               <span className="frame-library__controls">
-                <CossButton
+                <Button
                   aria-label={`Move ${item.name} up`}
                   disabled={busy || index === 0}
                   onClick={() => onMoveFrame(item.id, 'up')}
@@ -361,8 +360,8 @@ export function FrameEditor({
                   variant="ghost"
                 >
                   <ArrowUp aria-hidden="true" weight="bold" />
-                </CossButton>
-                <CossButton
+                </Button>
+                <Button
                   aria-label={`Move ${item.name} down`}
                   disabled={busy || index === frames.length - 1}
                   onClick={() => onMoveFrame(item.id, 'down')}
@@ -372,8 +371,8 @@ export function FrameEditor({
                   variant="ghost"
                 >
                   <ArrowDown aria-hidden="true" weight="bold" />
-                </CossButton>
-                <CossButton
+                </Button>
+                <Button
                   aria-label={`Delete ${item.name}`}
                   disabled={busy}
                   onClick={(event) => {
@@ -386,7 +385,7 @@ export function FrameEditor({
                   variant="ghost"
                 >
                   <Trash aria-hidden="true" weight="bold" />
-                </CossButton>
+                </Button>
               </span>
             </div>
           ))}
@@ -492,14 +491,14 @@ export function FrameEditor({
                 />
                 <FieldDescription>Controls how many photos future sessions capture.</FieldDescription>
               </Field>
-              <CossButton
+              <Button
                 disabled={busy || selectedFrame.active}
                 onClick={() => onActivateFrame(selectedFrame.id)}
                 type="button"
                 variant="secondary"
               >
                 {selectedFrame.active ? 'Active for new sessions' : 'Use for new sessions'}
-              </CossButton>
+              </Button>
               {status ? (
                 <p className="form-success" role="status">
                   {status}
@@ -539,12 +538,12 @@ export function FrameEditor({
                       Layer {selectedSlot.zIndex + 1} of {currentSlots.length}. Frame artwork always stays on top.
                     </p>
                     <div className="slot-layer-actions">
-                      <CossButton type="button" variant="secondary" onClick={bringForward}>
+                      <Button type="button" variant="secondary" onClick={bringForward}>
                         Bring forward
-                      </CossButton>
-                      <CossButton type="button" variant="secondary" onClick={sendToBack}>
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={sendToBack}>
                         Send to back
-                      </CossButton>
+                      </Button>
                     </div>
                     {layerStatus ? (
                       <p className="field-description" role="status">{layerStatus}</p>
@@ -647,12 +646,12 @@ export function FrameEditor({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<CossButton type="button" variant="ghost" />}>
+            <AlertDialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </AlertDialogClose>
             <AlertDialogClose
               render={
-                <CossButton
+                <Button
                   disabled={busy}
                   onClick={() => {
                     if (deleteTarget) onDeleteFrame(deleteTarget.id);

@@ -21,10 +21,10 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
       {...props}
     >
       {children}
-      <BaseProgress.Track className="relative h-0.5 w-full overflow-hidden bg-[#e8e8ed]">
+      <BaseProgress.Track className="relative h-1.5 w-full overflow-hidden rounded-full bg-[#e8e8ed]">
         <BaseProgress.Indicator
           className={cn(
-            'h-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none',
+            'h-full rounded-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none',
             indicatorClassName,
           )}
           style={{ width: `${Math.max(0, Math.min(100, Number(value) || 0))}%` }}

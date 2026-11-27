@@ -1,7 +1,7 @@
 import { CAMERA_ZOOM_DEFAULT } from '@grace-booth/shared';
+import { Button } from '@grace-booth/ui';
 
 import { posePromptForShot } from '../capture-helpers';
-import { Button } from '../components/Button';
 import { ProgressStepper } from '../components/ProgressStepper';
 import { mockPhotoFor } from '../local-fixtures';
 

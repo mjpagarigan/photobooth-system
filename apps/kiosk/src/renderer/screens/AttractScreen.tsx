@@ -1,6 +1,5 @@
+import { Button } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
-
-import { Button } from '../components/Button';
 
 const SHOT_WORDS = [
   'Zero',

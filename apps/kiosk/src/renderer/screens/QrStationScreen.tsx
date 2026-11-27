@@ -1,9 +1,8 @@
-import { WarningCircle } from '@grace-booth/ui';
+import { Button, WarningCircle } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
 
-import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
 import { PrinterIndicator } from '../components/Printing';
 import { usePrinterHealth } from '../hooks/usePrinterHealth';

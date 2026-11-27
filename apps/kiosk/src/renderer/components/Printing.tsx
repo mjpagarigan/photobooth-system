@@ -1,4 +1,4 @@
-import { Minus, Plus, Printer, Warning } from '@grace-booth/ui';
+import { Button, Minus, Plus, Printer, Warning } from '@grace-booth/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import type {
@@ -11,7 +11,6 @@ import type {
 import { MAX_COPIES_PER_REQUEST } from '@grace-booth/shared';
 
 import { isPrinterReady } from '../hooks/usePrinterHealth';
-import { Button } from './Button';
 
 function getBridge(): GraceBoothBridge | null {
   return window.graceBooth ?? null;
@@ -283,7 +282,7 @@ export function PrintQueuePanel({ health }: { health: PrinterHealth | null }) {
                     aria-label={`Cancel ${KIND_LABEL[job.kind].toLowerCase()} copy ${job.copyIndex}`}
                     disabled={busyId === job.id}
                     onClick={() => void act(job.id, 'cancel')}
-                    variant="quiet"
+                    variant="subtle"
                   >
                     Cancel
                   </Button>

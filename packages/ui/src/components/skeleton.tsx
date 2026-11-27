@@ -6,7 +6,7 @@ export const Skeleton = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement
     return (
       <div
         aria-hidden="true"
-        className={cn('animate-pulse rounded-md bg-secondary/80', className)}
+        className={cn('animate-pulse rounded-md bg-[var(--color-skeleton)]', className)}
         ref={ref}
         {...props}
       />

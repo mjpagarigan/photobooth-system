@@ -57,7 +57,7 @@ export function Sidebar({
     <aside
       data-slot="sidebar"
       className={cn(
-        'relative flex h-full w-72 flex-col shrink-0 border-r border-border/40 bg-card text-card-foreground transition-all duration-200 select-none z-20',
+        'relative flex h-full w-72 flex-col shrink-0 border-r border-[#e8e8ed] bg-[#f5f5f7] text-[#1d1d1f] transition-all duration-200 select-none z-20',
         className,
       )}
       {...props}
@@ -73,7 +73,7 @@ export function SidebarHeader({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div data-slot="sidebar-header" className={cn('flex flex-col gap-2 p-5 border-b border-border/40', className)} {...props}>
+    <div data-slot="sidebar-header" className={cn('flex flex-col gap-1.5 px-4 pt-5 pb-3', className)} {...props}>
       {children}
     </div>
   );
@@ -85,7 +85,7 @@ export function SidebarContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div data-sidebar="content" data-slot="sidebar-content" className={cn('flex flex-1 flex-col overflow-y-auto p-3 gap-4', className)} {...props}>
+    <div data-sidebar="content" data-slot="sidebar-content" className={cn('flex flex-1 flex-col overflow-y-auto px-3 py-2 gap-4', className)} {...props}>
       {children}
     </div>
   );
@@ -111,7 +111,7 @@ export function SidebarGroupLabel({
   return (
     <span
       className={cn(
-        'px-3 py-1.5 font-mono text-[10px] font-bold tracking-widest text-muted-foreground uppercase',
+        'px-3 py-1 font-sans text-xs font-semibold tracking-normal text-[#636366]',
         className,
       )}
       data-slot="sidebar-group-label"
@@ -167,10 +167,10 @@ export type SidebarMenuButtonProps = {
 export const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
   function SidebarMenuButton({ children, className, isActive, render, disabled, ...props }, ref) {
     const classNames = cn(
-      'flex w-full items-center gap-3 rounded-lg px-3.5 py-3 font-sans text-sm font-semibold tracking-wide transition-colors cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-ring',
+      'flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 font-sans text-sm font-medium tracking-normal transition-colors cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2',
       isActive
-        ? 'bg-primary text-primary-foreground shadow-sm'
-        : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground active:bg-secondary',
+        ? 'bg-white text-[#1d1d1f] font-semibold shadow-[var(--shadow-2)]'
+        : 'text-[#424245] hover:bg-[#e8e8ed] hover:text-[#1d1d1f] active:bg-[#e8e8ed]',
       disabled && 'pointer-events-none opacity-50',
       className,
     );
@@ -208,7 +208,7 @@ export function SidebarFooter({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('mt-auto flex flex-col gap-2 p-4 border-t border-border/40', className)}
+      className={cn('mt-auto flex flex-col gap-2 p-4 border-t border-[#e8e8ed]', className)}
       data-slot="sidebar-footer"
       {...props}
     >

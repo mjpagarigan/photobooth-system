@@ -21,13 +21,12 @@ import {
   isCancellableSessionState,
   isCaptureScreen,
 } from '@grace-booth/shared';
-import { AnchoredToastProvider, ToastProvider } from '@grace-booth/ui';
+import { AnchoredToastProvider, Button, ToastProvider } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
 import { FrameEditor } from './admin/FrameEditor';
 import { computeDisplayedCountdownSeconds } from './capture-helpers';
-import { Button } from './components/Button';
 import { CameraSetupModal } from './components/CameraSetupModal';
 import { FrameImportDialog } from './components/FrameImportDialog';
 import { PasscodeDialog } from './components/PasscodeDialog';

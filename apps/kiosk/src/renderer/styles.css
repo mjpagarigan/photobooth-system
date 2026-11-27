@@ -4,14 +4,8 @@
 
 :root {
   color-scheme: light;
-  --color-primary: #0066cc;
-  --color-primary-hover: #0071e3;
   --color-primary-pressed: #00539f;
   --color-primary-tint: #e8f2fd;
-
-  --color-secondary: #ffffff;
-  --color-secondary-hover: #f5f5f7;
-  --color-secondary-pressed: #e8e8ed;
 
   --color-steel: #636366;
   --color-maroon: #d70015;
@@ -32,11 +26,8 @@
   --border-rigid: 1px solid #e8e8ed;
   --border-thick: 1px solid #d2d2d7;
   --border-primary: 2px solid var(--color-primary);
-  --font-display:
-    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-body:
-    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Consolas, monospace;
+  --font-display: var(--font-heading);
+  --font-body: var(--font-sans);
 
   --shadow-soft: var(--shadow-4);
   --shadow-card: var(--shadow-4);
@@ -148,128 +139,8 @@ body,
 }
 
 /* ==========================================================================
-   BUTTONS & TOUCH ERGONOMICS (MIN 48PX - 56PX FOR KIOSK)
+   ICON & OPERATOR CONTROLS
    ========================================================================== */
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 20px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition:
-    background-color 100ms ease,
-    border-color 100ms ease,
-    color 100ms ease,
-    box-shadow 100ms ease;
-  min-height: 44px;
-  white-space: nowrap;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.button:focus-visible {
-  outline: 2px solid #ffffff;
-  outline-offset: 0;
-  box-shadow: 0 0 0 2px #000000;
-}
-
-.button--primary,
-.button--default {
-  background: var(--color-primary);
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: var(--shadow-2);
-}
-
-.button--primary:hover:not(:disabled),
-.button--default:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  box-shadow: var(--shadow-4);
-}
-
-.button--primary:active:not(:disabled),
-.button--default:active:not(:disabled) {
-  background: var(--color-primary-pressed);
-  box-shadow: none;
-}
-
-.button--secondary {
-  background: #ffffff;
-  color: var(--color-ink-pure);
-  border: 1px solid var(--color-neutral-stroke1, #d2d2d7);
-  box-shadow: var(--shadow-2);
-}
-
-.button--secondary:hover:not(:disabled) {
-  background: #f5f5f7;
-  border-color: #c7c7cc;
-}
-
-.button--secondary:active:not(:disabled) {
-  background: #e8e8ed;
-  box-shadow: none;
-}
-
-.button--quiet,
-.button--ghost,
-.button--subtle {
-  background: transparent;
-  color: var(--color-ink-pure);
-  border: 1px solid transparent;
-}
-
-.button--quiet:hover:not(:disabled),
-.button--ghost:hover:not(:disabled),
-.button--subtle:hover:not(:disabled) {
-  background: #f5f5f7;
-}
-
-.button--danger,
-.button--destructive {
-  background: var(--color-maroon);
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: var(--shadow-2);
-}
-
-.button--danger:hover:not(:disabled),
-.button--destructive:hover:not(:disabled) {
-  background: #b11f24;
-}
-
-.button--wide {
-  width: 100%;
-}
-
-.button:disabled {
-  opacity: 1;
-  color: #aeaeb2;
-  border-color: #e8e8ed;
-  background: #e8e8ed;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.button__two-line {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.2;
-}
-
-.button__line {
-  font-size: 13px;
-  font-weight: 600;
-}
 
 .icon-button {
   display: inline-flex;
@@ -483,7 +354,7 @@ body,
   gap: 14px;
 }
 
-.button.button--attract-start {
+.button--attract-start {
   min-height: 60px;
   padding: 0 36px;
   border-radius: var(--radius-full);
@@ -921,7 +792,7 @@ body,
   gap: 12px;
 }
 
-.button.button--shot-review {
+.button--shot-review {
   min-height: 54px;
   padding: 0 28px;
   font-size: 17px;
@@ -931,7 +802,7 @@ body,
 .screen--capture .button--review-accept:disabled {
   background: #2c2c2e;
   border-color: #3a3a3c;
-  color: #98989d;
+  color: #a1a1a6;
 }
 
 /* ==========================================================================
@@ -1161,8 +1032,8 @@ body,
   margin-top: 8px;
 }
 
-.button.button--review-retake,
-.button.button--review-accept {
+.button--review-retake,
+.button--review-accept {
   min-height: 60px;
   padding: 0 34px;
   border: 0;
@@ -1172,24 +1043,30 @@ body,
   box-shadow: none;
 }
 
-.button.button--review-retake {
+.button--review-retake:not(:disabled) {
   background: #2c2c2e;
   color: #ffffff;
 }
 
-.button.button--review-retake:hover:not(:disabled) {
+.button--review-retake:hover:not(:disabled) {
   background: #3a3a3c;
   color: #ffffff;
 }
 
-.button.button--review-accept {
+.button--review-accept:not(:disabled) {
   background: #ffffff;
   color: #000000;
 }
 
-.button.button--review-accept:hover:not(:disabled) {
+.button--review-accept:hover:not(:disabled) {
   background: #e8e8ed;
   color: #000000;
+}
+
+.button--review-retake:disabled,
+.button--review-accept:disabled {
+  background: #2c2c2e;
+  color: #a1a1a6;
 }
 
 .review-copy {
@@ -1638,7 +1515,7 @@ body,
   image-rendering: pixelated;
 }
 
-.button.button--final-done {
+.button--final-done {
   min-height: 52px;
   padding: 0 48px;
   border: 0;
@@ -1842,22 +1719,30 @@ body,
   image-rendering: pixelated;
 }
 
-.button.button--station-done {
+.button--station-done {
   min-height: 56px;
   margin-top: 28px;
   padding: 0 44px;
   border: 0;
   border-radius: var(--radius-full);
-  background: #ffffff;
-  color: #000000;
   font-size: 17px;
   font-weight: 600;
   box-shadow: none;
 }
 
-.button.button--station-done:hover:not(:disabled) {
+.button--station-done:not(:disabled) {
+  background: #ffffff;
+  color: #000000;
+}
+
+.button--station-done:hover:not(:disabled) {
   background: #e8e8ed;
   color: #000000;
+}
+
+.button--station-done:disabled {
+  background: #2c2c2e;
+  color: #a1a1a6;
 }
 
 /* ==========================================================================
@@ -1947,8 +1832,8 @@ body,
   grid-template-columns: minmax(0, 1fr);
 }
 
-.button.button--recovery-dark,
-.button.button--recovery-primary {
+.button--recovery-dark,
+.button--recovery-primary {
   min-height: 56px;
   border: 0;
   border-radius: var(--radius-md);
@@ -1957,14 +1842,19 @@ body,
   box-shadow: none;
 }
 
-.button.button--recovery-dark {
+.button--recovery-dark:not(:disabled) {
   background: #1d1d1f;
   color: #ffffff;
 }
 
-.button.button--recovery-dark:hover:not(:disabled) {
+.button--recovery-dark:hover:not(:disabled) {
   background: #3a3a3c;
   color: #ffffff;
+}
+
+.button--recovery-dark:disabled {
+  background: #e8e8ed;
+  color: #aeaeb2;
 }
 
 .recovery-card > p.recovery-card__help {
@@ -2730,13 +2620,6 @@ body,
   font-size: 13px;
   color: var(--color-ink-muted);
   word-break: break-all;
-}
-
-.account-section__body .button.w-full {
-  align-self: flex-start;
-  width: auto;
-  min-height: 44px;
-  padding: 0 22px;
 }
 
 .account-jump {
@@ -3550,7 +3433,7 @@ body,
   margin-top: 18px;
 }
 
-.passcode-dialog__actions .button {
+.passcode-dialog__actions button {
   min-height: 44px;
   padding: 0 22px;
 }
@@ -3921,23 +3804,6 @@ body,
   gap: 8px;
 }
 
-.slot-tabs button {
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid #d2d2d7;
-  background: #ffffff;
-  color: #1d1d1f;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.slot-tabs button.is-active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #ffffff;
-}
-
 .info-banner {
   padding: 10px 14px;
   border-radius: var(--radius-sm);
@@ -4023,11 +3889,6 @@ body,
     border: 0;
     width: auto;
     flex: 0 0 auto;
-  }
-
-  .admin-nav__exit .button {
-    width: auto;
-    min-height: 48px;
   }
 
   .admin-workspace {
@@ -4137,7 +3998,7 @@ body,
     border: 1px solid CanvasText;
   }
 
-  .button:focus-visible,
+  button:focus-visible,
   .operator-access:focus-visible,
   .review-option-card:focus-visible,
   .layouts-picker-tile:focus-visible,
@@ -4226,7 +4087,7 @@ body,
     justify-content: center;
   }
 
-  .shot-review-dock__actions .button {
+  .shot-review-dock__actions button {
     flex: 1 1 0;
   }
 }
@@ -4382,7 +4243,7 @@ body,
   color: var(--color-maroon);
 }
 
-.review-printer-warning .button {
+.review-printer-warning button {
   justify-self: start;
   min-height: 48px;
 }

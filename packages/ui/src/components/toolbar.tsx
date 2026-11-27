@@ -8,10 +8,7 @@ export const Toolbar = forwardRef<
 >(function Toolbar({ className, ...props }, ref) {
   return (
     <BaseToolbar.Root
-      className={cn(
-        'flex items-center gap-2 rounded-lg border border-border/40 bg-card p-1.5 text-card-foreground shadow-sm',
-        className,
-      )}
+      className={cn('flex items-center gap-2', className)}
       ref={ref}
       {...props}
     />
@@ -39,7 +36,7 @@ export const ToolbarSeparator = forwardRef<
 >(function ToolbarSeparator({ className, ...props }, ref) {
   return (
     <BaseToolbar.Separator
-      className={cn('mx-1 h-5 w-px shrink-0 bg-border/60', className)}
+      className={cn('mx-1 h-5 w-px shrink-0 bg-[#e8e8ed]', className)}
       ref={ref}
       {...props}
     />

@@ -5,22 +5,22 @@ import { SpinnerGap } from './icons';
 import { cn } from '../lib/utils';
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 rounded-full border font-sans text-sm font-semibold leading-5 tracking-normal transition-[background-color,border-color,color,box-shadow] duration-100 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-0 focus-visible:shadow-[0_0_0_3px_#0066cc] disabled:pointer-events-none disabled:shadow-none select-none cursor-pointer',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border font-sans text-sm font-semibold leading-5 tracking-normal transition-[background-color,border-color,color] duration-100 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:pointer-events-none select-none cursor-pointer',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#0071e3] active:bg-[#00539f] active:shadow-none disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
+          'border-transparent bg-primary text-white hover:bg-[#0071e3] active:bg-[#00539f] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         primary:
-          'border-transparent bg-primary text-white shadow-[var(--shadow-2)] hover:bg-[#0071e3] active:bg-[#00539f] active:shadow-none disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
+          'border-transparent bg-primary text-white hover:bg-[#0071e3] active:bg-[#00539f] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         secondary:
-          'border-[#d2d2d7] bg-white text-[#1d1d1f] shadow-[var(--shadow-2)] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] active:shadow-none disabled:border-[#e8e8ed] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
+          'border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] disabled:border-[#e8e8ed] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         outline:
           'border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] disabled:border-[#e8e8ed] disabled:bg-transparent disabled:text-[#aeaeb2]',
         destructive:
-          'border-transparent bg-[#d70015] text-white shadow-[var(--shadow-2)] hover:bg-[#b80012] active:bg-[#9c0010] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
+          'border-transparent bg-[#d70015] text-white hover:bg-[#b80012] active:bg-[#9c0010] disabled:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         'destructive-outline':
-          'border-[#d70015] text-[#d70015] bg-transparent hover:bg-[#fdf3f4] active:bg-[#f9d9dc] disabled:border-[#e8e8ed] disabled:text-[#aeaeb2]',
+          'border-[#d70015] text-[#d70015] bg-transparent hover:bg-[#ffecee] active:bg-[#ffccd1] disabled:border-[#e8e8ed] disabled:text-[#aeaeb2]',
         ghost:
           'border-transparent text-[#1d1d1f] hover:bg-[#f5f5f7] active:bg-[#e8e8ed] disabled:text-[#aeaeb2]',
         subtle:
@@ -28,9 +28,9 @@ export const buttonVariants = cva(
         link: 'h-auto border-transparent p-0 font-normal text-primary underline-offset-4 hover:underline',
       },
       size: {
-        xs: 'h-6 px-2 text-xs',
+        xs: 'h-6 px-2.5 text-xs',
         sm: 'h-8 px-3 text-sm',
-        default: 'h-10 min-h-[40px] px-3 text-sm',
+        default: 'h-10 min-h-[40px] px-4 text-sm',
         lg: 'h-12 min-h-[48px] px-5 text-base font-semibold',
         xl: 'h-14 px-7 text-base font-semibold min-h-[56px]',
         'icon-xs': 'size-6 p-0',
@@ -49,6 +49,7 @@ export const buttonVariants = cva(
 
 export type ButtonProps = {
   loading?: boolean;
+  wide?: boolean;
   icon?: ReactNode;
   iconAfter?: ReactNode;
   render?: useRender.RenderProp;
@@ -61,6 +62,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     variant,
     size,
     loading = false,
+    wide = false,
     disabled,
     icon,
     iconAfter,
@@ -77,7 +79,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     ref,
     props: {
       'aria-busy': loading ? 'true' : undefined,
-      className: cn(buttonVariants({ variant, size, className })),
+      className: cn(buttonVariants({ variant, size }), wide && 'w-full', className),
       disabled: disabled ? true : loading,
       type,
       ...props,

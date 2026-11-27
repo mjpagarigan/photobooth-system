@@ -22,14 +22,14 @@ export const Radio = forwardRef<
   return (
     <BaseRadio.Root
       className={cn(
-        'aspect-square size-4.5 rounded-full border border-border bg-card text-primary shadow-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:border-primary flex items-center justify-center cursor-pointer',
+        'aspect-square size-[18px] cursor-pointer rounded-full border border-[#d2d2d7] bg-white text-white shadow-none transition-colors hover:border-[#86868b] focus:outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:border-primary data-[checked]:bg-primary flex items-center justify-center',
         className,
       )}
       ref={ref}
       {...props}
     >
       <BaseRadio.Indicator className="flex items-center justify-center">
-        <span className="size-2.5 rounded-full bg-primary" />
+        <span className="size-2 rounded-full bg-white" />
       </BaseRadio.Indicator>
     </BaseRadio.Root>
   );

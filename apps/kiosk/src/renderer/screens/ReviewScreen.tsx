@@ -4,7 +4,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { FrameSummary, PrinterHealth, SessionPrintRequest } from '@grace-booth/shared';
 import { isPrintableFrameSize } from '@grace-booth/shared';
 import {
-  Button as CossButton,
+  Button,
   Dialog,
   DialogClose,
   DialogDescription,
@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from '@grace-booth/ui';
 
-import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
 import { CopyStepper } from '../components/Printing';
 import { isPrinterReady } from '../hooks/usePrinterHealth';
@@ -322,7 +321,7 @@ export function ReviewScreen({
           </DialogPanel>
 
           <DialogFooter>
-            <DialogClose render={<CossButton type="button" variant="secondary" />}>
+            <DialogClose render={<Button type="button" variant="secondary" />}>
               Close
             </DialogClose>
           </DialogFooter>

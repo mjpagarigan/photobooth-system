@@ -1,7 +1,6 @@
-import { LockKey } from '@grace-booth/ui';
+import { Button, LockKey } from '@grace-booth/ui';
 import { useEffect } from 'react';
 
-import { Button } from '../components/Button';
 import { Photostrip } from '../components/Photostrip';
 
 type FinalQrScreenProps = {

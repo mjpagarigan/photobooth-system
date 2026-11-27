@@ -1,7 +1,6 @@
-import { CloudSlash, SpinnerGap, VideoCameraSlash } from '@grace-booth/ui';
+import { Button, CloudSlash, SpinnerGap, VideoCameraSlash } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
 
-import { Button } from '../components/Button';
 import type { RecoveryVariant } from '../types';
 
 type RecoveryScreenProps = {

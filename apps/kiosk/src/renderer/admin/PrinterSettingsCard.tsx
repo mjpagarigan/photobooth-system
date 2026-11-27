@@ -10,6 +10,7 @@ import type {
 } from '@grace-booth/shared';
 import { PAPER_4R_HUNDREDTHS } from '@grace-booth/shared';
 import {
+  Button,
   Field,
   FieldLabel,
   Form,
@@ -19,8 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@grace-booth/ui';
-
-import { Button } from '../components/Button';
 
 function getBridge(): GraceBoothBridge | null {
   return window.graceBooth ?? null;

@@ -31,6 +31,7 @@ import type {
 import {
   Alert,
   Badge,
+  Button,
   Field,
   FieldDescription,
   FieldError,
@@ -49,7 +50,6 @@ import {
   ToolbarGroup,
 } from '@grace-booth/ui';
 
-import { Button } from '../components/Button';
 import { CaptureSettingsCard } from './CaptureSettingsCard';
 import { PrinterSettingsCard } from './PrinterSettingsCard';
 

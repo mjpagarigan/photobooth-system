@@ -11,7 +11,7 @@ import { useState } from 'react';
 import type { GalleryItem, GalleryUploadStatus, UploadJobSummary } from '@grace-booth/shared';
 import {
   Badge,
-  Button as CossButton,
+  Button,
   Dialog,
   DialogClose,
   DialogDescription,
@@ -23,7 +23,6 @@ import {
   Skeleton,
 } from '@grace-booth/ui';
 
-import { Button } from './Button';
 import { ReprintControl } from './Printing';
 
 type RecentGalleryProps = {
@@ -79,7 +78,7 @@ export function RecentGallery({
       {!operator ? (
         <header className="recent-gallery__header">
           <h2>Recent photos</h2>
-          <CossButton
+          <Button
             aria-label="Close recent photos"
             className="recent-gallery__close"
             onClick={onClose}
@@ -88,7 +87,7 @@ export function RecentGallery({
             variant="ghost"
           >
             <X aria-hidden="true" weight="bold" />
-          </CossButton>
+          </Button>
         </header>
       ) : null}
 
@@ -235,7 +234,7 @@ export function RecentGallery({
               </div>
               <DialogClose
                 render={
-                  <CossButton
+                  <Button
                     aria-label="Close photo details"
                     size="icon"
                     type="button"
@@ -362,7 +361,7 @@ export function RecentGallery({
             </DialogPanel>
 
             <DialogFooter className="recent-detail-modal__footer">
-              <DialogClose render={<CossButton type="button" variant="secondary" />}>
+              <DialogClose render={<Button type="button" variant="secondary" />}>
                 Close
               </DialogClose>
             </DialogFooter>

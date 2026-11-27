@@ -3,16 +3,16 @@ import { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../lib/utils';
 
 export const alertVariants = cva(
-  'relative w-full rounded-xl border p-4 text-sm font-sans flex items-start gap-3 shadow-sm [&>svg]:size-5 [&>svg]:shrink-0',
+  'relative w-full rounded-[14px] border p-4 text-sm font-sans flex items-start gap-3 shadow-none [&>svg]:size-5 [&>svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-card text-foreground border-border/50 [&>svg]:text-muted-foreground',
-        info: 'bg-card text-foreground border-primary/40 [&>svg]:text-primary',
-        success: 'bg-card text-foreground border-success/40 [&>svg]:text-success',
-        warning: 'bg-card text-foreground border-[#d97706]/40 [&>svg]:text-[#fbbf24]',
-        error: 'bg-card text-foreground border-destructive/50 [&>svg]:text-destructive',
-        destructive: 'bg-card text-foreground border-destructive/50 [&>svg]:text-destructive',
+        default: 'bg-white text-[#1d1d1f] border-[#e8e8ed] [&>svg]:text-[#636366]',
+        info: 'bg-[#e8f2fd] text-[#1d1d1f] border-[#d6e8fb] [&>svg]:text-[#0066cc]',
+        success: 'bg-[#e3f5e7] text-[#1d1d1f] border-[#b5e2c0] [&>svg]:text-[#1b6f30]',
+        warning: 'bg-[#fff6e5] text-[#1d1d1f] border-[#ffd699] [&>svg]:text-[#8a5a00]',
+        error: 'bg-[#ffecee] text-[#1d1d1f] border-[#ffccd1] [&>svg]:text-[#d70015]',
+        destructive: 'bg-[#ffecee] text-[#1d1d1f] border-[#ffccd1] [&>svg]:text-[#d70015]',
       },
     },
     defaultVariants: {
