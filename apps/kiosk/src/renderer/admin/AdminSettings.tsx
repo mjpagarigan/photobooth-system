@@ -74,6 +74,20 @@ function jobLabel(job: UploadJobSummary): string {
   return job.state.replaceAll('_', ' ');
 }
 
+const JOB_BADGE_VARIANT: Record<
+  UploadJobSummary['state'],
+  'error' | 'warning' | 'success' | 'info' | 'secondary'
+> = {
+  queued: 'warning',
+  creating_upload: 'info',
+  uploading: 'info',
+  confirming: 'info',
+  retry_wait: 'warning',
+  failed: 'error',
+  succeeded: 'success',
+  cancelled: 'secondary',
+};
+
 const SETTINGS_SECTIONS = [
   ['overview', 'Overview'],
   ['capture', 'Capture'],
@@ -808,7 +822,9 @@ export function AdminSettings({
                       <FieldError>{localError?.includes('port') ? localError : null}</FieldError>
                     </Field>
                   </div>
-                  <p className="certificate-state">
+                  <p
+                    className={`certificate-state ${settings.lan.tlsConfigured ? 'certificate-state--ok' : 'certificate-state--warning'}`}
+                  >
                     <ShieldCheck aria-hidden="true" weight="bold" />
                     {settings.lan.tlsConfigured
                       ? 'TLS certificate configured'
@@ -1003,7 +1019,7 @@ export function AdminSettings({
                   <div>
                     <h3>Google Photos Shared Album Sync</h3>
                     <p>
-                      Live stream completed photo strips into an active Google Photos shared album.
+                      Live stream completed photos into an active Google Photos shared album.
                     </p>
                   </div>
                 </div>
@@ -1012,7 +1028,7 @@ export function AdminSettings({
                   <label className="switch-row">
                     <span>
                       <strong>Enable Google Photos live sync</strong>
-                      <small>Send completed strips to the configured shared album.</small>
+                      <small>Send completed photos to the configured shared album.</small>
                     </span>
                     <Switch
                       checked={googlePhotosEnabled}
@@ -1228,7 +1244,7 @@ export function AdminSettings({
                 <div className="retention-values" style={{ marginTop: '1rem' }}>
                   <div>
                     <strong>{googleStats.syncedCount}</strong>
-                    <span>Synced Strips</span>
+                    <span>Synced Photos</span>
                   </div>
                   <div>
                     <strong>{googleStats.pendingCount}</strong>
@@ -1273,10 +1289,12 @@ export function AdminSettings({
                     <p>
                       {failedJobs.length === 0
                         ? 'No failed uploads need attention.'
-                        : `${failedJobs.length} failed upload${failedJobs.length === 1 ? '' : 's'} need attention.`}
+                        : `${failedJobs.length} failed ${failedJobs.length === 1 ? 'upload needs' : 'uploads need'} attention.`}
                     </p>
                   </div>
-                  <span className="telemetry-counter">{jobs.length} recent jobs</span>
+                  <span className="telemetry-counter">
+                    {jobs.length} recent {jobs.length === 1 ? 'job' : 'jobs'}
+                  </span>
                 </div>
                 <div className="upload-list">
                   {jobs.length === 0 ? (
@@ -1311,7 +1329,10 @@ export function AdminSettings({
                             Retry upload
                           </Button>
                         ) : (
-                          <Badge className={`job-state job-state--${job.state}`}>
+                          <Badge
+                            className={`job-state job-state--${job.state}`}
+                            variant={JOB_BADGE_VARIANT[job.state]}
+                          >
                             {jobLabel(job)}
                           </Badge>
                         )}

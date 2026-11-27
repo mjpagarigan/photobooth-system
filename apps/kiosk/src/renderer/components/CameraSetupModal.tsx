@@ -33,6 +33,8 @@ import {
   Field,
   FieldDescription,
   FieldLabel,
+  Fieldset,
+  FieldsetLegend,
   Radio,
   RadioGroup,
   Select,
@@ -65,7 +67,7 @@ const CAMERA_FAILURES: Record<
   },
   'device-missing': {
     problem: 'The selected camera is not connected.',
-    remedy: 'Choose the camera again in Active device node, then Apply & Save.',
+    remedy: 'Choose the camera again in Camera device, then Apply & Save.',
   },
   unavailable: {
     problem: 'The camera is unavailable or in use by another app.',
@@ -74,8 +76,42 @@ const CAMERA_FAILURES: Record<
 };
 
 const RESOLUTION_ITEMS = [
-  { label: '720p (1280 × 720) — virtual cameras and testing', value: '720p' as const },
-  { label: '1080p (1920 × 1080) — production quality', value: '1080p' as const },
+  { label: '720p (1280 × 720), virtual cameras and testing', value: '720p' as const },
+  { label: '1080p (1920 × 1080), production quality', value: '1080p' as const },
+];
+
+type CameraSourceOption = {
+  value: Exclude<CameraAdapterKind, 'internal_webcam'>;
+  icon: typeof VideoCamera;
+  title: string;
+  description: string;
+};
+
+const CAMERA_SOURCE_OPTIONS: readonly CameraSourceOption[] = [
+  {
+    value: 'webcam',
+    icon: VideoCamera,
+    title: 'Laptop / USB Webcam',
+    description: 'Internal camera or standard UVC device',
+  },
+  {
+    value: 'nikon',
+    icon: Camera,
+    title: 'Nikon DSLR (USB)',
+    description: 'Single 8-pin USB cable, live view and 24 MP shutter',
+  },
+  {
+    value: 'sony',
+    icon: Camera,
+    title: 'Sony A7 Tethered',
+    description: 'High-precision Sony Alpha mirrorless',
+  },
+  {
+    value: 'mock',
+    icon: ArrowsClockwise,
+    title: 'Mock Hardware',
+    description: 'Simulated capture for testing',
+  },
 ];
 
 export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetupModalProps) {
@@ -229,56 +265,36 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
         </DialogHeader>
 
         <DialogPanel className="camera-setup-dialog__content">
-          <Field className="camera-adapter-selector">
-            <FieldLabel>Camera source</FieldLabel>
+          <Fieldset className="camera-adapter-selector">
+            <FieldsetLegend>Camera source</FieldsetLegend>
             <RadioGroup
+              aria-label="Camera source"
               className="camera-source-grid"
               onValueChange={(value) => setSelectedAdapter(value as CameraAdapterKind)}
               value={selectedAdapter === 'internal_webcam' ? 'webcam' : selectedAdapter}
             >
-              <label
-                className={`camera-source-card ${selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam' ? 'camera-source-card--active' : ''}`}
-              >
-                <Radio value="webcam" />
-                <VideoCamera size={24} weight="bold" />
-                <span className="camera-source-card__title">Laptop / USB Webcam</span>
-                <span className="camera-source-card__desc">
-                  Internal camera or standard UVC device
-                </span>
-              </label>
-
-              <label
-                className={`camera-source-card ${selectedAdapter === 'nikon' ? 'camera-source-card--active' : ''}`}
-              >
-                <Radio value="nikon" />
-                <Camera size={24} weight="bold" />
-                <span className="camera-source-card__title">Nikon DSLR (USB)</span>
-                <span className="camera-source-card__desc">
-                  Single 8-pin USB cable — live view + 24 MP shutter
-                </span>
-              </label>
-
-              <label
-                className={`camera-source-card ${selectedAdapter === 'sony' ? 'camera-source-card--active' : ''}`}
-              >
-                <Radio value="sony" />
-                <Camera size={24} weight="bold" />
-                <span className="camera-source-card__title">Sony A7 Tethered</span>
-                <span className="camera-source-card__desc">
-                  High-precision Sony Alpha mirrorless
-                </span>
-              </label>
-
-              <label
-                className={`camera-source-card ${selectedAdapter === 'mock' ? 'camera-source-card--active' : ''}`}
-              >
-                <Radio value="mock" />
-                <ArrowsClockwise size={24} weight="bold" />
-                <span className="camera-source-card__title">Mock Hardware</span>
-                <span className="camera-source-card__desc">Simulated capture for testing</span>
-              </label>
+              {CAMERA_SOURCE_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const active =
+                  option.value === 'webcam'
+                    ? selectedAdapter === 'webcam' || selectedAdapter === 'internal_webcam'
+                    : selectedAdapter === option.value;
+                return (
+                  <label
+                    className={`camera-source-card${active ? ' camera-source-card--active' : ''}`}
+                    key={option.value}
+                  >
+                    <Radio aria-label={option.title} className="sr-only" value={option.value} />
+                    <Icon aria-hidden="true" size={20} weight="bold" />
+                    <span className="camera-source-card__text">
+                      <span className="camera-source-card__title">{option.title}</span>
+                      <span className="camera-source-card__desc">{option.description}</span>
+                    </span>
+                  </label>
+                );
+              })}
             </RadioGroup>
-          </Field>
+          </Fieldset>
 
           {nikonSelected && (
             <div className="camera-webcam-section">
@@ -464,14 +480,14 @@ export function CameraSetupModal({ isOpen, onClose, onCameraSaved }: CameraSetup
               </div>
               <div className="camera-select-grid">
                 <Field className="camera-device-select-row">
-                  <FieldLabel>Active device node</FieldLabel>
+                  <FieldLabel>Camera device</FieldLabel>
                   <div className="select-with-refresh">
                     <Select
                       items={deviceItems}
                       value={selectedDeviceId ?? ''}
                       onValueChange={(value) => setSelectedDeviceId(value ?? null)}
                     >
-                      <SelectTrigger aria-label="Active device node">
+                      <SelectTrigger aria-label="Camera device">
                         <SelectValue placeholder="Default system webcam" />
                       </SelectTrigger>
                       <SelectPopup positionerProps={{ alignItemWithTrigger: false }}>

@@ -192,7 +192,7 @@ export function PrinterSettingsCard() {
       }}
     >
       <div className="settings-card__title">
-        <Printer aria-hidden="true" />
+        <Printer aria-hidden="true" weight="bold" />
         <div>
           <h3>4R photo printer</h3>
           <p>
@@ -203,7 +203,7 @@ export function PrinterSettingsCard() {
       </div>
       {message ? (
         <p
-          className={message.kind === 'ok' ? 'form-status' : 'form-error'}
+          className={message.kind === 'ok' ? 'form-success' : 'form-error'}
           role={message.kind === 'ok' ? 'status' : 'alert'}
         >
           {message.text}

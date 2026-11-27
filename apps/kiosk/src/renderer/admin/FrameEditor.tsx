@@ -100,6 +100,7 @@ export function FrameEditor({
 }: FrameEditorProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [pendingSlotReduction, setPendingSlotReduction] = useState<number | null>(null);
   const deleteOpenerRef = useRef<HTMLElement | null>(null);
   // Name edits are scoped to the frame they started on so switching frames never leaks a draft.
   const [nameDraft, setNameDraft] = useState<{ frameId: string; value: string } | null>(null);
@@ -113,6 +114,7 @@ export function FrameEditor({
   const selectFrame = (frameId: string) => {
     setSelectedId(frameId);
     setDeleteTargetId(null);
+    setPendingSlotReduction(null);
     setLayerStatus(null);
   };
 
@@ -189,20 +191,25 @@ export function FrameEditor({
     }
   };
 
-  const changeSlotCount = (nextCount: number) => {
-    if (!selectedFrame || nextCount === currentSlots.length || nextCount < 1 || nextCount > 10) return;
-    if (
-      nextCount < currentSlots.length &&
-      !window.confirm(
-        `Reduce this frame to ${nextCount} shots? Slots ${nextCount + 1}–${currentSlots.length} will be removed when you save.`,
-      )
-    ) return;
+  const applySlotCount = (nextCount: number) => {
+    if (!selectedFrame) return;
     const generated = starterSlots(nextCount, selectedFrame.width, selectedFrame.height);
-    const next = nextCount > currentSlots.length
-      ? [...currentSlots, ...generated.slice(currentSlots.length)]
-      : currentSlots.filter((slot) => slot.slotIndex <= nextCount);
+    const next =
+      nextCount > currentSlots.length
+        ? [...currentSlots, ...generated.slice(currentSlots.length)]
+        : currentSlots.filter((slot) => slot.slotIndex <= nextCount);
     setDraft({ frameKey, slots: next });
     setSelectedIndex(Math.min(selectedIndex, nextCount));
+  };
+
+  const changeSlotCount = (nextCount: number) => {
+    if (!selectedFrame || nextCount === currentSlots.length || nextCount < 1 || nextCount > 10)
+      return;
+    if (nextCount < currentSlots.length) {
+      setPendingSlotReduction(nextCount);
+      return;
+    }
+    applySlotCount(nextCount);
   };
 
   const bringForward = () => {
@@ -290,7 +297,7 @@ export function FrameEditor({
             Frame library
           </h1>
           <p>
-            Manage every collage frame available at review time and its three-photo slot geometry.
+            Manage every frame available at review time and its photo slot geometry.
           </p>
         </div>
         <Toolbar aria-label="Frame editor actions" className="admin-page-header__actions">
@@ -374,6 +381,7 @@ export function FrameEditor({
                 </Button>
                 <Button
                   aria-label={`Delete ${item.name}`}
+                  className="frame-library__delete"
                   disabled={busy}
                   onClick={(event) => {
                     deleteOpenerRef.current = event.currentTarget;
@@ -662,6 +670,49 @@ export function FrameEditor({
               }
             >
               Delete frame
+            </AlertDialogClose>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) setPendingSlotReduction(null);
+        }}
+        open={pendingSlotReduction !== null}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove extra photo slots?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingSlotReduction !== null
+                ? `Reduce this frame to ${pendingSlotReduction} ${pendingSlotReduction === 1 ? 'shot' : 'shots'}? ${
+                    currentSlots.length - pendingSlotReduction === 1
+                      ? `Slot ${currentSlots.length} will`
+                      : `Slots ${pendingSlotReduction + 1}–${currentSlots.length} will`
+                  } be removed when you save.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button type="button" variant="ghost" />}>
+              Cancel
+            </AlertDialogClose>
+            <AlertDialogClose
+              render={
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    if (pendingSlotReduction !== null) {
+                      applySlotCount(pendingSlotReduction);
+                    }
+                    setPendingSlotReduction(null);
+                  }}
+                  type="button"
+                  variant="destructive"
+                />
+              }
+            >
+              Remove slots
             </AlertDialogClose>
           </AlertDialogFooter>
         </AlertDialogPopup>

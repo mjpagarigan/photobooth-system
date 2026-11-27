@@ -21,6 +21,7 @@ import {
   DialogPopup,
   DialogTitle,
   Skeleton,
+  type DialogTone,
 } from '@grace-booth/ui';
 
 import { ReprintControl } from './Printing';
@@ -36,6 +37,7 @@ type RecentGalleryProps = {
   repairingSessionId?: string | null | undefined;
   /** Shows Reprint on 4R photos when this booth can print. */
   printing?: boolean | undefined;
+  tone?: DialogTone;
   onClose: () => void;
 };
 
@@ -58,6 +60,7 @@ export function RecentGallery({
   onRepairCloudPhoto,
   repairingSessionId = null,
   printing = false,
+  tone = 'light',
   onClose,
 }: RecentGalleryProps) {
   const [detailItem, setDetailItem] = useState<GalleryItem | null>(null);
@@ -70,9 +73,7 @@ export function RecentGallery({
   const content = (
     <section
       className={`recent-gallery${operator ? ' recent-gallery--operator' : ''}`}
-      role={operator ? undefined : 'dialog'}
-      aria-modal={operator ? undefined : 'true'}
-      aria-label="Recently captured photostrips"
+      aria-label="Recently captured photos"
       data-testid="recent-gallery"
     >
       {!operator ? (
@@ -120,14 +121,14 @@ export function RecentGallery({
               key={item.sessionId}
             >
               <button
-                aria-label={`View photo strip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
+                aria-label={`View photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
                 className="gallery-tile__open"
                 onClick={() => setDetailItem(item)}
                 type="button"
               >
                 <div className="gallery-tile__preview-container">
                   <img
-                    alt={`Photostrip captured at ${formatTimestamp(item.metadata.capturedAt)}`}
+                    alt={`Photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
                     className="gallery-tile__preview"
                     draggable="false"
                     src={item.previewDataUrl}
@@ -142,9 +143,11 @@ export function RecentGallery({
                 <span className="gallery-tile__captured">
                   {formatTimestamp(item.metadata.capturedAt)}
                 </span>
-                <Badge className={`status-pill status-pill--${item.metadata.uploadStatus}`}>
-                  {STATUS_LABEL[item.metadata.uploadStatus]}
-                </Badge>
+                {operator ? (
+                  <Badge className={`status-pill status-pill--${item.metadata.uploadStatus}`}>
+                    {STATUS_LABEL[item.metadata.uploadStatus]}
+                  </Badge>
+                ) : null}
               </div>
               {item.qrDataUrl ? (
                 <div className="gallery-tile__qr-wrapper">
@@ -198,7 +201,9 @@ export function RecentGallery({
                   </Button>
                 </div>
               ) : null}
-              {operator && item.metadata.uploadStatus === 'unavailable' ? (
+              {operator &&
+              Boolean(onRepairCloudPhoto) &&
+              item.metadata.uploadStatus === 'unavailable' ? (
                 <div className="gallery-tile__action" onClick={(e) => e.stopPropagation()}>
                   <Button
                     icon={<CloudArrowUp aria-hidden="true" weight="bold" />}
@@ -222,11 +227,12 @@ export function RecentGallery({
             className="recent-detail-modal"
             maxWidthClass="max-w-4xl"
             showCloseButton={false}
+            tone={tone}
           >
             <DialogHeader className="recent-detail-modal__header">
               <div className="recent-detail-modal__title-group">
                 <DialogTitle>
-                  <Images aria-hidden="true" weight="bold" /> Photo Strip Details
+                  <Images aria-hidden="true" weight="bold" /> Photo Details
                 </DialogTitle>
                 <DialogDescription className="recent-detail-modal__subtitle">
                   {formatTimestamp(detailItem.metadata.capturedAt)}
@@ -236,6 +242,7 @@ export function RecentGallery({
                 render={
                   <Button
                     aria-label="Close photo details"
+                    className="recent-detail-modal__close"
                     size="icon"
                     type="button"
                     variant="ghost"
@@ -253,7 +260,7 @@ export function RecentGallery({
             >
               <div className="recent-detail-modal__strip-col">
                 <img
-                  alt={`Enlarged photostrip captured at ${formatTimestamp(detailItem.metadata.capturedAt)}`}
+                  alt={`Enlarged photo captured at ${formatTimestamp(detailItem.metadata.capturedAt)}`}
                   className="recent-detail-modal__image"
                   draggable="false"
                   src={detailItem.previewDataUrl}
@@ -274,54 +281,56 @@ export function RecentGallery({
                       src={detailItem.qrDataUrl}
                     />
                     <p className="recent-detail-modal__qr-hint">
-                      Scan with your smartphone camera to download this photo strip.
+                      Scan with your smartphone camera to download this photo.
                     </p>
                   </div>
                 ) : null}
 
-                <div className="recent-detail-modal__meta-card">
-                  <h3>Metadata</h3>
-                  <table className="recent-detail-modal__table">
-                    <tbody>
-                      <tr>
-                        <th scope="row">Captured</th>
-                        <td>{formatTimestamp(detailItem.metadata.capturedAt)}</td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Photo Count</th>
-                        <td>{detailItem.metadata.photoCount} photos</td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Frame Layout</th>
-                        <td>{detailItem.metadata.frameName ?? 'Default Frame'}</td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Upload Status</th>
-                        <td>
-                          <span
-                            className={`status-pill status-pill--${detailItem.metadata.uploadStatus}`}
-                          >
-                            {STATUS_LABEL[detailItem.metadata.uploadStatus]}
-                          </span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Cloud Expiry</th>
-                        <td>
-                          {detailItem.metadata.cloudExpiresAt
-                            ? formatTimestamp(detailItem.metadata.cloudExpiresAt)
-                            : 'Not uploaded / Local only'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Session ID</th>
-                        <td className="recent-detail-modal__session-id">
-                          <code>{detailItem.sessionId}</code>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                {operator ? (
+                  <div className="recent-detail-modal__meta-card">
+                    <h3>Metadata</h3>
+                    <table className="recent-detail-modal__table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">Captured</th>
+                          <td>{formatTimestamp(detailItem.metadata.capturedAt)}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Photo Count</th>
+                          <td>{detailItem.metadata.photoCount} photos</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Frame</th>
+                          <td>{detailItem.metadata.frameName ?? 'Default Frame'}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Upload Status</th>
+                          <td>
+                            <span
+                              className={`status-pill status-pill--${detailItem.metadata.uploadStatus}`}
+                            >
+                              {STATUS_LABEL[detailItem.metadata.uploadStatus]}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Cloud Expiry</th>
+                          <td>
+                            {detailItem.metadata.cloudExpiresAt
+                              ? formatTimestamp(detailItem.metadata.cloudExpiresAt)
+                              : 'Not uploaded / Local only'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Session ID</th>
+                          <td className="recent-detail-modal__session-id">
+                            <code>{detailItem.sessionId}</code>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
 
                 {printing && detailItem.metadata.printable ? (
                   <div className="recent-detail-modal__retry-box">
@@ -344,7 +353,9 @@ export function RecentGallery({
                     </Button>
                   </div>
                 ) : null}
-                {operator && detailItem.metadata.uploadStatus === 'unavailable' ? (
+                {operator &&
+                Boolean(onRepairCloudPhoto) &&
+                detailItem.metadata.uploadStatus === 'unavailable' ? (
                   <div className="recent-detail-modal__retry-box">
                     <Button
                       icon={<CloudArrowUp aria-hidden="true" weight="bold" />}
@@ -381,11 +392,12 @@ export function RecentGallery({
         className="recent-gallery-shell"
         maxWidthClass="max-w-6xl"
         showCloseButton={false}
+        tone={tone}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Recent photos</DialogTitle>
           <DialogDescription>
-            Recently captured photostrips available on this booth.
+            Recently captured photos available on this booth.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="p-0">{content}</DialogPanel>

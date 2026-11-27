@@ -239,8 +239,9 @@ describe('CameraSetupModal resolution preferences', () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Choose the camera again in Active device node, then Apply & Save.'),
+      screen.getByText('Choose the camera again in Camera device, then Apply & Save.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Camera device' })).toBeInTheDocument();
     expect(screen.queryByText(/in use by another app/i)).not.toBeInTheDocument();
   }, 10_000);
 
@@ -321,5 +322,22 @@ describe('CameraSetupModal resolution preferences', () => {
       resolution: '1080p',
       zoomPercent: 100,
     });
+  });
+
+  it('switches across camera sources through the radiogroup and formats resolution choices plainly', async () => {
+    stubCamo(vi.fn(() => Promise.resolve(streamAt(1_920, 1_080))));
+    installBridge(vi.fn().mockResolvedValue(cameraConfiguration('webcam', 'camo-camera', '1080p')));
+    const user = userEvent.setup();
+    render(<CameraSetupModal isOpen={true} onClose={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Capture resolution' })).toHaveTextContent(
+        '1080p (1920 × 1080), production quality',
+      ),
+    );
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: /mock hardware/i }));
+    expect(screen.getByText(/mock camera emulator/i)).toBeVisible();
   });
 });

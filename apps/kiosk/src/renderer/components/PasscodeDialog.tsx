@@ -1,5 +1,5 @@
 import { ArrowRight, Eye, EyeSlash, X } from '@grace-booth/ui';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 
 import {
   Button,
@@ -16,6 +16,7 @@ import {
   FieldLabel,
   Form,
   Input,
+  type DialogTone,
 } from '@grace-booth/ui';
 
 type PasscodeDialogProps = {
@@ -26,6 +27,7 @@ type PasscodeDialogProps = {
   onCancel: () => void;
   onClearError?: () => void;
   onSubmit: (passcode: string) => void;
+  tone?: DialogTone;
 };
 
 const MIN_PASSCODE_LENGTH = 8;
@@ -38,11 +40,13 @@ export function PasscodeDialog({
   onCancel,
   onClearError,
   onSubmit,
+  tone = 'light',
 }: PasscodeDialogProps) {
   const [passcode, setPasscode] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [showPasscode, setShowPasscode] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const errorId = useId();
   const openerRef = useRef<HTMLElement | null>(
     typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -93,8 +97,11 @@ export function PasscodeDialog({
         finalFocus={() => openerRef.current}
         maxWidthClass="max-w-md"
         showCloseButton={false}
+        tone={tone}
       >
-        <DialogHeader className="passcode-dialog__header">
+        <DialogHeader
+          className={`passcode-dialog__header${dismissible ? '' : ' passcode-dialog__header--locked'}`}
+        >
           <div>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
@@ -119,7 +126,7 @@ export function PasscodeDialog({
         <Form className="contents" noValidate onSubmit={submit}>
           <DialogPanel className="passcode-dialog__form">
             {displayedError ? (
-              <div className="form-error" role="alert">
+              <div className="form-error" id={errorId} role="alert">
                 {displayedError}
               </div>
             ) : null}
@@ -127,6 +134,7 @@ export function PasscodeDialog({
               <FieldLabel>Passcode</FieldLabel>
               <div className="password-field">
                 <Input
+                  aria-describedby={displayedError ? errorId : undefined}
                   aria-invalid={Boolean(displayedError)}
                   autoComplete={isBootstrap ? 'new-password' : 'current-password'}
                   autoFocus
@@ -138,6 +146,7 @@ export function PasscodeDialog({
                     if (localError) setLocalError(null);
                     onClearError?.();
                   }}
+                  placeholder=" "
                   required
                   type={showPasscode ? 'text' : 'password'}
                   value={passcode}
@@ -175,6 +184,8 @@ export function PasscodeDialog({
               <Field className="passcode-field" name="confirmation">
                 <FieldLabel>Confirm passcode</FieldLabel>
                 <Input
+                  aria-describedby={displayedError ? errorId : undefined}
+                  aria-invalid={Boolean(displayedError)}
                   autoComplete="new-password"
                   id="operator-passcode-confirmation"
                   maxLength={64}
@@ -184,6 +195,7 @@ export function PasscodeDialog({
                     if (localError) setLocalError(null);
                     onClearError?.();
                   }}
+                  placeholder=" "
                   required
                   type={showPasscode ? 'text' : 'password'}
                   value={confirmation}

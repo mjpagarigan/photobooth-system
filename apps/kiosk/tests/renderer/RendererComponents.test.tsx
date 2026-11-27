@@ -13,6 +13,8 @@ import { AdminShell } from '../../src/renderer/admin/AdminShell';
 import { FrameEditor } from '../../src/renderer/admin/FrameEditor';
 import { fitFrameWithin } from '../../src/renderer/admin/frame-editor-layout';
 import { posePromptForShot } from '../../src/renderer/capture-helpers';
+import { FrameImportDialog } from '../../src/renderer/components/FrameImportDialog';
+import { PasscodeDialog } from '../../src/renderer/components/PasscodeDialog';
 import { RecentGallery } from '../../src/renderer/components/RecentGallery';
 import { AttractScreen } from '../../src/renderer/screens/AttractScreen';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
@@ -115,6 +117,9 @@ describe('guest screen components', () => {
     );
     expect(screen.queryByRole('button', { name: /repair cloud copy/i })).not.toBeInTheDocument();
 
+    rerender(<RecentGallery items={[item]} onClose={() => undefined} operator />);
+    expect(screen.queryByRole('button', { name: /repair cloud copy/i })).not.toBeInTheDocument();
+
     rerender(
       <RecentGallery
         items={[item]}
@@ -128,7 +133,7 @@ describe('guest screen components', () => {
     expect(screen.queryByRole('img', { name: /QR code/i })).not.toBeInTheDocument();
   });
 
-  it('moves focus into photo details, traps it there, and restores the invoking tile', async () => {
+  it('hides operator metadata from guests and forwards tone to both dialogs', async () => {
     const item: GalleryItem = {
       sessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       previewDataUrl: 'data:image/jpeg;base64,AA==',
@@ -143,10 +148,22 @@ describe('guest screen components', () => {
       },
     };
     const user = userEvent.setup();
-    render(<RecentGallery items={[item]} onClose={() => undefined} operator={false} />);
+    render(
+      <RecentGallery items={[item]} onClose={() => undefined} operator={false} tone="dark" />,
+    );
 
-    const tile = screen.getByRole('button', { name: /view photo strip/i });
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-tone', 'dark');
+    expect(screen.queryByText('Uploaded')).not.toBeInTheDocument();
+
+    const tile = screen.getByRole('button', { name: /view photo captured at/i });
     await user.click(tile);
+
+    const detailHeading = screen.getByRole('heading', { name: /photo details/i });
+    expect(detailHeading.closest('[role="dialog"]')).toHaveAttribute('data-tone', 'dark');
+    expect(screen.queryByText('Upload Status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cloud Expiry')).not.toBeInTheDocument();
+    expect(screen.queryByText(item.sessionId)).not.toBeInTheDocument();
+
     const detailClose = screen.getByRole('button', { name: /close photo details/i });
     expect(detailClose).toHaveFocus();
 
@@ -612,6 +629,35 @@ describe('FrameEditor', () => {
     expect(onDeleteFrame).toHaveBeenCalledWith(FRAME_2.id);
   });
 
+  it('confirms slot reduction through an AlertDialog instead of window.confirm', async () => {
+    const confirmMock = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirmMock);
+    const onSave =
+      vi.fn<(frameId: string, name: string, slots: FrameLayout, revision: number) => void>();
+    const user = userEvent.setup();
+    try {
+      render(<FrameEditor {...baseProps} frames={[FRAME]} onSave={onSave} />);
+      const shotsInput = screen.getByLabelText('Shots / slots');
+      fireEvent.change(shotsInput, { target: { value: '2' } });
+
+      expect(confirmMock).not.toHaveBeenCalled();
+      expect(screen.getByRole('alertdialog')).toBeVisible();
+      expect(screen.getByText('Remove extra photo slots?')).toBeVisible();
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.getByLabelText('Shots / slots')).toHaveValue(3);
+
+      fireEvent.change(shotsInput, { target: { value: '2' } });
+      await user.click(screen.getByRole('button', { name: 'Remove slots' }));
+      expect(screen.getByLabelText('Shots / slots')).toHaveValue(2);
+
+      await user.click(screen.getByRole('button', { name: /save configuration/i }));
+      expect(onSave.mock.calls[0]?.[2]).toHaveLength(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('uses roving keyboard selection for photo-slot tabs', async () => {
     const user = userEvent.setup();
     render(<FrameEditor {...baseProps} frames={[FRAME]} onSave={() => undefined} />);
@@ -821,6 +867,113 @@ describe('AdminSettings', () => {
 
     await user.click(screen.getByTestId('open-frame-editor-from-capture'));
     expect(onOpenFrameEditor).toHaveBeenCalledOnce();
+  });
+
+  it('uses singular queue grammar and warning/ok certificate states', () => {
+    const failedJob = {
+      id: 'job-1',
+      sessionId: 'session-1',
+      state: 'failed' as const,
+      attemptCount: 2,
+      automaticRetryIndex: 1,
+      nextAttemptAt: null,
+      lastErrorCode: 'network',
+      lastErrorMessage: 'Offline',
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    const { rerender } = render(<AdminSettingsScreen {...props} jobs={[failedJob]} />);
+    expect(screen.getByText('1 failed upload needs attention.')).toBeVisible();
+    expect(screen.getByText('1 recent job')).toBeVisible();
+    expect(screen.getByText('TLS certificate required before LAN access')).toHaveClass(
+      'certificate-state--warning',
+    );
+
+    rerender(
+      <AdminSettingsScreen
+        {...props}
+        jobs={[failedJob]}
+        settings={{ ...SETTINGS, lan: { ...SETTINGS.lan, tlsConfigured: true } }}
+      />,
+    );
+    expect(screen.getByText('TLS certificate configured')).toHaveClass('certificate-state--ok');
+  });
+});
+
+describe('FrameImportDialog', () => {
+  const candidate = {
+    candidateId: 'candidate-1',
+    suggestedName: 'Celebration 4R',
+    width: 1800,
+    height: 1200,
+    byteSize: 120_000,
+  };
+
+  it('validates blank name and out-of-range shot count inline, dismisses via close button once, and submits trimmed values', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+
+    render(
+      <FrameImportDialog
+        busy={false}
+        candidate={candidate}
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const nameInput = screen.getByLabelText('Frame name');
+    const shotsInput = screen.getByLabelText('Shots / slots');
+    const submitButton = screen.getByRole('button', { name: 'Add frame' });
+
+    fireEvent.change(nameInput, { target: { value: '   ' } });
+    expect(screen.getByText('Enter a frame name.')).toBeVisible();
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(nameInput, { target: { value: '  Gala 4R  ' } });
+    fireEvent.change(shotsInput, { target: { value: '12' } });
+    expect(screen.getByText('Enter a whole number between 1 and 10.')).toBeVisible();
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(shotsInput, { target: { value: '4' } });
+    expect(submitButton).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Close dialog' }));
+    expect(onCancel).toHaveBeenCalledOnce();
+
+    await user.click(submitButton);
+    expect(onConfirm).toHaveBeenCalledWith('Gala 4R', 4);
+  });
+});
+
+describe('PasscodeDialog tone and validation attributes', () => {
+  it('forwards tone to DialogPopup and links validation errors to both bootstrap inputs', async () => {
+    const user = userEvent.setup();
+    render(
+      <PasscodeDialog
+        dismissible={false}
+        mode="bootstrap"
+        onCancel={() => undefined}
+        onSubmit={() => undefined}
+        tone="dark"
+      />,
+    );
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-tone', 'dark');
+
+    await user.type(screen.getByLabelText('Passcode'), 'abcdefgh');
+    await user.type(screen.getByLabelText('Confirm passcode'), 'ijklmnop');
+    await user.click(screen.getByRole('button', { name: 'Save passcode' }));
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Passcodes do not match.');
+    const confirmInput = screen.getByLabelText('Confirm passcode');
+    expect(confirmInput).toHaveAttribute('aria-invalid', 'true');
+    expect(confirmInput.getAttribute('aria-describedby')?.split(/\s+/)).toContain(alert.id);
+    expect(screen.getByLabelText('Passcode').getAttribute('aria-describedby')?.split(/\s+/)).toContain(
+      alert.id,
+    );
   });
 });
 

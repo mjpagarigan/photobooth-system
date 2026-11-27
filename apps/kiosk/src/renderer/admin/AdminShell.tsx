@@ -33,7 +33,7 @@ export function AdminShell({ children, onExit, onViewChange, view }: AdminShellP
             <span>Operator</span>
           </div>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="admin-nav__content">
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
