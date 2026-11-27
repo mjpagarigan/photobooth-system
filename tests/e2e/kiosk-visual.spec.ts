@@ -531,7 +531,7 @@ test('camera setup is a bounded, structured dialog', async ({ page }) => {
   expect(bounds!.y).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1280);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(720);
-  await expect(page.locator('.camera-source-card')).toHaveCount(3);
+  await expect(page.locator('.camera-source-card')).toHaveCount(4);
   await expect(page.locator('.camera-preview-box')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Close' })).toBeFocused();
 });

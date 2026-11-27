@@ -4290,11 +4290,11 @@ body,
 }
 
 .upload-job {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 10px 14px;
   padding: 16px;
   border-radius: var(--radius-sm);
   background: #ffffff;
@@ -4309,6 +4309,10 @@ body,
   gap: 10px;
 }
 
+.upload-job__state > svg {
+  flex-shrink: 0;
+}
+
 .upload-job__state > div,
 .upload-job__timing {
   display: flex;
@@ -4317,11 +4321,25 @@ body,
   gap: 2px;
 }
 
+.upload-job__timing {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  font-size: 13px;
+  color: #636366;
+}
+
+.upload-job > button,
+.upload-job > .job-state {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
 .upload-job__state strong,
 .upload-job__state span,
 .upload-job__timing span,
 .upload-job__timing small {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .job-state {
