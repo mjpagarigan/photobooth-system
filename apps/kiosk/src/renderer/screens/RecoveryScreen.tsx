@@ -18,7 +18,7 @@ type RecoveryScreenProps = {
 const COPY = {
   camera: {
     title: 'Your camera needs a hand.',
-    body: 'Ask a booth volunteer to check the camera connection, then start again.',
+    body: 'Ask a booth operator to check the camera connection, then start again.',
     action: 'Restart session',
     icon: VideoCameraSlash,
   },
@@ -84,6 +84,7 @@ export function RecoveryScreen({
                 disabled={!canFinishOffline}
                 loading={busy}
                 onClick={onFinishOffline}
+                variant="secondary"
               >
                 Finish offline
               </Button>
@@ -99,7 +100,7 @@ export function RecoveryScreen({
           </div>
         ) : null}
         {variant !== 'interrupted' ? (
-          <p className="recovery-card__help">Still stuck? Ask a booth volunteer.</p>
+          <p className="recovery-card__help">Still stuck? Ask a booth operator.</p>
         ) : null}
       </article>
       {variant !== 'interrupted' ? (

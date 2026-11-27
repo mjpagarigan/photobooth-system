@@ -227,6 +227,9 @@ export function CaptureScreen(props: CaptureScreenProps) {
                 <h1 id="capture-title" data-screen-heading tabIndex={-1} className="sr-only">
                   Taking photo
                 </h1>
+                <p className="countdown-card__capturing-pill" aria-hidden="true">
+                  Taking photo…
+                </p>
               </div>
             )}
           </>

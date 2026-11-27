@@ -1,11 +1,37 @@
-import { Button, LockKey } from '@grace-booth/ui';
+import { Button, LockKey, WifiHigh } from '@grace-booth/ui';
 import { useEffect } from 'react';
 
 import { Photostrip } from '../components/Photostrip';
 
+export type FinalDeliveryMode = 'cloud' | 'offline';
+
+type FinalDeliveryCopy = {
+  eyebrow: string;
+  heading: (cloudRetentionDays: number) => string;
+  detail: string;
+  icon: typeof LockKey;
+};
+
+const DELIVERY_COPY: Record<FinalDeliveryMode, FinalDeliveryCopy> = {
+  cloud: {
+    eyebrow: 'Ready to download',
+    heading: (days) => `Available for ${days} days`,
+    detail: 'Private link, just for you',
+    icon: LockKey,
+  },
+  offline: {
+    eyebrow: 'Local Wi-Fi',
+    heading: () => 'Save on this network',
+    detail: 'Connect your phone to the booth Wi-Fi, then scan',
+    icon: WifiHigh,
+  },
+};
+
 type FinalQrScreenProps = {
   busy?: boolean;
+  cloudRetentionDays?: number;
   collageUrl: string;
+  deliveryMode?: FinalDeliveryMode;
   onDone: () => void;
   onOpenRecent?: () => void;
   qrImageUrl: string;
@@ -13,7 +39,9 @@ type FinalQrScreenProps = {
 
 export function FinalQrScreen({
   busy = false,
+  cloudRetentionDays = 30,
   collageUrl,
+  deliveryMode = 'cloud',
   onDone,
   onOpenRecent,
   qrImageUrl,
@@ -22,6 +50,9 @@ export function FinalQrScreen({
     const heading = document.querySelector<HTMLElement>('[data-screen-heading]');
     heading?.focus();
   }, []);
+
+  const copy = DELIVERY_COPY[deliveryMode];
+  const DetailIcon = copy.icon;
 
   return (
     <main className="screen screen--done" data-testid="final-screen">
@@ -50,11 +81,11 @@ export function FinalQrScreen({
             <Photostrip collageUrl={collageUrl} label="Your finished photo" variant="collage" />
           </section>
           <div className="final-keepsake__copy">
-            <p className="final-keepsake__eyebrow">Ready to download</p>
-            <h2>Available for 30 days</h2>
+            <p className="final-keepsake__eyebrow">{copy.eyebrow}</p>
+            <h2>{copy.heading(cloudRetentionDays)}</h2>
             <p className="final-keepsake__private">
-              <LockKey aria-hidden="true" />
-              Private link, just for you
+              <DetailIcon aria-hidden="true" />
+              {copy.detail}
             </p>
           </div>
         </div>

@@ -272,14 +272,14 @@ export function ReviewScreen({
       </div>
 
       <Dialog open={layoutsModalOpen} onOpenChange={setLayoutsModalOpen}>
-        <DialogPopup maxWidthClass="max-w-4xl" className="layouts-picker-modal">
+        <DialogPopup tone="dark" maxWidthClass="max-w-4xl" className="layouts-picker-modal">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <SquaresFour aria-hidden="true" weight="bold" className="size-5 text-primary" />
+              <SquaresFour aria-hidden="true" weight="bold" className="size-5 text-[#2997ff]" />
               <span>All frame layouts</span>
             </DialogTitle>
             <DialogDescription>
-              Choose from all {options.length} photo templates for your photostrip.
+              Choose from all {options.length} frames for your keepsake.
             </DialogDescription>
           </DialogHeader>
 
@@ -307,7 +307,7 @@ export function ReviewScreen({
                       />
                       {isSelected && (
                         <div className="layouts-picker-selected-badge" aria-hidden="true">
-                          <CheckCircle weight="fill" className="size-5 text-primary" />
+                          <CheckCircle weight="fill" className="size-5" />
                         </div>
                       )}
                     </div>
@@ -321,7 +321,9 @@ export function ReviewScreen({
           </DialogPanel>
 
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="secondary" />}>
+            <DialogClose
+              render={<Button className="layouts-picker-close" type="button" variant="secondary" />}
+            >
               Close
             </DialogClose>
           </DialogFooter>

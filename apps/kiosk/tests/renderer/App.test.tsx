@@ -1314,4 +1314,188 @@ describe('countdown calculation and per-shot review flow', () => {
     await screen.findByTestId('review-screen');
     expect(screen.getByTestId('printer-indicator')).toBeVisible();
   });
+
+  it('applies dark dialog tone on studio screens and light tone on light guest screens', async () => {
+    const harness = createBridge();
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    await user.click(screen.getByRole('button', { name: 'Admin' }));
+    expect(await screen.findByRole('dialog', { name: /operator access/i })).toHaveAttribute(
+      'data-tone',
+      'light',
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    for (const darkSnapshot of [
+      sessionSnapshot({ screen: 'countdown', state: 'countdown' }),
+      sessionSnapshot({ screen: 'review', state: 'review' }),
+      sessionSnapshot({ screen: 'processing', state: 'processing' }),
+      sessionSnapshot({ screen: 'recovery', state: 'camera_error', errorCode: 'camera_unavailable' }),
+    ]) {
+      act(() => harness.emit(darkSnapshot));
+      await user.keyboard('{Control>}{Shift>}a{/Shift}{/Control}');
+      expect(await screen.findByRole('dialog', { name: /operator access/i })).toHaveAttribute(
+        'data-tone',
+        'dark',
+      );
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    }
+
+    act(() =>
+      harness.emit(
+        sessionSnapshot({
+          screen: 'final',
+          state: 'final',
+          media: {
+            captureUrls: [],
+            collageUrl: 'grace-booth-media://asset/collage',
+            qrImageUrl: 'grace-booth-media://asset/qr',
+          },
+          controls: {
+            canStart: false,
+            canAcceptShot: false,
+            canRetakeShot: false,
+            canRetakeAll: false,
+            canAcceptPhotos: false,
+            canRetryUpload: false,
+            canFinishOffline: false,
+            canFinish: true,
+          },
+        }),
+      ),
+    );
+    await screen.findByTestId('final-screen');
+    await user.keyboard('{Control>}{Shift>}a{/Shift}{/Control}');
+    expect(await screen.findByRole('dialog', { name: /operator access/i })).toHaveAttribute(
+      'data-tone',
+      'light',
+    );
+  });
+
+  it('shows AttractScreen camera message from snapshot only when canStart is false', async () => {
+    const harness = createBridge({
+      ...ATTRACT,
+      controls: { ...ATTRACT.controls, canStart: false },
+      message: 'Camera is warming up.',
+    });
+    window.graceBooth = harness.bridge;
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+    expect(screen.getByRole('alert')).toHaveTextContent('Camera is warming up.');
+
+    act(() =>
+      harness.emit({
+        ...ATTRACT,
+        controls: { ...ATTRACT.controls, canStart: true },
+        message: 'Camera is warming up.',
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('shows local Wi-Fi delivery copy on FinalQrScreen after finishing offline', async () => {
+    const uploadFailed = sessionSnapshot({
+      screen: 'recovery',
+      state: 'upload_failed',
+      errorCode: 'upload_failed',
+      controls: {
+        canStart: false,
+        canAcceptShot: false,
+        canRetakeShot: false,
+        canRetakeAll: false,
+        canAcceptPhotos: false,
+        canRetryUpload: true,
+        canFinishOffline: true,
+        canFinish: false,
+      },
+    });
+    const offlineFinal = sessionSnapshot({
+      screen: 'final',
+      state: 'final',
+      media: {
+        captureUrls: [],
+        collageUrl: 'grace-booth-media://asset/collage',
+        qrImageUrl: 'grace-booth-media://asset/qr',
+      },
+      controls: {
+        canStart: false,
+        canAcceptShot: false,
+        canRetakeShot: false,
+        canRetakeAll: false,
+        canAcceptPhotos: false,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        canFinish: true,
+      },
+    });
+    const harness = createBridge(uploadFailed);
+    harness.bridge.booth.finishOffline = vi.fn().mockImplementation(() => {
+      harness.emit(offlineFinal);
+      return Promise.resolve(ok(offlineFinal));
+    });
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /finish offline/i }));
+    expect(await screen.findByTestId('final-screen')).toBeVisible();
+    expect(screen.getByText('Local Wi-Fi')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Save on this network' })).toBeVisible();
+    expect(screen.getByText('Connect your phone to the booth Wi-Fi, then scan')).toBeVisible();
+  });
+
+  it('wires repairCloudPhoto in the operator gallery and refreshes items', async () => {
+    const unavailableItem: GalleryItem = {
+      sessionId: SESSION_ID,
+      previewDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: 1_700_000_000_000,
+        photoCount: 3,
+        frameName: 'Test Frame',
+        uploadStatus: 'unavailable',
+        cloudExpiresAt: 1_800_000_000_000,
+        printable: false,
+      },
+    };
+    const repairedItem: GalleryItem = {
+      ...unavailableItem,
+      qrDataUrl: 'data:image/png;base64,cXI=',
+      metadata: { ...unavailableItem.metadata, uploadStatus: 'uploaded' },
+    };
+
+    const harness = createBridge();
+    harness.getAuthStatusMock.mockResolvedValue(
+      ok({ configured: true, authenticated: true, expiresAt: Date.now() + 60_000 }),
+    );
+    harness.getRecentMock
+      .mockResolvedValueOnce(ok([unavailableItem]))
+      .mockResolvedValueOnce(ok([repairedItem]));
+    const repairMock = vi
+      .fn<GraceBoothBridge['gallery']['repairCloudPhoto']>()
+      .mockResolvedValue(ok({ status: 'repaired', message: 'Cloud copy repaired.' }));
+    harness.bridge.gallery.repairCloudPhoto = repairMock;
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    await user.click(screen.getByRole('button', { name: 'Admin' }));
+    await screen.findByTestId('frame-editor');
+    await user.click(screen.getByRole('button', { name: 'Recent photos' }));
+
+    const repairButton = await screen.findByRole('button', { name: /repair cloud copy/i });
+    await user.click(repairButton);
+
+    await waitFor(() => expect(repairMock).toHaveBeenCalledWith(SESSION_ID));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /repair cloud copy/i })).not.toBeInTheDocument(),
+    );
+    expect(harness.getRecentMock).toHaveBeenCalledTimes(2);
+  });
 });

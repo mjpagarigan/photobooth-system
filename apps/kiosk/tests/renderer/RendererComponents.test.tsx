@@ -15,9 +15,11 @@ import { fitFrameWithin } from '../../src/renderer/admin/frame-editor-layout';
 import { posePromptForShot } from '../../src/renderer/capture-helpers';
 import { FrameImportDialog } from '../../src/renderer/components/FrameImportDialog';
 import { PasscodeDialog } from '../../src/renderer/components/PasscodeDialog';
+import { PhotoSlot } from '../../src/renderer/components/PhotoSlot';
 import { RecentGallery } from '../../src/renderer/components/RecentGallery';
 import { AttractScreen } from '../../src/renderer/screens/AttractScreen';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
+import { FinalQrScreen } from '../../src/renderer/screens/FinalQrScreen';
 import { ProcessingScreen } from '../../src/renderer/screens/ProcessingScreen';
 import { RecoveryScreen } from '../../src/renderer/screens/RecoveryScreen';
 import { ReviewScreen } from '../../src/renderer/screens/ReviewScreen';
@@ -499,6 +501,116 @@ describe('guest screen components', () => {
     );
     expect(screen.getByTestId('recovery-interrupted')).toBeVisible();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('refers guests to a booth operator on camera and upload recovery screens', () => {
+    const { rerender } = render(
+      <RecoveryScreen
+        onOpenAdmin={() => undefined}
+        onRestart={() => undefined}
+        onRetryUpload={() => undefined}
+        variant="camera"
+      />,
+    );
+    expect(screen.getByText(/ask a booth operator to check the camera/i)).toBeVisible();
+    expect(screen.getByText(/still stuck\? ask a booth operator\./i)).toBeVisible();
+    expect(screen.queryByText(/volunteer/i)).not.toBeInTheDocument();
+
+    rerender(
+      <RecoveryScreen
+        canFinishOffline
+        canRetryUpload
+        onFinishOffline={() => undefined}
+        onOpenAdmin={() => undefined}
+        onRestart={() => undefined}
+        onRetryUpload={() => undefined}
+        variant="upload"
+      />,
+    );
+    expect(screen.getByText(/still stuck\? ask a booth operator\./i)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Finish offline' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Retry upload' })).toBeVisible();
+    expect(screen.queryByText(/volunteer/i)).not.toBeInTheDocument();
+  });
+
+  it('switches FinalQrScreen copy between cloud retention and local Wi-Fi delivery', () => {
+    const { rerender } = render(
+      <FinalQrScreen
+        collageUrl="/collage.jpg"
+        onDone={() => undefined}
+        qrImageUrl="/qr.png"
+      />,
+    );
+    expect(screen.getByText('Ready to download')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Available for 30 days' })).toBeVisible();
+    expect(screen.getByText('Private link, just for you')).toBeVisible();
+
+    rerender(
+      <FinalQrScreen
+        cloudRetentionDays={14}
+        collageUrl="/collage.jpg"
+        deliveryMode="cloud"
+        onDone={() => undefined}
+        qrImageUrl="/qr.png"
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'Available for 14 days' })).toBeVisible();
+
+    rerender(
+      <FinalQrScreen
+        collageUrl="/collage.jpg"
+        deliveryMode="offline"
+        onDone={() => undefined}
+        qrImageUrl="/qr.png"
+      />,
+    );
+    expect(screen.getByText('Local Wi-Fi')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Save on this network' })).toBeVisible();
+    expect(screen.getByText('Connect your phone to the booth Wi-Fi, then scan')).toBeVisible();
+    expect(screen.queryByText(/available for/i)).not.toBeInTheDocument();
+  });
+
+  it('opens the ReviewScreen frame layouts picker in dark tone with frame copy', async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewScreen
+        canAccept
+        canRetake
+        captureUrls={['/a.jpg', '/b.jpg', '/c.jpg']}
+        frames={[FRAME, FRAME_2]}
+        onAccept={() => undefined}
+        onRetake={() => undefined}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /all layouts/i }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('data-tone', 'dark');
+    expect(screen.getByText('Choose from all 2 frames for your keepsake.')).toBeVisible();
+    expect(screen.queryByText(/templates|photostrip/i)).not.toBeInTheDocument();
+  });
+
+  it('renders a neutral empty placeholder in PhotoSlot when src is missing', () => {
+    const { container, rerender } = render(<PhotoSlot index={1} />);
+    expect(container.querySelector('.photo-slot__empty')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+
+    rerender(<PhotoSlot index={1} src="/capture/one.jpg" />);
+    expect(container.querySelector('.photo-slot__empty')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Photo 1' })).toHaveAttribute('src', '/capture/one.jpg');
+  });
+
+  it('shows capturing feedback during the capturing phase and focusable heading on AttractScreen', () => {
+    render(<CaptureScreen phase="capturing" shotNumber={2} totalShots={3} />);
+    expect(screen.getByText('Taking photo…')).toBeVisible();
+
+    cleanup();
+    render(
+      <AttractScreen canStart onOpenAdmin={() => undefined} onStart={() => undefined} />,
+    );
+    const heading = screen.getByRole('heading', { name: 'Hello, smile.' });
+    expect(heading).toHaveAttribute('data-screen-heading');
+    expect(heading).toHaveAttribute('tabindex', '-1');
   });
 });
 

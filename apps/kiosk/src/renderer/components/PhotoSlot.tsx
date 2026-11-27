@@ -2,8 +2,6 @@ import type { CSSProperties } from 'react';
 
 import type { CropMode } from '@grace-booth/shared';
 
-import { mockPhotoFor } from '../local-fixtures';
-
 type PhotoSlotProps = {
   index: number;
   src?: string | undefined;
@@ -23,20 +21,22 @@ export function PhotoSlot({
   src,
   style,
 }: PhotoSlotProps) {
-  const photoSrc = src ?? mockPhotoFor(index);
-
   return (
     <figure
       className={`photo-slot${framed ? ' photo-slot--framed' : ''}${className ? ` ${className}` : ''}`}
       style={style}
     >
       <div className="photo-slot__media">
-        <img
-          className={cropMode === 'fit' ? 'photo-slot__image--fit' : undefined}
-          src={photoSrc}
-          alt={label}
-          draggable="false"
-        />
+        {src ? (
+          <img
+            className={cropMode === 'fit' ? 'photo-slot__image--fit' : undefined}
+            src={src}
+            alt={label}
+            draggable="false"
+          />
+        ) : (
+          <div className="photo-slot__empty" aria-hidden="true" />
+        )}
       </div>
     </figure>
   );

@@ -12,6 +12,7 @@ import type {
   FrameImportCandidate,
   GalleryItem,
   GraceBoothBridge,
+  GuestScreen,
   RpcResult,
   SaveCaptureSettingsInput,
   UploadJobSummary,
@@ -21,7 +22,12 @@ import {
   isCancellableSessionState,
   isCaptureScreen,
 } from '@grace-booth/shared';
-import { AnchoredToastProvider, Button, ToastProvider } from '@grace-booth/ui';
+import {
+  AnchoredToastProvider,
+  Button,
+  ToastProvider,
+  type DialogTone,
+} from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
@@ -38,7 +44,7 @@ import { useNikonLivePreview } from './hooks/useNikonLivePreview';
 import { LOCAL_FIXTURES } from './local-fixtures';
 import { AttractScreen } from './screens/AttractScreen';
 import { CaptureScreen } from './screens/CaptureScreen';
-import { FinalQrScreen } from './screens/FinalQrScreen';
+import { FinalQrScreen, type FinalDeliveryMode } from './screens/FinalQrScreen';
 import { ProcessingScreen } from './screens/ProcessingScreen';
 import { RecoveryScreen } from './screens/RecoveryScreen';
 import { ReviewScreen } from './screens/ReviewScreen';
@@ -56,6 +62,42 @@ type DialogState = {
 };
 
 const CANCEL_ARM_WINDOW_MS = 2_000;
+
+const DARK_GUEST_SCREENS = new Set<GuestScreen>([
+  'countdown',
+  'capturing',
+  'shot_review',
+  'review',
+  'processing',
+  'recovery',
+]);
+
+function dialogToneForScreen(screen: GuestScreen | null, loading: boolean): DialogTone {
+  if (loading || screen === null) {
+    return 'light';
+  }
+  return DARK_GUEST_SCREENS.has(screen) ? 'dark' : 'light';
+}
+
+function finalDeliveryModeFor(
+  snapshot: BoothSnapshot,
+  offlineFinalSessionId: string | null,
+): FinalDeliveryMode {
+  if (
+    snapshot.sessionId !== null &&
+    offlineFinalSessionId !== null &&
+    snapshot.sessionId === offlineFinalSessionId
+  ) {
+    return 'offline';
+  }
+  if (
+    snapshot.message &&
+    /\b(?:offline|local(?:\s+wi-?fi|\s+network)?)\b/i.test(snapshot.message)
+  ) {
+    return 'offline';
+  }
+  return 'cloud';
+}
 
 function getBridge(): GraceBoothBridge | null {
   return window.graceBooth ?? null;
@@ -154,6 +196,8 @@ export function App() {
     items: GalleryItem[];
     error: string | null;
   }>({ open: false, busy: false, items: [], error: null });
+  const [repairingSessionId, setRepairingSessionId] = useState<string | null>(null);
+  const [offlineFinalSessionId, setOfflineFinalSessionId] = useState<string | null>(null);
   const [visualSeed, setVisualSeed] = useState<VisualSeedPayload | null>(null);
   const livePrinterHealth = usePrinterHealth();
   const printerHealth = visualSeed?.printerHealth ?? livePrinterHealth;
@@ -420,9 +464,46 @@ export function App() {
   );
 
   const startGuestSession = useCallback(() => {
+    setOfflineFinalSessionId(null);
     prepareAudio();
     void runGuestCommand((bridge) => bridge.booth.start());
   }, [prepareAudio, runGuestCommand]);
+
+  const finishOfflineSession = useCallback(async () => {
+    if (visualSeed) {
+      return;
+    }
+    const bridge = getBridge();
+    if (!bridge) {
+      setGuestError('The booth controls are unavailable. Ask an operator for help.');
+      return;
+    }
+    // Set before awaiting because main emits the final snapshot before the RPC resolves.
+    const targetSessionId = snapshot.sessionId;
+    setOfflineFinalSessionId(targetSessionId);
+    setGuestBusy(true);
+    setGuestError(null);
+    try {
+      const result = await bridge.booth.finishOffline();
+      if (result.ok) {
+        setOfflineFinalSessionId(result.data.sessionId ?? targetSessionId);
+        setSnapshot(result.data);
+      } else {
+        setOfflineFinalSessionId(null);
+        setGuestError(
+          safeGuestMessage(
+            result.error.message,
+            'That action could not be completed. Please try again.',
+          ),
+        );
+      }
+    } catch {
+      setOfflineFinalSessionId(null);
+      setGuestError('That action could not be completed. Please try again.');
+    } finally {
+      setGuestBusy(false);
+    }
+  }, [snapshot.sessionId, visualSeed]);
 
   const acceptShot = useCallback(
     (shotNumber: number) => {
@@ -1083,6 +1164,43 @@ export function App() {
     setRecent((current) => ({ ...current, open: false }));
   }, []);
 
+  const repairCloudPhoto = useCallback(
+    async (sessionId: string) => {
+      if (visualSeed) {
+        return;
+      }
+      const bridge = getBridge();
+      if (!bridge) {
+        setRecent((curr) => ({
+          ...curr,
+          error: 'The local operator service is unavailable.',
+        }));
+        return;
+      }
+      setRepairingSessionId(sessionId);
+      setRecent((curr) => ({ ...curr, error: null }));
+      try {
+        const result = await bridge.gallery.repairCloudPhoto(sessionId);
+        if (!result.ok) {
+          setRecent((curr) => ({ ...curr, error: adminErrorMessage(result) }));
+          return;
+        }
+        await loadOperatorGallery();
+        if (result.data.status !== 'repaired') {
+          setRecent((curr) => ({ ...curr, error: result.data.message }));
+        }
+      } catch {
+        setRecent((curr) => ({
+          ...curr,
+          error: 'The cloud copy could not be repaired safely.',
+        }));
+      } finally {
+        setRepairingSessionId(null);
+      }
+    },
+    [loadOperatorGallery, visualSeed],
+  );
+
   // Auto-load the operator gallery when its panel view is opened.
   useEffect(() => {
     if (adminOpen && adminView === 'gallery') {
@@ -1101,10 +1219,15 @@ export function App() {
     }
 
     if (snapshot.screen === 'attract') {
+      const attractCameraMessage =
+        guestError ??
+        (!snapshot.controls.canStart && snapshot.message
+          ? safeGuestMessage(snapshot.message, 'The booth is getting ready.')
+          : null);
       return (
         <AttractScreen
           busy={guestBusy}
-          cameraMessage={guestError}
+          cameraMessage={attractCameraMessage}
           canStart={snapshot.controls.canStart}
           onOpenAdmin={() => void beginProtectedAction('admin')}
           onOpenCameras={() => setCameraSetupOpen(true)}
@@ -1203,8 +1326,13 @@ export function App() {
       return (
         <FinalQrScreen
           busy={guestBusy}
+          cloudRetentionDays={adminSettings?.cloudRetentionDays ?? 30}
           collageUrl={snapshot.media.collageUrl}
-          onDone={() => void runGuestCommand((bridge) => bridge.booth.done())}
+          deliveryMode={finalDeliveryModeFor(snapshot, offlineFinalSessionId)}
+          onDone={() => {
+            setOfflineFinalSessionId(null);
+            void runGuestCommand((bridge) => bridge.booth.done());
+          }}
           onOpenRecent={() => void openRecentGallery()}
           qrImageUrl={snapshot.media.qrImageUrl}
         />
@@ -1227,23 +1355,26 @@ export function App() {
         onOpenAdmin={() => void beginProtectedAction('admin')}
         onRestart={() => void beginProtectedAction('restart')}
         onRetryUpload={() => void runGuestCommand((bridge) => bridge.booth.retryUpload())}
-        onFinishOffline={() => void runGuestCommand((bridge) => bridge.booth.finishOffline())}
+        onFinishOffline={() => void finishOfflineSession()}
         variant={variant}
       />
     );
   }, [
     acceptShot,
+    adminSettings?.cloudRetentionDays,
     beginProtectedAction,
     camera.ready,
     camera.videoRef,
     cameraZoomPercent,
     countdownSeconds,
+    finishOfflineSession,
     guestBusy,
     guestError,
     loading,
     nikonPreview.frameUrl,
     nikonPreview.ready,
     nikonPreviewEnabled,
+    offlineFinalSessionId,
     openRecentGallery,
     printerHealth,
     retakeAll,
@@ -1305,9 +1436,11 @@ export function App() {
                     items={recent.items}
                     jobs={jobs}
                     onClose={() => setAdminView('settings')}
+                    onRepairCloudPhoto={(sessionId) => void repairCloudPhoto(sessionId)}
                     onRetryJob={(jobId) => void retryJob(jobId)}
                     operator={true}
                     printing={printerHealth !== null}
+                    repairingSessionId={repairingSessionId}
                   />
                 </section>
               ) : (
@@ -1354,6 +1487,8 @@ export function App() {
     );
   }
 
+  const guestDialogTone = dialogToneForScreen(snapshot.screen, loading);
+
   return (
     <ToastProvider>
       <AnchoredToastProvider>
@@ -1385,6 +1520,7 @@ export function App() {
               }}
               onClearError={() => setDialogError(null)}
               onSubmit={(passcode) => void submitPasscode(passcode)}
+              tone={guestDialogTone}
             />
           ) : null}
           <CameraSetupModal
@@ -1400,6 +1536,7 @@ export function App() {
               onClose={closeRecentGallery}
               operator={false}
               printing={printerHealth !== null}
+              tone={guestDialogTone}
             />
           ) : null}
         </>

@@ -28,6 +28,7 @@ export function QrStationScreen(): React.ReactElement {
   const [stationState, setStationState] = useState<QrStationState>(DEFAULT_QR_STATE);
   const printerHealth = usePrinterHealth();
   const [secondsRemaining, setSecondsRemaining] = useState<number>(45);
+  const [dismissing, setDismissing] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<GalleryItem[]>([]);
   const [recentBusy, setRecentBusy] = useState(false);
@@ -82,12 +83,17 @@ export function QrStationScreen(): React.ReactElement {
 
   const handleDismiss = useCallback(async () => {
     const bridge = getBridge();
-    if (!bridge) return;
-    const result = await bridge.qrStation.dismiss(stationState.sessionId);
-    if (result.ok) {
-      setStationState(result.data);
+    if (!bridge || dismissing) return;
+    setDismissing(true);
+    try {
+      const result = await bridge.qrStation.dismiss(stationState.sessionId);
+      if (result.ok) {
+        setStationState(result.data);
+      }
+    } finally {
+      setDismissing(false);
     }
-  }, [stationState.sessionId]);
+  }, [dismissing, stationState.sessionId]);
 
   const openRecentGallery = useCallback(async () => {
     const bridge = getBridge();
@@ -135,6 +141,7 @@ export function QrStationScreen(): React.ReactElement {
       items={recentItems}
       busy={recentBusy}
       error={recentError}
+      tone="dark"
       onClose={closeRecentGallery}
     />
   ) : null;
@@ -152,7 +159,10 @@ export function QrStationScreen(): React.ReactElement {
   if (stationState.status === 'error') {
     return (
       <main className="screen screen--qr-station qr-station--error" data-testid="qr-station-error">
-        {timer}
+        <div className="qr-station__corner">
+          {timer}
+          {recentButton}
+        </div>
         {printerIndicator}
         <section className="qr-station__message" aria-labelledby="qr-station-error-title">
           <WarningCircle aria-hidden="true" size={56} />
@@ -160,10 +170,15 @@ export function QrStationScreen(): React.ReactElement {
             Photo delivery unavailable
           </h1>
           <p>{stationState.message ?? 'Ask an operator for help or try another photo session.'}</p>
-          <Button className="button--station-done" onClick={() => void handleDismiss()}>
+          <Button
+            className="button--station-done"
+            loading={dismissing}
+            onClick={() => void handleDismiss()}
+          >
             Done
           </Button>
         </section>
+        {recentGallery}
       </main>
     );
   }
@@ -179,7 +194,9 @@ export function QrStationScreen(): React.ReactElement {
             alt="M.A.T. Media and Technology"
             draggable="false"
           />
-          <h1 id="qr-station-idle-title">Your photo appears here.</h1>
+          <h1 id="qr-station-idle-title" data-screen-heading tabIndex={-1}>
+            Your photo appears here.
+          </h1>
           <p>Finish on the main screen, then scan your code right here.</p>
         </section>
         {recentGallery}
@@ -210,7 +227,11 @@ export function QrStationScreen(): React.ReactElement {
           <div className="qr-station__code">
             <img src={stationState.qrImageUrl} alt="QR code for photo download" draggable="false" />
           </div>
-          <Button className="button--station-done" onClick={() => void handleDismiss()}>
+          <Button
+            className="button--station-done"
+            loading={dismissing}
+            onClick={() => void handleDismiss()}
+          >
             Done
           </Button>
         </section>

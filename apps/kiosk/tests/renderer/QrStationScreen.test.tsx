@@ -71,6 +71,9 @@ describe('QrStationScreen', () => {
     const recentButton = screen.getByRole('button', { name: /recent photos/i });
     expect(recentButton).toBeInTheDocument();
     expect(screen.getByTestId('qr-station-idle')).toHaveClass('screen--qr-station');
+    const idleHeading = screen.getByRole('heading', { name: 'Your photo appears here.' });
+    expect(idleHeading).toHaveAttribute('data-screen-heading');
+    expect(idleHeading).toHaveAttribute('tabindex', '-1');
     expect(screen.getByRole('img', { name: 'M.A.T. Media and Technology' })).toHaveAttribute(
       'src',
       '/backgrounds/ministry-idle.jpg',
@@ -167,5 +170,98 @@ describe('QrStationScreen', () => {
     expect(mockBridge.qrStation.dismiss.mock.calls[0]).toEqual([
       '11111111-1111-4111-8111-111111111111',
     ]);
+  });
+
+  it('opens RecentGallery in dark tone from both active and error states', async () => {
+    const user = userEvent.setup();
+    mockBridge.qrStation.getState.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'error',
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: null,
+        expiresAt: Date.now() + 30_000,
+        durationSeconds: 45,
+        message: 'Upload failed. Ask an operator for help.',
+        canRetryUpload: false,
+      },
+    });
+
+    const { unmount } = render(<QrStationScreen />);
+    await screen.findByTestId('qr-station-error');
+
+    await user.click(screen.getByRole('button', { name: /recent photos/i }));
+    expect(await screen.findByRole('dialog')).toHaveAttribute('data-tone', 'dark');
+    expect(mockBridge.gallery.getRecent.mock.calls).toEqual([[20]]);
+    unmount();
+
+    mockBridge.qrStation.getState.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'active',
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: 'data:image/png;base64,mockqr',
+        expiresAt: Date.now() + 45_000,
+        durationSeconds: 45,
+        message: null,
+        canRetryUpload: false,
+      },
+    });
+
+    render(<QrStationScreen />);
+    await screen.findByTestId('qr-station-active');
+    await user.click(screen.getByRole('button', { name: /recent photos/i }));
+    expect(await screen.findByRole('dialog')).toHaveAttribute('data-tone', 'dark');
+  });
+
+  it('marks Done busy while dismiss is in flight and blocks duplicate requests', async () => {
+    const user = userEvent.setup();
+    let resolveDismiss!: (
+      value: Awaited<ReturnType<GraceBoothBridge['qrStation']['dismiss']>>,
+    ) => void;
+    mockBridge.qrStation.getState.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'active',
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: 'data:image/png;base64,mockqr',
+        expiresAt: Date.now() + 45_000,
+        durationSeconds: 45,
+        message: null,
+        canRetryUpload: false,
+      },
+    });
+    mockBridge.qrStation.dismiss.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDismiss = resolve;
+      }),
+    );
+
+    render(<QrStationScreen />);
+    const doneButton = await screen.findByRole('button', { name: /done/i });
+
+    await user.click(doneButton);
+    expect(doneButton).toBeDisabled();
+    expect(doneButton).toHaveAttribute('aria-busy', 'true');
+    await user.click(doneButton);
+    expect(mockBridge.qrStation.dismiss.mock.calls).toHaveLength(1);
+
+    resolveDismiss({
+      ok: true,
+      data: {
+        status: 'idle',
+        sessionId: null,
+        collageUrl: null,
+        qrImageUrl: null,
+        expiresAt: null,
+        durationSeconds: 45,
+        message: null,
+        canRetryUpload: false,
+      },
+    });
+    expect(await screen.findByTestId('qr-station-idle')).toBeVisible();
   });
 });
