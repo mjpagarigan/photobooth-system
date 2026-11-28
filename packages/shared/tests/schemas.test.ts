@@ -7,6 +7,7 @@ import {
   DEFAULT_CAPTURE_SETTINGS,
   FrameLayoutSchema,
   GalleryItemMetadataSchema,
+  GalleryItemSchema,
   GuestScreenSchema,
   IpcContracts,
   MAX_FRAME_SLOTS,
@@ -214,10 +215,25 @@ describe('shared boundary schemas', () => {
     ).toThrow();
   });
 
-  it('validates recent-gallery limits and multi-slot photoCount up to MAX_FRAME_SLOTS', () => {
-    expect(IpcContracts['gallery:get-recent'].request.parse({ limit: 5 })).toEqual({ limit: 5 });
-    expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 0 })).toThrow();
-    expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 51 })).toThrow();
+  it('validates recent-gallery refresh contract, GalleryItem URLs, and multi-slot photoCount up to MAX_FRAME_SLOTS', () => {
+    expect(IpcContracts['gallery:get-recent'].request.parse(undefined)).toEqual({
+      refresh: false,
+    });
+    expect(IpcContracts['gallery:get-recent'].request.parse({})).toEqual({ refresh: false });
+    expect(IpcContracts['gallery:get-recent'].request.parse({ refresh: false })).toEqual({
+      refresh: false,
+    });
+    expect(IpcContracts['gallery:get-recent'].request.parse({ refresh: true })).toEqual({
+      refresh: true,
+    });
+    expect(() => IpcContracts['gallery:get-recent'].request.parse({ limit: 20 })).toThrow();
+    expect(() =>
+      IpcContracts['gallery:get-recent'].request.parse({ refresh: false, limit: 20 }),
+    ).toThrow();
+    expect(() =>
+      IpcContracts['gallery:get-recent'].request.parse({ refresh: true, extra: true }),
+    ).toThrow();
+    expect(() => IpcContracts['gallery:get-recent'].request.parse({ refresh: 'yes' })).toThrow();
 
     const baseMetadata = {
       capturedAt: 1_700_000_000_000,
@@ -234,6 +250,42 @@ describe('shared boundary schemas', () => {
     expect(() =>
       GalleryItemMetadataSchema.parse({ ...baseMetadata, photoCount: MAX_FRAME_SLOTS + 1 }),
     ).toThrow();
+
+    const validItem = {
+      sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
+      previewUrl: 'grace-booth-media://asset/preview',
+      detailUrl: 'grace-booth-media://asset/detail',
+      qrDataUrl: 'data:image/png;base64,AA==',
+      metadata: baseMetadata,
+    };
+    expect(GalleryItemSchema.parse(validItem)).toEqual(validItem);
+    expect(
+      IpcContracts['gallery:get-recent'].response.parse({ ok: true, data: [validItem] }),
+    ).toEqual({ ok: true, data: [validItem] });
+    expect(() =>
+      GalleryItemSchema.parse({
+        sessionId: validItem.sessionId,
+        previewDataUrl: 'data:image/jpeg;base64,AA==',
+        qrDataUrl: null,
+        metadata: baseMetadata,
+      }),
+    ).toThrow();
+    expect(() =>
+      GalleryItemSchema.parse({
+        ...validItem,
+        previewDataUrl: 'data:image/jpeg;base64,AA==',
+      }),
+    ).toThrow();
+    expect(() =>
+      GalleryItemSchema.parse({
+        sessionId: validItem.sessionId,
+        previewUrl: validItem.previewUrl,
+        qrDataUrl: null,
+        metadata: baseMetadata,
+      }),
+    ).toThrow();
+    expect(() => GalleryItemSchema.parse({ ...validItem, previewUrl: '' })).toThrow();
+    expect(() => GalleryItemSchema.parse({ ...validItem, detailUrl: '' })).toThrow();
   });
 
   it('validates capture settings defaults, bounds, and save inputs', () => {
