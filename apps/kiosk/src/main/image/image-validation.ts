@@ -36,7 +36,14 @@ export async function validateSourceJpeg(bytes: Uint8Array): Promise<ValidatedIm
 export async function createThumbnailJpeg(
   bytes: Uint8Array,
   maxEdge = 3600,
+  quality = 95,
 ): Promise<{ bytes: Buffer; width: number; height: number }> {
+  if (!Number.isSafeInteger(maxEdge) || maxEdge < 1 || maxEdge > MAX_EDGE) {
+    throw new AppError('image_dimensions', 'The thumbnail edge limit is outside the safe range.');
+  }
+  if (!Number.isSafeInteger(quality) || quality < 1 || quality > 100) {
+    throw new AppError('thumbnail_quality', 'The thumbnail quality must be between 1 and 100.');
+  }
   validateSignature(bytes, JPEG_MAGIC, MAX_SOURCE_BYTES, 'JPEG');
   const image = sharp(bytes, { failOn: 'warning', limitInputPixels: MAX_SOURCE_PIXELS });
   const metadata = await image.metadata();
@@ -44,7 +51,7 @@ export async function createThumbnailJpeg(
   const { data, info } = await image
     .rotate()
     .resize(maxEdge, maxEdge, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 95, mozjpeg: false })
+    .jpeg({ quality, mozjpeg: false })
     .toBuffer({ resolveWithObject: true });
   return { bytes: data, width: info.width, height: info.height };
 }

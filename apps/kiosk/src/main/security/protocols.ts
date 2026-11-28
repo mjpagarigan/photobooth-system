@@ -75,18 +75,19 @@ export function installProtocolHandlers(rendererRoot: string, media: MediaServic
     }
   });
 
-  protocol.handle('grace-booth-media', (request) =>
-    Promise.resolve(readMediaResponse(request, media)),
-  );
+  protocol.handle('grace-booth-media', (request) => readMediaResponse(request, media));
 }
 
-function readMediaResponse(request: Request, media: MediaService): Response {
+export async function readMediaResponse(request: Request, media: MediaService): Promise<Response> {
   const url = new URL(request.url);
-  if (url.hostname !== 'asset') return new Response('Not found', { status: 404 });
+  if (url.hostname !== 'asset' && url.hostname !== 'thumb') {
+    return new Response('Not found', { status: 404 });
+  }
   const parsed = MediaIdSchema.safeParse(url.pathname.slice(1));
   if (!parsed.success) return new Response('Not found', { status: 404 });
   try {
-    const value = media.read(parsed.data);
+    const value =
+      url.hostname === 'thumb' ? await media.readThumbnail(parsed.data) : media.read(parsed.data);
     return new Response(value.bytes, {
       status: 200,
       headers: {

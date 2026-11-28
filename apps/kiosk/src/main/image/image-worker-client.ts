@@ -59,7 +59,7 @@ type WorkerRequestMessage =
     }
   | { id: string; operation: 'validate-source'; bytes: Uint8Array }
   | { id: string; operation: 'normalize-frame'; bytes: Uint8Array }
-  | { id: string; operation: 'thumbnail'; bytes: Uint8Array; maxEdge: number };
+  | { id: string; operation: 'thumbnail'; bytes: Uint8Array; maxEdge: number; quality?: number };
 
 type PendingRequest = {
   resolve(value: WorkerResult): void;
@@ -81,6 +81,7 @@ export type ImageProcessor = {
   createThumbnail(
     bytes: Uint8Array,
     maxEdge?: number,
+    quality?: number,
   ): Promise<{ bytes: Buffer; width: number; height: number }>;
   close(): Promise<void>;
 };
@@ -161,15 +162,16 @@ export class WorkerImageProcessor implements ImageProcessor {
   createThumbnail(
     bytes: Uint8Array,
     maxEdge = 360,
+    quality = 95,
   ): Promise<{ bytes: Buffer; width: number; height: number }> {
     const id = randomUUID();
     const copy = Uint8Array.from(bytes);
-    return this.send({ id, operation: 'thumbnail', bytes: copy, maxEdge }, [copy.buffer]).then(
-      (result) => {
-        if (result.kind !== 'thumbnail') throw new Error('Unexpected image-worker response');
-        return { bytes: Buffer.from(result.bytes), width: result.width, height: result.height };
-      },
-    );
+    return this.send({ id, operation: 'thumbnail', bytes: copy, maxEdge, quality }, [
+      copy.buffer,
+    ]).then((result) => {
+      if (result.kind !== 'thumbnail') throw new Error('Unexpected image-worker response');
+      return { bytes: Buffer.from(result.bytes), width: result.width, height: result.height };
+    });
   }
 
   async close(): Promise<void> {

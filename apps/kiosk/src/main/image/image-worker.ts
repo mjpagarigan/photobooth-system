@@ -33,6 +33,7 @@ type ThumbnailRequest = {
   operation: 'thumbnail';
   bytes: Uint8Array;
   maxEdge: number;
+  quality?: number;
 };
 
 type WorkerRequest =
@@ -85,7 +86,7 @@ async function processRequest(request: WorkerRequest): Promise<void> {
       return;
     }
     if (request.operation === 'thumbnail') {
-      const result = await createThumbnailJpeg(request.bytes, request.maxEdge);
+      const result = await createThumbnailJpeg(request.bytes, request.maxEdge, request.quality);
       parentPort?.postMessage(
         {
           id: request.id,
