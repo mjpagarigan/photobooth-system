@@ -1,5 +1,5 @@
 import { Button, WarningCircle, WifiHigh } from '@grace-booth/ui';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
 
@@ -7,8 +7,10 @@ import { Photostrip } from '../components/Photostrip';
 import { PrinterIndicator } from '../components/Printing';
 import { SessionPrintStatus } from '../components/SessionPrintStatus';
 import { usePrinterHealth } from '../hooks/usePrinterHealth';
+import { useMidnightRefresh } from '../hooks/useMidnightRefresh';
 import { RecentGallery } from '../components/RecentGallery';
 import { LOCAL_FIXTURES } from '../local-fixtures';
+import { safeGuestMessage } from '../types';
 
 function getBridge(): GraceBoothBridge | null {
   return window.graceBooth ?? null;
@@ -38,6 +40,15 @@ export function QrStationScreen(): React.ReactElement {
   const [recentItems, setRecentItems] = useState<GalleryItem[]>([]);
   const [recentBusy, setRecentBusy] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
+  const recentRequestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const visualMode = new URLSearchParams(window.location.search).get('visual');
@@ -146,26 +157,40 @@ export function QrStationScreen(): React.ReactElement {
   const openRecentGallery = useCallback(async () => {
     const bridge = getBridge();
     if (!bridge) return;
+    const requestId = ++recentRequestIdRef.current;
     setRecentOpen(true);
     setRecentBusy(true);
+    setRecentItems([]);
     setRecentError(null);
     try {
-      const result = await bridge.gallery.getRecent(20);
+      const result = await bridge.gallery.getRecent();
+      if (!mountedRef.current || recentRequestIdRef.current !== requestId) return;
       if (result.ok) {
         setRecentItems(result.data);
       } else {
-        setRecentError(result.error.message || 'Recent photos could not be loaded.');
+        setRecentError(
+          safeGuestMessage(result.error.message, 'Recent photos could not be loaded.'),
+        );
       }
     } catch {
+      if (!mountedRef.current || recentRequestIdRef.current !== requestId) return;
       setRecentError('Recent photos could not be loaded.');
     } finally {
-      setRecentBusy(false);
+      if (mountedRef.current && recentRequestIdRef.current === requestId) {
+        setRecentBusy(false);
+      }
     }
   }, []);
 
   const closeRecentGallery = useCallback(() => {
+    recentRequestIdRef.current += 1;
     setRecentOpen(false);
+    setRecentBusy(false);
   }, []);
+
+  useMidnightRefresh(recentOpen, () => {
+    void openRecentGallery();
+  });
 
   const progressPercentage = useMemo(() => {
     if (stationState.status === 'idle' || !stationState.durationSeconds) return 0;

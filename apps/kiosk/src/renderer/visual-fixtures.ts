@@ -671,11 +671,14 @@ export async function createVisualSeedPayload(
       return null;
   }
 
+  const galleryUrl =
+    mode === 'admin-gallery' || mode === 'recent-gallery' ? await buildReadyCollage() : null;
   const galleryItem: GalleryItem | null =
-    mode === 'admin-gallery' || mode === 'recent-gallery'
+    galleryUrl !== null
       ? {
           sessionId: SESSION_ID,
-          previewDataUrl: await buildReadyCollage(),
+          previewUrl: galleryUrl,
+          detailUrl: galleryUrl,
           qrDataUrl: await buildReadyQr(),
           metadata: {
             capturedAt: 1_786_883_400_000,

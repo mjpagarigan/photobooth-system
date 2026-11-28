@@ -6,7 +6,7 @@ import {
   QrCode,
   X,
 } from '@grace-booth/ui';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { GalleryItem, GalleryUploadStatus, UploadJobSummary } from '@grace-booth/shared';
 import {
@@ -63,12 +63,14 @@ export function RecentGallery({
   tone = 'light',
   onClose,
 }: RecentGalleryProps) {
-  const [detailItem, setDetailItem] = useState<GalleryItem | null>(null);
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
 
-  const jobForSession = (sessionId: string): UploadJobSummary | null =>
-    jobs.find((job) => job.sessionId === sessionId) ?? null;
+  const jobsBySessionId = useMemo(() => new Map(jobs.map((job) => [job.sessionId, job])), [jobs]);
 
-  const detailJob = detailItem ? jobForSession(detailItem.sessionId) : null;
+  const detailItem = detailSessionId
+    ? (items.find((item) => item.sessionId === detailSessionId) ?? null)
+    : null;
+  const detailJob = detailItem ? (jobsBySessionId.get(detailItem.sessionId) ?? null) : null;
 
   const content = (
     <section
@@ -92,7 +94,7 @@ export function RecentGallery({
         </header>
       ) : null}
 
-      {busy ? (
+      {busy && items.length === 0 ? (
         <div className="recent-gallery__loading" role="status">
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
@@ -106,14 +108,14 @@ export function RecentGallery({
       ) : null}
       {!busy && !error && items.length === 0 ? (
         <div className="recent-gallery__empty">
-          <p className="recent-gallery__empty-title">No photos yet.</p>
-          <p>Finished photos from this booth appear here.</p>
+          <p className="recent-gallery__empty-title">No photos today yet.</p>
+          <p>Finished photos captured today on this booth appear here.</p>
         </div>
       ) : null}
 
       <div className="recent-gallery__grid" data-testid="recent-gallery-grid">
         {items.map((item, index) => {
-          const job = operator ? jobForSession(item.sessionId) : null;
+          const job = operator ? (jobsBySessionId.get(item.sessionId) ?? null) : null;
           return (
             <article
               className={`gallery-tile${operator ? ' gallery-tile--operator' : ''}`}
@@ -123,15 +125,17 @@ export function RecentGallery({
               <button
                 aria-label={`View photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
                 className="gallery-tile__open"
-                onClick={() => setDetailItem(item)}
+                onClick={() => setDetailSessionId(item.sessionId)}
                 type="button"
               >
                 <div className="gallery-tile__preview-container">
                   <img
                     alt={`Photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
                     className="gallery-tile__preview"
+                    decoding="async"
                     draggable="false"
-                    src={item.previewDataUrl}
+                    loading={item.previewUrl.startsWith('data:') ? 'eager' : 'lazy'}
+                    src={item.previewUrl}
                   />
                   <span className="gallery-tile__zoom-badge" aria-hidden="true">
                     <MagnifyingGlassPlus weight="bold" />
@@ -154,7 +158,9 @@ export function RecentGallery({
                   <img
                     alt={`QR code for the photo captured at ${formatTimestamp(item.metadata.capturedAt)}`}
                     className="gallery-tile__qr"
+                    decoding="async"
                     draggable="false"
+                    loading={item.qrDataUrl.startsWith('data:') ? 'eager' : 'lazy'}
                     src={item.qrDataUrl}
                   />
                 </div>
@@ -221,7 +227,7 @@ export function RecentGallery({
         })}
       </div>
 
-      <Dialog onOpenChange={(open) => !open && setDetailItem(null)} open={Boolean(detailItem)}>
+      <Dialog onOpenChange={(open) => !open && setDetailSessionId(null)} open={Boolean(detailItem)}>
         {detailItem ? (
           <DialogPopup
             className="recent-detail-modal"
@@ -262,8 +268,9 @@ export function RecentGallery({
                 <img
                   alt={`Enlarged photo captured at ${formatTimestamp(detailItem.metadata.capturedAt)}`}
                   className="recent-detail-modal__image"
+                  decoding="async"
                   draggable="false"
-                  src={detailItem.previewDataUrl}
+                  src={detailItem.detailUrl}
                 />
               </div>
 
@@ -344,7 +351,7 @@ export function RecentGallery({
                       icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
                       onClick={() => {
                         onRetryJob?.(detailJob.id);
-                        setDetailItem(null);
+                        setDetailSessionId(null);
                       }}
                       variant="secondary"
                       wide
@@ -372,9 +379,7 @@ export function RecentGallery({
             </DialogPanel>
 
             <DialogFooter className="recent-detail-modal__footer">
-              <DialogClose render={<Button type="button" variant="secondary" />}>
-                Close
-              </DialogClose>
+              <DialogClose render={<Button type="button" variant="secondary" />}>Close</DialogClose>
             </DialogFooter>
           </DialogPopup>
         ) : null}
@@ -396,9 +401,7 @@ export function RecentGallery({
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Recent photos</DialogTitle>
-          <DialogDescription>
-            Recently captured photos available on this booth.
-          </DialogDescription>
+          <DialogDescription>Recently captured photos available on this booth.</DialogDescription>
         </DialogHeader>
         <DialogPanel className="p-0">{content}</DialogPanel>
       </DialogPopup>
