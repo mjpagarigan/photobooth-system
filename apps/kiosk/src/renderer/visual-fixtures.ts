@@ -30,6 +30,9 @@ export type VisualSeedPayload = {
 
 export type VisualFixtureMode =
   | 'attract'
+  | 'attract-printing'
+  | 'attract-printed'
+  | 'attract-print-paused'
   | 'countdown'
   | 'shot-review'
   | 'review'
@@ -58,10 +61,16 @@ export type VisualFixtureMode =
   | 'camera-setup'
   | 'recent-gallery';
 
-export type QrStationVisualFixtureMode =
-  | 'qr-station-active'
-  | 'qr-station-printing'
-  | 'qr-station-printed';
+export const QR_STATION_VISUAL_MODES = [
+  'qr-station-active',
+  'qr-station-printing',
+  'qr-station-printed',
+  'qr-station-preparing',
+  'qr-station-preparing-collage',
+  'qr-station-preparing-no-print',
+] as const;
+
+export type QrStationVisualFixtureMode = (typeof QR_STATION_VISUAL_MODES)[number];
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FRAME_ID = '22222222-2222-4222-8222-222222222222';
@@ -367,9 +376,83 @@ function buildFourSlotFrameOverlay(): string {
   return canvas.toDataURL('image/png');
 }
 
+function isQrStationVisualFixtureMode(value: string): value is QrStationVisualFixtureMode {
+  return (QR_STATION_VISUAL_MODES as readonly string[]).includes(value);
+}
+
+export async function readQrStationVisualFixture(search: string): Promise<QrStationState | null> {
+  if (!import.meta.env.DEV) {
+    return null;
+  }
+
+  const seed = new URLSearchParams(search).get('visual');
+  if (!seed || !isQrStationVisualFixtureMode(seed)) {
+    return null;
+  }
+
+  return createQrStationVisualState(seed);
+}
+
 export async function createQrStationVisualState(
   mode: QrStationVisualFixtureMode = 'qr-station-active',
 ): Promise<QrStationState> {
+  if (mode === 'qr-station-preparing') {
+    return {
+      status: 'preparing',
+      sessionId: SESSION_ID,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: null,
+      durationSeconds: 45,
+      message: 'Creating your collage…',
+      canRetryUpload: false,
+      canFinishOffline: false,
+      printStatus: {
+        phase: 'preparing',
+        origin: 'session',
+        pendingCopies: 2,
+        totalCopies: 2,
+      },
+    };
+  }
+
+  if (mode === 'qr-station-preparing-collage') {
+    return {
+      status: 'preparing',
+      sessionId: SESSION_ID,
+      collageUrl: await buildReadyCollage(),
+      qrImageUrl: null,
+      expiresAt: null,
+      durationSeconds: 45,
+      message: 'Uploading for your phone…',
+      canRetryUpload: false,
+      canFinishOffline: false,
+      printStatus: {
+        phase: 'printing',
+        origin: 'session',
+        stage: 'active',
+        printedCopies: 0,
+        remainingCopies: 2,
+        totalCopies: 2,
+      },
+    };
+  }
+
+  if (mode === 'qr-station-preparing-no-print') {
+    return {
+      status: 'preparing',
+      sessionId: SESSION_ID,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: null,
+      durationSeconds: 45,
+      message: 'Creating your collage…',
+      canRetryUpload: false,
+      canFinishOffline: false,
+      printStatus: null,
+    };
+  }
+
   const printStatus: QrStationState['printStatus'] =
     mode === 'qr-station-printing'
       ? {
@@ -410,9 +493,56 @@ export async function createVisualSeedPayload(
   let snapshot = BASE_SNAPSHOT;
   let adminView: AdminView | null = null;
   let countdownSeconds: number | undefined;
+  let printerHealth: PrinterHealth | null | undefined;
 
   switch (mode) {
     case 'attract':
+      break;
+    case 'attract-printing':
+      snapshot = {
+        ...BASE_SNAPSHOT,
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      };
+      break;
+    case 'attract-printed':
+      snapshot = {
+        ...BASE_SNAPSHOT,
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 2,
+          completedAt: 1_786_883_400_000,
+        },
+      };
+      break;
+    case 'attract-print-paused':
+      snapshot = {
+        ...BASE_SNAPSHOT,
+        printStatus: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'offline',
+          detail: 'Printer is offline. Copies wait until the printer reconnects.',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      };
+      printerHealth = {
+        status: 'offline',
+        printerName: 'Epson L8050',
+        message: 'Check the printer power and USB cable.',
+        queuedCount: 2,
+        attentionCount: 0,
+        checkedAt: 1_786_883_400_000,
+      };
       break;
     case 'countdown':
       countdownSeconds = 5;
@@ -729,6 +859,7 @@ export async function createVisualSeedPayload(
   if (mode === 'operator-bootstrap') payload.dialog = { intent: 'bootstrap', mode: 'bootstrap' };
   if (mode === 'operator-restart') payload.dialog = { intent: 'restart', mode: 'restart' };
   if (mode === 'camera-setup') payload.cameraSetupOpen = true;
+  if (printerHealth !== undefined) payload.printerHealth = printerHealth;
   return countdownSeconds === undefined ? payload : { ...payload, countdownSeconds };
 }
 

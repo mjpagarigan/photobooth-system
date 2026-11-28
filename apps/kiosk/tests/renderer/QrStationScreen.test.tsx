@@ -493,4 +493,107 @@ describe('QrStationScreen', () => {
       screen.getByText('Local Wi-Fi · Connect your phone to the booth Wi-Fi, then scan'),
     ).toBeVisible();
   });
+
+  it('renders preparing state progressively without Done, timer, or holding copy and opens dark RecentGallery', async () => {
+    const user = userEvent.setup();
+    const sessionId = '11111111-1111-4111-8111-111111111111';
+    let stationListener: ((state: QrStationState) => void) | null = null;
+    mockBridge.qrStation.subscribe.mockImplementation((listener) => {
+      stationListener = listener;
+      return vi.fn();
+    });
+    mockBridge.qrStation.getState.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'preparing',
+        sessionId,
+        collageUrl: null,
+        qrImageUrl: null,
+        expiresAt: null,
+        durationSeconds: 45,
+        message: 'Creating your collage…',
+        canRetryUpload: false,
+        canFinishOffline: false,
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 2,
+          totalCopies: 2,
+        },
+      },
+    });
+
+    render(<QrStationScreen />);
+
+    const preparing = await screen.findByTestId('qr-station-preparing');
+    expect(preparing).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('qr-station-preview-placeholder')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Your finished photo' })).not.toBeInTheDocument();
+    expect(screen.getByText('Creating your collage…')).toBeVisible();
+    expect(screen.getByText('Preparing QR code…')).toBeVisible();
+    expect(screen.getByTestId('session-print-status')).toHaveAttribute('data-tone', 'dark');
+    expect(screen.getByTestId('session-print-status')).toHaveAttribute(
+      'data-print-phase',
+      'preparing',
+    );
+    expect(screen.queryByRole('button', { name: /done/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Holding while printing')).not.toBeInTheDocument();
+    expect(screen.queryByText(/clears in/i)).not.toBeInTheDocument();
+
+    act(() => {
+      stationListener?.({
+        status: 'preparing',
+        sessionId,
+        collageUrl: 'grace-booth-media://asset/collage-1',
+        qrImageUrl: null,
+        expiresAt: null,
+        durationSeconds: 45,
+        message: 'Uploading for your phone…',
+        canRetryUpload: false,
+        canFinishOffline: false,
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+    });
+
+    expect(screen.queryByTestId('qr-station-preview-placeholder')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Your finished photo' })).toHaveAttribute(
+      'src',
+      'grace-booth-media://asset/collage-1',
+    );
+    expect(screen.getByText('Uploading for your phone…')).toBeVisible();
+    expect(screen.getByTestId('session-print-status')).toHaveAttribute(
+      'data-print-phase',
+      'printing',
+    );
+    expect(screen.queryByText('Holding while printing')).not.toBeInTheDocument();
+    expect(screen.queryByText(/clears in/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /recent photos/i }));
+    expect(await screen.findByRole('dialog')).toHaveAttribute('data-tone', 'dark');
+    await user.keyboard('{Escape}');
+
+    act(() => {
+      stationListener?.({
+        status: 'preparing',
+        sessionId,
+        collageUrl: null,
+        qrImageUrl: null,
+        expiresAt: null,
+        durationSeconds: 45,
+        message: 'Creating your collage…',
+        canRetryUpload: false,
+        canFinishOffline: false,
+        printStatus: null,
+      });
+    });
+
+    expect(screen.queryByTestId('session-print-status')).not.toBeInTheDocument();
+  });
 });

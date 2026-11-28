@@ -1362,7 +1362,11 @@ describe('countdown calculation and per-shot review flow', () => {
       sessionSnapshot({ screen: 'countdown', state: 'countdown' }),
       sessionSnapshot({ screen: 'review', state: 'review' }),
       sessionSnapshot({ screen: 'processing', state: 'processing' }),
-      sessionSnapshot({ screen: 'recovery', state: 'camera_error', errorCode: 'camera_unavailable' }),
+      sessionSnapshot({
+        screen: 'recovery',
+        state: 'camera_error',
+        errorCode: 'camera_unavailable',
+      }),
     ]) {
       act(() => harness.emit(darkSnapshot));
       await user.keyboard('{Control>}{Shift>}a{/Shift}{/Control}');
@@ -1690,5 +1694,33 @@ describe('countdown calculation and per-shot review flow', () => {
     expect(recoveryPrintStatus).toHaveAttribute('data-print-phase', 'completed');
     expect(recoveryPrintStatus).not.toHaveAttribute('role');
     expect(recoveryPrintStatus).toHaveTextContent('Print finished');
+  });
+
+  it('forwards handed-off printStatus to AttractScreen and removes it when cleared', async () => {
+    const harness = createBridge({
+      ...ATTRACT,
+      printStatus: {
+        phase: 'printing',
+        origin: 'session',
+        stage: 'active',
+        printedCopies: 0,
+        remainingCopies: 2,
+        totalCopies: 2,
+      },
+    });
+    window.graceBooth = harness.bridge;
+
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    const status = screen.getByTestId('session-print-status');
+    expect(status).toHaveClass('attract-print-status');
+    expect(status).toHaveAttribute('data-tone', 'light');
+    expect(status).toHaveAttribute('data-print-phase', 'printing');
+    expect(status).toHaveTextContent('Latest print');
+    expect(status).toHaveTextContent('Printing copy 1 of 2…');
+
+    act(() => harness.emit({ ...ATTRACT, printStatus: null }));
+    expect(screen.queryByTestId('session-print-status')).not.toBeInTheDocument();
   });
 });

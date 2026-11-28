@@ -1,7 +1,13 @@
-import { Button, WarningCircle, WifiHigh } from '@grace-booth/ui';
+import { Button, SpinnerGap, WarningCircle, WifiHigh } from '@grace-booth/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
+import {
+  isSessionPrintActive,
+  qrStationAllowsAutoDismiss,
+  type GalleryItem,
+  type GraceBoothBridge,
+  type QrStationState,
+} from '@grace-booth/shared';
 
 import { Photostrip } from '../components/Photostrip';
 import { PrinterIndicator } from '../components/Printing';
@@ -40,38 +46,48 @@ export function QrStationScreen(): React.ReactElement {
   const [recentError, setRecentError] = useState<string | null>(null);
 
   useEffect(() => {
-    const visualMode = new URLSearchParams(window.location.search).get('visual');
-    if (
-      import.meta.env.DEV &&
-      (visualMode === 'qr-station-active' ||
-        visualMode === 'qr-station-printing' ||
-        visualMode === 'qr-station-printed')
-    ) {
-      void import('../visual-fixtures').then(async ({ createQrStationVisualState }) => {
-        setStationState(await createQrStationVisualState(visualMode));
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+
+    const connectLiveBridge = () => {
+      const bridge = getBridge();
+      if (!bridge || !active) return;
+
+      void bridge.qrStation.getState().then((result) => {
+        if (active && result.ok) setStationState(result.data);
       });
-      return;
+
+      unsubscribe = bridge.qrStation.subscribe((state) => {
+        if (!active) return;
+        setStationState(state);
+        setActionError(null);
+      });
+    };
+
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('visual')) {
+      void import('../visual-fixtures').then(async ({ readQrStationVisualFixture }) => {
+        const fixture = await readQrStationVisualFixture(window.location.search);
+        if (!active) return;
+        if (fixture) {
+          setStationState(fixture);
+        } else {
+          connectLiveBridge();
+        }
+      });
+    } else {
+      connectLiveBridge();
     }
 
-    const bridge = getBridge();
-    if (!bridge) return;
-
-    void bridge.qrStation.getState().then((result) => {
-      if (result.ok) setStationState(result.data);
-    });
-
-    const unsubscribe = bridge.qrStation.subscribe((state) => {
-      setStationState(state);
-      setActionError(null);
-    });
-
     return () => {
-      unsubscribe();
+      active = false;
+      unsubscribe?.();
     };
   }, []);
 
+  const allowsAutoDismiss = qrStationAllowsAutoDismiss(stationState);
+
   useEffect(() => {
-    if (stationState.status === 'idle' || !stationState.expiresAt) {
+    if (!allowsAutoDismiss || !stationState.expiresAt) {
       return;
     }
 
@@ -86,7 +102,7 @@ export function QrStationScreen(): React.ReactElement {
     return () => {
       window.clearInterval(interval);
     };
-  }, [stationState.status, stationState.expiresAt]);
+  }, [allowsAutoDismiss, stationState.expiresAt]);
 
   const actionBusy = dismissing || recoveryAction !== null;
 
@@ -168,14 +184,14 @@ export function QrStationScreen(): React.ReactElement {
   }, []);
 
   const progressPercentage = useMemo(() => {
-    if (stationState.status === 'idle' || !stationState.durationSeconds) return 0;
+    if (!allowsAutoDismiss || !stationState.durationSeconds) return 0;
     return Math.max(0, Math.min(100, (secondsRemaining / stationState.durationSeconds) * 100));
-  }, [stationState.status, stationState.durationSeconds, secondsRemaining]);
+  }, [allowsAutoDismiss, stationState.durationSeconds, secondsRemaining]);
 
   const holdingForPrint =
+    allowsAutoDismiss &&
     stationState.expiresAt === null &&
-    (stationState.printStatus?.phase === 'preparing' ||
-      stationState.printStatus?.phase === 'printing');
+    isSessionPrintActive(stationState.printStatus);
 
   const recentButton = (
     <button
@@ -271,6 +287,65 @@ export function QrStationScreen(): React.ReactElement {
           </div>
         </section>
         {recentGallery}
+      </main>
+    );
+  }
+
+  if (stationState.status === 'preparing') {
+    const hasCollage = Boolean(stationState.collageUrl);
+    return (
+      <main
+        className="screen screen--qr-station qr-station--preparing"
+        data-testid="qr-station-preparing"
+        aria-busy="true"
+      >
+        <div className="qr-station__corner">{recentButton}</div>
+        <div className="qr-station__layout">
+          <section
+            className="final-result qr-station__result"
+            aria-label={hasCollage ? 'Your finished photo' : 'Preparing your photo'}
+          >
+            {stationState.collageUrl ? (
+              <Photostrip
+                collageUrl={stationState.collageUrl}
+                label="Your finished photo"
+                variant="collage"
+              />
+            ) : (
+              <div
+                className="qr-station__preview-placeholder"
+                data-testid="qr-station-preview-placeholder"
+                aria-hidden="true"
+              >
+                <div className="qr-station__preview-shimmer" />
+              </div>
+            )}
+          </section>
+          <section className="qr-station__panel" aria-labelledby="qr-station-preparing-title">
+            <h1 id="qr-station-preparing-title" data-screen-heading tabIndex={-1}>
+              {hasCollage ? (
+                <>
+                  Photo ready. <span>Finishing your QR code.</span>
+                </>
+              ) : (
+                <>
+                  Preparing your photo. <span>Your QR code will appear shortly.</span>
+                </>
+              )}
+            </h1>
+            <p>
+              {stationState.message ??
+                (hasCollage ? 'Uploading for your phone…' : 'Creating your collage…')}
+            </p>
+            <SessionPrintStatus status={stationState.printStatus} tone="dark" />
+            <div className="qr-station__code-placeholder" role="status" aria-live="polite">
+              <SpinnerGap aria-hidden="true" className="spin" size={32} />
+              <span>Preparing QR code…</span>
+            </div>
+          </section>
+        </div>
+        {recentGallery}
+        {printerIndicator}
       </main>
     );
   }

@@ -577,6 +577,38 @@ test('review fits and remains accessible at large desktop viewport', async ({ pa
 
 const SESSION_PRINT_VISUAL_CASES = [
   {
+    name: 'attract-printing at 1280x720',
+    url: '/?visual=attract-printing',
+    viewport: { width: 1_280, height: 720 },
+    phase: 'printing',
+    reducedMotion: false,
+    qrAlt: null,
+  },
+  {
+    name: 'attract-printing at 1366x768',
+    url: '/?visual=attract-printing',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'printing',
+    reducedMotion: false,
+    qrAlt: null,
+  },
+  {
+    name: 'attract-print-paused at 1280x720',
+    url: '/?visual=attract-print-paused',
+    viewport: { width: 1_280, height: 720 },
+    phase: 'paused',
+    reducedMotion: false,
+    qrAlt: null,
+  },
+  {
+    name: 'attract-printed at 1366x768',
+    url: '/?visual=attract-printed',
+    viewport: { width: 1_366, height: 768 },
+    phase: 'completed',
+    reducedMotion: false,
+    qrAlt: null,
+  },
+  {
     name: 'processing-printing at 1366x768',
     url: '/?visual=processing-printing',
     viewport: { width: 1_366, height: 768 },
@@ -621,6 +653,22 @@ const SESSION_PRINT_VISUAL_CASES = [
     url: '/?visual=recovery-upload-printed',
     viewport: { width: 1_366, height: 768 },
     phase: 'completed',
+    reducedMotion: false,
+    qrAlt: null,
+  },
+  {
+    name: 'qr-station-preparing at 1920x1080',
+    url: '/?view=qr-station&visual=qr-station-preparing',
+    viewport: { width: 1_920, height: 1_080 },
+    phase: 'preparing',
+    reducedMotion: true,
+    qrAlt: null,
+  },
+  {
+    name: 'qr-station-preparing-collage at 1920x1080',
+    url: '/?view=qr-station&visual=qr-station-preparing-collage',
+    viewport: { width: 1_920, height: 1_080 },
+    phase: 'printing',
     reducedMotion: false,
     qrAlt: null,
   },
@@ -685,6 +733,86 @@ for (const visualCase of SESSION_PRINT_VISUAL_CASES) {
     expect(seriousOrCritical).toEqual([]);
   });
 }
+
+test('attract-print-paused separates left print status from right printer indicator and keeps Start focused at 1280x720', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1_280, height: 720 });
+  await page.goto('/?visual=attract-print-paused');
+
+  const printStatus = page.locator('.attract-print-status');
+  const printerIndicator = page.locator('.printer-indicator--corner');
+  const startButton = page.getByRole('button', { name: 'Start photo session' });
+
+  await expect(printStatus).toBeVisible();
+  await expect(printerIndicator).toBeVisible();
+  await expect(startButton).toBeVisible();
+  await expect(startButton).toBeFocused();
+  await expect(startButton).toBeEnabled();
+  await waitForVisualAssets(page);
+  await expectNoPageOverflow(page);
+
+  const leftBox = await printStatus.boundingBox();
+  const rightBox = await printerIndicator.boundingBox();
+  expect(leftBox).not.toBeNull();
+  expect(rightBox).not.toBeNull();
+
+  const horizontalGap = rightBox!.x - (leftBox!.x + leftBox!.width);
+  expect(horizontalGap).toBeGreaterThanOrEqual(24);
+  const overlaps =
+    leftBox!.x < rightBox!.x + rightBox!.width &&
+    leftBox!.x + leftBox!.width > rightBox!.x &&
+    leftBox!.y < rightBox!.y + rightBox!.height &&
+    leftBox!.y + leftBox!.height > rightBox!.y;
+  expect(overlaps).toBe(false);
+});
+
+test('QR station preparing modes hide timer, holding copy, and Done while revealing the collage', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1_920, height: 1_080 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  await page.goto('/?view=qr-station&visual=qr-station-preparing');
+  await expect(page.getByTestId('qr-station-preparing')).toBeVisible();
+  await expect(page.getByTestId('qr-station-preview-placeholder')).toBeVisible();
+  await expect(page.getByTestId('session-print-status')).toBeVisible();
+  await expect(page.getByText('Holding while printing')).toHaveCount(0);
+  await expect(page.getByText(/Clears in \d+s/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Done' })).toHaveCount(0);
+  await expectNoPageOverflow(page);
+
+  await page.goto('/?view=qr-station&visual=qr-station-preparing-collage');
+  await expect(page.getByTestId('qr-station-preparing')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Your finished photo' })).toBeVisible();
+  await expect(page.getByTestId('session-print-status')).toBeVisible();
+  await expect(page.getByText('Holding while printing')).toHaveCount(0);
+  await expect(page.getByText(/Clears in \d+s/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Done' })).toHaveCount(0);
+  await waitForVisualAssets(page);
+  await expectNoPageOverflow(page);
+});
+
+test('qr-station-preparing-no-print hides session print status and stays accessible at 1920x1080', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1_920, height: 1_080 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?view=qr-station&visual=qr-station-preparing-no-print');
+
+  await expect(page.getByTestId('qr-station-preparing')).toBeVisible();
+  await expect(page.getByTestId('session-print-status')).toHaveCount(0);
+  await expect(page.getByText('Holding while printing')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Done' })).toHaveCount(0);
+  await waitForVisualAssets(page);
+  await expectNoPageOverflow(page);
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  const seriousOrCritical = accessibility.violations.filter(
+    (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+  );
+  expect(seriousOrCritical).toEqual([]);
+});
 
 async function waitForVisualAssets(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(async () => {

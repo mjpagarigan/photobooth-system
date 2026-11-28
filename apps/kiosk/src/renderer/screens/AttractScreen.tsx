@@ -1,5 +1,8 @@
+import type { SessionPrintStatus as SessionPrintStatusData } from '@grace-booth/shared';
 import { Button } from '@grace-booth/ui';
 import { useEffect, useRef } from 'react';
+
+import { SessionPrintStatus } from '../components/SessionPrintStatus';
 
 const SHOT_WORDS = [
   'Zero',
@@ -23,6 +26,7 @@ type AttractScreenProps = {
   onOpenCameras?: () => void;
   onOpenRecent?: () => void;
   onStart: () => void;
+  printStatus?: SessionPrintStatusData | null;
   shotCount?: number;
 };
 
@@ -34,6 +38,7 @@ export function AttractScreen({
   onOpenCameras,
   onOpenRecent,
   onStart,
+  printStatus = null,
   shotCount = 3,
 }: AttractScreenProps) {
   const startButtonRef = useRef<HTMLButtonElement>(null);
@@ -129,6 +134,13 @@ export function AttractScreen({
       <footer className="attract-footer">
         Photos stay private. Scan the QR code at the end to download yours.
       </footer>
+
+      <SessionPrintStatus
+        status={printStatus}
+        tone="light"
+        contextLabel="Latest print"
+        className="attract-print-status"
+      />
     </main>
   );
 }

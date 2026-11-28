@@ -14,6 +14,7 @@ export type SessionPrintStatusProps = {
   tone?: SessionPrintTone;
   announce?: boolean;
   className?: string;
+  contextLabel?: string;
 };
 
 function renderIcon(kind: SessionPrintIconKind): ReactElement {
@@ -40,6 +41,7 @@ export function SessionPrintStatus({
   tone = 'light',
   announce = true,
   className,
+  contextLabel,
 }: SessionPrintStatusProps): ReactElement | null {
   if (!status) return null;
   const presentation = describeSessionPrintStatus(status);
@@ -66,6 +68,9 @@ export function SessionPrintStatus({
         {renderIcon(presentation.icon)}
       </span>
       <span className="session-print-status__copy">
+        {contextLabel ? (
+          <span className="session-print-status__context">{contextLabel}</span>
+        ) : null}
         <span className="session-print-status__label">{presentation.label}</span>
         {presentation.detail ? (
           <span className="session-print-status__detail">{presentation.detail}</span>
