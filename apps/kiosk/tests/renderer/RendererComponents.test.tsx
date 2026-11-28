@@ -17,6 +17,7 @@ import { FrameImportDialog } from '../../src/renderer/components/FrameImportDial
 import { PasscodeDialog } from '../../src/renderer/components/PasscodeDialog';
 import { PhotoSlot } from '../../src/renderer/components/PhotoSlot';
 import { RecentGallery } from '../../src/renderer/components/RecentGallery';
+import { SessionPrintStatus } from '../../src/renderer/components/SessionPrintStatus';
 import { AttractScreen } from '../../src/renderer/screens/AttractScreen';
 import { CaptureScreen } from '../../src/renderer/screens/CaptureScreen';
 import { FinalQrScreen } from '../../src/renderer/screens/FinalQrScreen';
@@ -533,11 +534,7 @@ describe('guest screen components', () => {
 
   it('switches FinalQrScreen copy between cloud retention and local Wi-Fi delivery', () => {
     const { rerender } = render(
-      <FinalQrScreen
-        collageUrl="/collage.jpg"
-        onDone={() => undefined}
-        qrImageUrl="/qr.png"
-      />,
+      <FinalQrScreen collageUrl="/collage.jpg" onDone={() => undefined} qrImageUrl="/qr.png" />,
     );
     expect(screen.getByText('Ready to download')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Available for 30 days' })).toBeVisible();
@@ -603,9 +600,7 @@ describe('guest screen components', () => {
     expect(screen.getByText('Taking photo…')).toBeVisible();
 
     cleanup();
-    render(
-      <AttractScreen canStart onOpenAdmin={() => undefined} onStart={() => undefined} />,
-    );
+    render(<AttractScreen canStart onOpenAdmin={() => undefined} onStart={() => undefined} />);
     const heading = screen.getByRole('heading', { name: 'Hello, smile.' });
     expect(heading).not.toHaveAttribute('data-screen-heading');
     expect(screen.getByRole('button', { name: 'Start photo session' })).toHaveFocus();
@@ -660,6 +655,65 @@ describe('guest screen components', () => {
     expect(recoveryPill).toHaveAttribute('data-tone', 'light');
     expect(recoveryPill).not.toHaveAttribute('role');
     expect(recoveryPill).toHaveTextContent('Printing paused');
+  });
+
+  it('renders AttractScreen handed-off print status with Latest print overline while keeping zero-node null parity and Start focus', () => {
+    const { container, rerender } = render(
+      <AttractScreen
+        canStart
+        onOpenAdmin={() => undefined}
+        onStart={() => undefined}
+        printStatus={null}
+      />,
+    );
+    expect(screen.queryByTestId('session-print-status')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start photo session' })).toHaveFocus();
+
+    rerender(
+      <AttractScreen
+        canStart
+        onOpenAdmin={() => undefined}
+        onStart={() => undefined}
+        printStatus={{
+          phase: 'printing',
+          origin: 'session',
+          stage: 'active',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        }}
+      />,
+    );
+    const pill = screen.getByTestId('session-print-status');
+    expect(pill).toHaveClass('attract-print-status');
+    expect(pill).toHaveAttribute('data-tone', 'light');
+    expect(pill).toHaveAttribute('data-print-phase', 'printing');
+    expect(container.querySelector('.session-print-status__context')).toHaveTextContent(
+      'Latest print',
+    );
+    expect(pill).toHaveTextContent('Printing copy 1 of 2…');
+    expect(screen.getByRole('heading', { name: 'Hello, smile.' })).not.toHaveAttribute(
+      'data-screen-heading',
+    );
+    expect(screen.getByRole('button', { name: 'Start photo session' })).toHaveFocus();
+
+    cleanup();
+    const { container: statusContainer, rerender: rerenderStatus } = render(
+      <SessionPrintStatus
+        status={{ phase: 'completed', origin: 'session', totalCopies: 1, completedAt: 1_000 }}
+      />,
+    );
+    expect(statusContainer.querySelector('.session-print-status__context')).toBeNull();
+
+    rerenderStatus(
+      <SessionPrintStatus
+        status={{ phase: 'completed', origin: 'session', totalCopies: 1, completedAt: 1_000 }}
+        contextLabel="Latest print"
+      />,
+    );
+    expect(statusContainer.querySelector('.session-print-status__context')).toHaveTextContent(
+      'Latest print',
+    );
   });
 });
 

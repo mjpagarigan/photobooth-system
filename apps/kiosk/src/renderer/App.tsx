@@ -22,12 +22,7 @@ import {
   isCancellableSessionState,
   isCaptureScreen,
 } from '@grace-booth/shared';
-import {
-  AnchoredToastProvider,
-  Button,
-  ToastProvider,
-  type DialogTone,
-} from '@grace-booth/ui';
+import { AnchoredToastProvider, Button, ToastProvider, type DialogTone } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
@@ -1175,6 +1170,7 @@ export function App() {
           onOpenCameras={() => setCameraSetupOpen(true)}
           onOpenRecent={() => void openRecentGallery()}
           onStart={startGuestSession}
+          printStatus={snapshot.printStatus ?? null}
           shotCount={snapshot.requiredShotCount ?? 3}
         />
       );

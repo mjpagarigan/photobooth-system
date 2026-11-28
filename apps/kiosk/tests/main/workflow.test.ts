@@ -1721,8 +1721,29 @@ describe('print choice at review', () => {
       workflow.subscribeQrStation((state) => qrEmissions.push(state));
 
       const afterAccept = workflow.acceptPhotos(fourR, { copies: 1 });
-      expect(afterAccept).toMatchObject({ screen: 'attract', printStatus: null });
+      expect(afterAccept).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 1,
+          totalCopies: 1,
+        },
+      });
       expect(screen1Emissions.map((snap) => snap.screen)).toEqual(['attract']);
+      expect(qrEmissions[0]).toMatchObject({
+        status: 'preparing',
+        sessionId,
+        collageUrl: null,
+        qrImageUrl: null,
+        expiresAt: null,
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 1,
+          totalCopies: 1,
+        },
+      });
 
       for (let pass = 0; pass < 6; pass += 1) {
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -1757,6 +1778,17 @@ describe('print choice at review', () => {
 
       const dismissed = workflow.dismissQrStation(sessionId);
       expect(dismissed.printStatus).toBeNull();
+      expect(workflow.getSnapshot()).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'printing',
+          origin: 'reprint',
+          stage: 'queued',
+          printedCopies: 0,
+          remainingCopies: 1,
+          totalCopies: 1,
+        },
+      });
       expect(screen1Emissions.some((snap) => snap.screen === 'processing')).toBe(false);
     } finally {
       await printService.stop();
@@ -1795,7 +1827,12 @@ describe('print choice at review', () => {
 
     try {
       const collageBytes = await sharp({
-        create: { width: 1_800, height: 1_200, channels: 3, background: { r: 220, g: 220, b: 220 } },
+        create: {
+          width: 1_800,
+          height: 1_200,
+          channels: 3,
+          background: { r: 220, g: 220, b: 220 },
+        },
       })
         .jpeg({ quality: 80 })
         .toBuffer();
@@ -2118,6 +2155,541 @@ describe('print choice at review', () => {
       expect(printService.getSessionPrintStatus(sessionId)).toBeNull();
     } finally {
       await printService.stop();
+    }
+  });
+
+  async function setupDualPrintHarness(
+    opts: {
+      isDual?: boolean;
+      processImpl?: (collageBytes: Buffer) => Promise<{
+        bytes: Buffer;
+        width: number;
+        height: number;
+        byteSize: number;
+        timing: { validationMs: number; slotsMs: number; compositeMs: number; totalMs: number };
+      }>;
+    } = {},
+  ) {
+    const testStore = createTestStore();
+    store = testStore;
+    const queue = new FakeUploadQueue();
+    queue.testStore = testStore;
+
+    const prints = new PrintRepository(testStore.database);
+    const adapter = new MockPrinterAdapter({ outputDirectory: null, printDurationMs: 40 });
+    const printerSettings = prints.getPrinterSettings();
+    prints.updatePrinterSettings({
+      printerName: MOCK_PRINTER_NAME,
+      paperRawKind: 127,
+      paperName: '102 x 152 mm (4 x 6 in)',
+      timeoutSeconds: 60,
+      expectedRevision: printerSettings.revision,
+    });
+    const printService = new PrintService(
+      prints,
+      testStore.repository,
+      testStore.vault,
+      testStore.paths,
+      adapter,
+      { now: () => Date.now(), tickMs: 1_000_000 },
+    );
+    await printService.start();
+
+    const collageBytes = await sharp({
+      create: { width: 1_800, height: 1_200, channels: 3, background: { r: 30, g: 90, b: 150 } },
+    })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    const defaultProcess = () =>
+      Promise.resolve({
+        bytes: collageBytes,
+        width: 1_800,
+        height: 1_200,
+        byteSize: collageBytes.byteLength,
+        timing: { validationMs: 1, slotsMs: 1, compositeMs: 1, totalMs: 3 },
+      });
+
+    const imageProcessor: ImageProcessor = {
+      process: () => (opts.processImpl ? opts.processImpl(collageBytes) : defaultProcess()),
+      validateSourceJpeg: () => Promise.resolve({ width: 1_800, height: 1_200 }),
+      normalizeFramePng: () => Promise.reject(new Error('not used')),
+      createThumbnail: () => Promise.reject(new Error('not used')),
+      close: () => Promise.resolve(),
+    };
+    const frameService = {
+      ensureDefaultFrame: () => Promise.resolve(undefined),
+      ensureDefaultFrames: () => Promise.resolve({ option1: undefined, option2: undefined }),
+      getFrameOptions: () => [null, null],
+      getFrameSummaries: () => [],
+      listFrames: () => [],
+      toSummary: (f: StoredFrame) => ({
+        id: f.id,
+        name: f.name,
+        width: f.width,
+        height: f.height,
+        byteSize: f.byteSize,
+        mediaUrl: `grace-booth-media://asset/${f.id}`,
+        slots: f.slots,
+        revision: f.revision,
+      }),
+    } as unknown as FrameService;
+    const qrService = {
+      render: () => Promise.resolve({ imageDataUrl: 'data:image/png;base64,mockqr' }),
+    } as unknown as QrService;
+
+    const wf = new BoothWorkflow(
+      testStore.repository,
+      testStore.vault,
+      new SequencedCamera(['ready', 'ready', 'ready']),
+      frameService,
+      imageProcessor,
+      queue as unknown as UploadQueue,
+      qrService,
+      {
+        isDualDisplayActive: () => opts.isDual ?? true,
+        now: () => Date.now(),
+        print: printService,
+      },
+    );
+    workflow = wf;
+    testStore.repository.setDualDisplaySettings('enabled', false, 45);
+    const fourR = insertFrame(testStore, 1_800, 1_200);
+
+    const createReviewSessionWithCapture = (createdAt: number) => {
+      const sessionId = randomUUID();
+      testStore.repository.createSession(sessionId, createdAt);
+      testStore.database.raw
+        .prepare(
+          "UPDATE sessions SET state = 'review', capture_count = 1, required_shot_count = 1 WHERE id = ?",
+        )
+        .run(sessionId);
+      const written = testStore.vault.write('pending', collageBytes);
+      testStore.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'capture', 0, 1, ?, 'image/jpeg', 1800, 1200, ?, ?, ?)`,
+        )
+        .run(
+          randomUUID(),
+          sessionId,
+          written.relativePath,
+          written.byteSize,
+          written.sha256,
+          createdAt,
+        );
+      return sessionId;
+    };
+
+    return {
+      testStore,
+      queue,
+      adapter,
+      printService,
+      collageBytes,
+      wf,
+      fourR,
+      createReviewSessionWithCapture,
+    };
+  }
+
+  it('reveals Screen 2 preparing state progressively on dual-display handoff for Print ON and Print OFF', async () => {
+    let resolveCollage: (() => void) | null = null;
+    const harness = await setupDualPrintHarness({
+      processImpl: (collageBytes) =>
+        new Promise((resolve) => {
+          resolveCollage = () =>
+            resolve({
+              bytes: collageBytes,
+              width: 1_800,
+              height: 1_200,
+              byteSize: collageBytes.byteLength,
+              timing: { validationMs: 1, slotsMs: 1, compositeMs: 1, totalMs: 3 },
+            });
+        }),
+    });
+
+    try {
+      const sessionA = harness.createReviewSessionWithCapture(1_000);
+      await harness.wf.initialize();
+
+      const afterPrintOn = harness.wf.acceptPhotos(harness.fourR, { copies: 2 });
+      expect(afterPrintOn).toMatchObject({
+        screen: 'attract',
+        sessionId: null,
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionA,
+        collageUrl: null,
+        qrImageUrl: null,
+        expiresAt: null,
+        message: 'Creating your collage…',
+        canRetryUpload: false,
+        canFinishOffline: false,
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+
+      resolveCollage!();
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionA,
+        qrImageUrl: null,
+        expiresAt: null,
+        message: 'Preparing your QR code…',
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'queued',
+          printedCopies: 0,
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+      expect(harness.wf.getQrStationState().collageUrl).toMatch(/^grace-booth-media:\/\/asset\//);
+      expect(harness.wf.getSnapshot()).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          stage: 'queued',
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+
+      harness.queue.emit('uploading', sessionA);
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionA,
+        expiresAt: null,
+        message: 'Uploading for your phone…',
+      });
+
+      await harness.queue.completeOffline(sessionA);
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'active',
+        sessionId: sessionA,
+        expiresAt: null,
+      });
+
+      harness.wf.dismissQrStation(sessionA);
+      const startedB = await harness.wf.start();
+      const sessionB = startedB.sessionId!;
+      harness.testStore.database.raw
+        .prepare(
+          "UPDATE sessions SET state = 'review', capture_count = 1, required_shot_count = 1, created_at = ? WHERE id = ?",
+        )
+        .run(Date.now() + 5_000, sessionB);
+      const writtenB = harness.testStore.vault.write('pending', harness.collageBytes);
+      harness.testStore.database.raw
+        .prepare(
+          `INSERT INTO session_assets
+            (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type, width, height, byte_size, sha256, created_at)
+          VALUES (?, ?, 'capture', 0, 1, ?, 'image/jpeg', 1800, 1200, ?, ?, 2)`,
+        )
+        .run(randomUUID(), sessionB, writtenB.relativePath, writtenB.byteSize, writtenB.sha256);
+
+      harness.wf.acceptPhotos(harness.fourR, null);
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionB,
+        collageUrl: null,
+        qrImageUrl: null,
+        expiresAt: null,
+        printStatus: null,
+      });
+      resolveCollage!();
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionB,
+        expiresAt: null,
+        printStatus: null,
+      });
+      expect(harness.wf.getQrStationState().collageUrl).toMatch(/^grace-booth-media:\/\/asset\//);
+    } finally {
+      await harness.printService.stop();
+    }
+  });
+
+  it('never starts Screen 2 auto-dismiss if printing completes during preparing while Monitor 1 lingers 10s then clears', async () => {
+    vi.useFakeTimers();
+    const harness = await setupDualPrintHarness();
+    try {
+      const sessionId = harness.createReviewSessionWithCapture(Date.now());
+      await harness.wf.initialize();
+
+      harness.wf.acceptPhotos(harness.fourR, { copies: 1 });
+      await vi.advanceTimersByTimeAsync(10);
+
+      await harness.printService.runQueuePass();
+      await vi.advanceTimersByTimeAsync(100);
+      await harness.printService.runQueuePass();
+
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId,
+        expiresAt: null,
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 1,
+        },
+      });
+      expect(harness.wf.getSnapshot()).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'completed',
+          origin: 'session',
+          totalCopies: 1,
+        },
+      });
+
+      vi.advanceTimersByTime(9_999);
+      expect(harness.wf.getSnapshot().printStatus?.phase).toBe('completed');
+      expect(harness.wf.getQrStationState().status).toBe('preparing');
+
+      vi.advanceTimersByTime(1);
+      expect(harness.wf.getSnapshot()).toMatchObject({
+        screen: 'attract',
+        printStatus: null,
+      });
+
+      vi.advanceTimersByTime(60_000);
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId,
+        expiresAt: null,
+      });
+
+      await harness.queue.completeOffline(sessionId);
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'active',
+        sessionId,
+      });
+      expect(harness.wf.getQrStationState().expiresAt).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+      await harness.printService.stop();
+    }
+  });
+
+  it('moves Screen 2 from preparing to error on dual-display collage failure, lingers Monitor 1 photo_interrupted 10s, and still allows same-session recovery', async () => {
+    vi.useFakeTimers();
+    const harness = await setupDualPrintHarness({
+      processImpl: () => Promise.reject(new Error('collage exploded')),
+    });
+    try {
+      const sessionId = harness.createReviewSessionWithCapture(Date.now());
+      await harness.wf.initialize();
+
+      harness.wf.acceptPhotos(harness.fourR, { copies: 2 });
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'error',
+        sessionId,
+        collageUrl: null,
+        qrImageUrl: null,
+        canRetryUpload: false,
+        canFinishOffline: false,
+        printStatus: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'photo_interrupted',
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+      expect(harness.wf.getQrStationState().expiresAt).not.toBeNull();
+
+      expect(harness.wf.getSnapshot()).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'paused',
+          origin: 'session',
+          reason: 'photo_interrupted',
+          remainingCopies: 2,
+          totalCopies: 2,
+        },
+      });
+
+      vi.advanceTimersByTime(10_000);
+      expect(harness.wf.getSnapshot().printStatus).toBeNull();
+
+      await harness.queue.completeOffline(sessionId);
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'active',
+        sessionId,
+        qrImageUrl: 'data:image/png;base64,mockqr',
+      });
+    } finally {
+      vi.useRealTimers();
+      await harness.printService.stop();
+    }
+  });
+
+  it('handles Guest A and Guest B overlap rules on Monitor 1 and Monitor 2', async () => {
+    vi.useFakeTimers();
+    const harness = await setupDualPrintHarness();
+    try {
+      const sessionA = harness.createReviewSessionWithCapture(Date.now());
+      await harness.wf.initialize();
+
+      harness.wf.acceptPhotos(harness.fourR, { copies: 1 });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(harness.wf.getSnapshot().printStatus).toMatchObject({
+        phase: 'printing',
+        origin: 'session',
+      });
+
+      const prepNextReviewSession = async (offsetMs: number) => {
+        const started = await harness.wf.start();
+        const id = started.sessionId!;
+        const createdAt = Date.now() + offsetMs;
+        harness.testStore.database.raw
+          .prepare(
+            "UPDATE sessions SET state = 'review', capture_count = 1, required_shot_count = 1, created_at = ? WHERE id = ?",
+          )
+          .run(createdAt, id);
+        const written = harness.testStore.vault.write('pending', harness.collageBytes);
+        harness.testStore.database.raw
+          .prepare(
+            `INSERT INTO session_assets
+              (id, session_id, kind, retake_round, shot_number, encrypted_path, content_type, width, height, byte_size, sha256, created_at)
+            VALUES (?, ?, 'capture', 0, 1, ?, 'image/jpeg', 1800, 1200, ?, ?, ?)`,
+          )
+          .run(randomUUID(), id, written.relativePath, written.byteSize, written.sha256, createdAt);
+        return id;
+      };
+
+      const sessionB = await prepNextReviewSession(1_000);
+      const afterB = harness.wf.acceptPhotos(harness.fourR, null);
+      expect(afterB).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'printing',
+          origin: 'session',
+          remainingCopies: 1,
+          totalCopies: 1,
+        },
+      });
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionB,
+        printStatus: null,
+      });
+
+      await harness.printService.runQueuePass();
+      await vi.advanceTimersByTimeAsync(100);
+      await harness.printService.runQueuePass();
+      expect(harness.wf.getSnapshot().printStatus).toMatchObject({
+        phase: 'completed',
+        origin: 'session',
+      });
+
+      const sessionC = await prepNextReviewSession(2_000);
+      const afterC = harness.wf.acceptPhotos(harness.fourR, null);
+      expect(afterC).toMatchObject({
+        screen: 'attract',
+        printStatus: null,
+      });
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionC,
+        printStatus: null,
+      });
+
+      const sessionD = await prepNextReviewSession(3_000);
+      harness.wf.acceptPhotos(harness.fourR, { copies: 2 });
+      expect(harness.wf.getSnapshot().printStatus).toMatchObject({
+        phase: 'preparing',
+        totalCopies: 2,
+      });
+      expect(harness.wf.getQrStationState().sessionId).toBe(sessionD);
+
+      const sessionE = await prepNextReviewSession(4_000);
+      const afterE = harness.wf.acceptPhotos(harness.fourR, { copies: 3 });
+      expect(afterE).toMatchObject({
+        screen: 'attract',
+        printStatus: {
+          phase: 'preparing',
+          pendingCopies: 3,
+          totalCopies: 3,
+        },
+      });
+      expect(harness.wf.getQrStationState()).toMatchObject({
+        status: 'preparing',
+        sessionId: sessionE,
+        printStatus: {
+          phase: 'preparing',
+          pendingCopies: 3,
+          totalCopies: 3,
+        },
+      });
+      void sessionA;
+    } finally {
+      vi.useRealTimers();
+      await harness.printService.stop();
+    }
+  });
+
+  it('keeps single-display mode isolated from QrStationState and clears printStatus on done', async () => {
+    const harness = await setupDualPrintHarness({ isDual: false });
+    try {
+      const sessionId = harness.createReviewSessionWithCapture(1_000);
+      await harness.wf.initialize();
+
+      const emissions: BoothSnapshot[] = [];
+      const qrEmissions: QrStationState[] = [];
+      harness.wf.subscribe((snap) => emissions.push(snap));
+      harness.wf.subscribeQrStation((state) => qrEmissions.push(state));
+
+      const accepted = harness.wf.acceptPhotos(harness.fourR, { copies: 1 });
+      expect(accepted).toMatchObject({
+        screen: 'processing',
+        sessionId,
+        printStatus: {
+          phase: 'preparing',
+          origin: 'session',
+          pendingCopies: 1,
+          totalCopies: 1,
+        },
+      });
+      expect(emissions).toHaveLength(1);
+      expect(harness.wf.getQrStationState().status).toBe('idle');
+      expect(qrEmissions).toEqual([]);
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      await harness.queue.completeOffline(sessionId);
+      expect(harness.wf.getSnapshot().screen).toBe('final');
+      expect(harness.wf.getQrStationState().status).toBe('idle');
+      expect(qrEmissions).toEqual([]);
+
+      const afterDone = harness.wf.done();
+      expect(afterDone).toMatchObject({
+        screen: 'attract',
+        sessionId: null,
+        printStatus: null,
+      });
+      expect(harness.wf.getSnapshot()).toEqual(afterDone);
+    } finally {
+      await harness.printService.stop();
     }
   });
 });
