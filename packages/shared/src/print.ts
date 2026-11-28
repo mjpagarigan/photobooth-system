@@ -319,3 +319,7 @@ export const SessionPrintStatusSchema = z
 
 export type SessionPrintStatus = z.infer<typeof SessionPrintStatusSchema>;
 export type SessionPrintPhase = SessionPrintStatus['phase'];
+
+export function isSessionPrintActive(status: SessionPrintStatus | null | undefined): boolean {
+  return status?.phase === 'preparing' || status?.phase === 'printing';
+}

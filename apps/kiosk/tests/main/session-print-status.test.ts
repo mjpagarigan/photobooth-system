@@ -218,7 +218,7 @@ describe('SessionPrintStatusSchema boundary invariants', () => {
       status: 'active' as const,
       sessionId: 'cda39163-9036-4acd-ae10-0c08fdb39022',
       collageUrl: null,
-      qrImageUrl: null,
+      qrImageUrl: 'data:image/png;base64,AA==',
       expiresAt: 10_000,
       durationSeconds: 45,
       message: null,

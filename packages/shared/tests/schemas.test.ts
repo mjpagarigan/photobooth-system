@@ -11,12 +11,15 @@ import {
   IpcContracts,
   MAX_FRAME_SLOTS,
   OptionalGoogleFormsUrlSchema,
+  QrStationStateSchema,
   RecruitmentButtonTextSchema,
   SaveCaptureSettingsInputSchema,
   SessionStateSchema,
   isAllowedGoogleFormsUrl,
   isCancellableSessionState,
   isCaptureScreen,
+  isSessionPrintActive,
+  qrStationAllowsAutoDismiss,
 } from '../src/index.js';
 
 const slots = [1, 2, 3].map((slotIndex) => ({
@@ -125,6 +128,183 @@ describe('shared boundary schemas', () => {
         deliveryMode: 'offline',
       },
     });
+  });
+
+  it('enforces all four QrStationStateSchema variants and rejects illegal field combinations', () => {
+    const sessionId = 'cda39163-9036-4acd-ae10-0c08fdb39022';
+
+    const idle = QrStationStateSchema.parse({
+      status: 'idle',
+      sessionId: null,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: null,
+      durationSeconds: 45,
+      message: null,
+      printStatus: null,
+    });
+    expect(idle).toMatchObject({
+      status: 'idle',
+      canRetryUpload: false,
+      canFinishOffline: false,
+    });
+    expect(qrStationAllowsAutoDismiss(idle)).toBe(false);
+
+    const preparing = QrStationStateSchema.parse({
+      status: 'preparing',
+      sessionId,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: null,
+      durationSeconds: 45,
+      message: 'Creating your collage…',
+      printStatus: {
+        phase: 'preparing',
+        origin: 'session',
+        pendingCopies: 2,
+        totalCopies: 2,
+      },
+    });
+    expect(preparing).toMatchObject({
+      status: 'preparing',
+      sessionId,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: null,
+      canRetryUpload: false,
+      canFinishOffline: false,
+    });
+    expect(qrStationAllowsAutoDismiss(preparing)).toBe(false);
+
+    const preparingWithCollage = QrStationStateSchema.parse({
+      ...preparing,
+      collageUrl: 'grace-booth-media://asset/collage-1',
+    });
+    expect(preparingWithCollage.collageUrl).toBe('grace-booth-media://asset/collage-1');
+
+    const active = QrStationStateSchema.parse({
+      status: 'active',
+      sessionId,
+      collageUrl: 'grace-booth-media://asset/collage-1',
+      qrImageUrl: 'data:image/png;base64,AA==',
+      expiresAt: 120_000,
+      durationSeconds: 45,
+      message: null,
+      deliveryMode: 'cloud',
+      printStatus: null,
+    });
+    expect(qrStationAllowsAutoDismiss(active)).toBe(true);
+
+    const error = QrStationStateSchema.parse({
+      status: 'error',
+      sessionId,
+      collageUrl: null,
+      qrImageUrl: null,
+      expiresAt: 120_000,
+      durationSeconds: 45,
+      message: 'Upload failed.',
+      canRetryUpload: true,
+      canFinishOffline: true,
+      printStatus: null,
+    });
+    expect(qrStationAllowsAutoDismiss(error)).toBe(true);
+
+    expect(() => QrStationStateSchema.parse({ ...preparing, expiresAt: 120_000 })).toThrow();
+    expect(() =>
+      QrStationStateSchema.parse({ ...preparing, qrImageUrl: 'data:image/png;base64,AA==' }),
+    ).toThrow();
+    expect(() => QrStationStateSchema.parse({ ...preparing, canRetryUpload: true })).toThrow();
+    expect(() => QrStationStateSchema.parse({ ...idle, expiresAt: 120_000 })).toThrow();
+    expect(() =>
+      QrStationStateSchema.parse({ ...idle, qrImageUrl: 'data:image/png;base64,AA==' }),
+    ).toThrow();
+    expect(() => QrStationStateSchema.parse({ ...idle, sessionId })).toThrow();
+    expect(() => QrStationStateSchema.parse({ ...active, qrImageUrl: null })).toThrow();
+    expect(() => QrStationStateSchema.parse({ ...active, canFinishOffline: true })).toThrow();
+    expect(() =>
+      QrStationStateSchema.parse({ ...error, qrImageUrl: 'data:image/png;base64,AA==' }),
+    ).toThrow();
+  });
+
+  it('identifies active session print phases via isSessionPrintActive', () => {
+    expect(isSessionPrintActive(null)).toBe(false);
+    expect(isSessionPrintActive(undefined)).toBe(false);
+    expect(
+      isSessionPrintActive({
+        phase: 'preparing',
+        origin: 'session',
+        pendingCopies: 1,
+        totalCopies: 1,
+      }),
+    ).toBe(true);
+    expect(
+      isSessionPrintActive({
+        phase: 'printing',
+        origin: 'reprint',
+        stage: 'active',
+        printedCopies: 0,
+        remainingCopies: 1,
+        totalCopies: 1,
+      }),
+    ).toBe(true);
+    expect(
+      isSessionPrintActive({
+        phase: 'paused',
+        origin: 'session',
+        reason: 'offline',
+        detail: 'Printer offline.',
+        printedCopies: 0,
+        remainingCopies: 1,
+        totalCopies: 1,
+      }),
+    ).toBe(false);
+    expect(
+      isSessionPrintActive({
+        phase: 'needs_attention',
+        origin: 'session',
+        detail: 'Check tray.',
+        printedCopies: 0,
+        attentionCopies: 1,
+        remainingCopies: 0,
+        totalCopies: 1,
+      }),
+    ).toBe(false);
+    expect(
+      isSessionPrintActive({
+        phase: 'completed',
+        origin: 'session',
+        totalCopies: 1,
+        completedAt: 1_000,
+      }),
+    ).toBe(false);
+    expect(
+      isSessionPrintActive({
+        phase: 'partial',
+        origin: 'session',
+        printedCopies: 1,
+        failedCopies: 1,
+        cancelledCopies: 0,
+        totalCopies: 2,
+        completedAt: 1_000,
+      }),
+    ).toBe(false);
+    expect(
+      isSessionPrintActive({
+        phase: 'failed',
+        origin: 'session',
+        failedCopies: 1,
+        cancelledCopies: 0,
+        totalCopies: 1,
+        detail: 'Spool failed.',
+      }),
+    ).toBe(false);
+    expect(
+      isSessionPrintActive({
+        phase: 'cancelled',
+        origin: 'session',
+        totalCopies: 1,
+      }),
+    ).toBe(false);
   });
 
   it('accepts a trimmed Unicode recruitment label and rejects invalid button text', () => {

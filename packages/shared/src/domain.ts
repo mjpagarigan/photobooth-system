@@ -221,22 +221,88 @@ export type DisplayInfo = z.infer<typeof DisplayInfoSchema>;
 export const DeliveryModeSchema = z.enum(['cloud', 'offline']);
 export type DeliveryMode = z.infer<typeof DeliveryModeSchema>;
 
-export const QrStationStateSchema = z
+export const QrStationIdleStateSchema = z
   .object({
-    status: z.enum(['idle', 'active', 'error']),
-    sessionId: OpaqueIdSchema.nullable(),
-    collageUrl: z.string().nullable(),
-    qrImageUrl: z.string().nullable(),
+    status: z.literal('idle'),
+    sessionId: z.null(),
+    collageUrl: z.null(),
+    qrImageUrl: z.null(),
+    expiresAt: z.null(),
+    durationSeconds: z.number().int().positive(),
+    message: z.null(),
+    canRetryUpload: z.literal(false).default(false),
+    canFinishOffline: z.literal(false).default(false),
+    deliveryMode: z.undefined().optional(),
+    printStatus: z.null().optional(),
+  })
+  .strict();
+
+export const QrStationPreparingStateSchema = z
+  .object({
+    status: z.literal('preparing'),
+    sessionId: OpaqueIdSchema,
+    collageUrl: z.string().min(1).nullable(),
+    qrImageUrl: z.null(),
+    expiresAt: z.null(),
+    durationSeconds: z.number().int().positive(),
+    message: z.string().nullable(),
+    canRetryUpload: z.literal(false).default(false),
+    canFinishOffline: z.literal(false).default(false),
+    deliveryMode: z.undefined().optional(),
+    printStatus: SessionPrintStatusSchema.nullable().optional(),
+  })
+  .strict();
+
+export const QrStationActiveStateSchema = z
+  .object({
+    status: z.literal('active'),
+    sessionId: OpaqueIdSchema,
+    collageUrl: z.string().min(1).nullable(),
+    qrImageUrl: z.string().min(1),
+    expiresAt: UtcMillisSchema.nullable(),
+    durationSeconds: z.number().int().positive(),
+    message: z.null(),
+    canRetryUpload: z.literal(false).default(false),
+    canFinishOffline: z.literal(false).default(false),
+    deliveryMode: DeliveryModeSchema.optional(),
+    printStatus: SessionPrintStatusSchema.nullable().optional(),
+  })
+  .strict();
+
+export const QrStationErrorStateSchema = z
+  .object({
+    status: z.literal('error'),
+    sessionId: OpaqueIdSchema,
+    collageUrl: z.string().min(1).nullable(),
+    qrImageUrl: z.null(),
     expiresAt: UtcMillisSchema.nullable(),
     durationSeconds: z.number().int().positive(),
     message: z.string().nullable(),
     canRetryUpload: z.boolean().default(false),
     canFinishOffline: z.boolean().default(false),
-    deliveryMode: DeliveryModeSchema.optional(),
+    deliveryMode: z.undefined().optional(),
     printStatus: SessionPrintStatusSchema.nullable().optional(),
   })
   .strict();
+
+export const QrStationStateSchema = z.discriminatedUnion('status', [
+  QrStationIdleStateSchema,
+  QrStationPreparingStateSchema,
+  QrStationActiveStateSchema,
+  QrStationErrorStateSchema,
+]);
+
+export type QrStationIdleState = z.infer<typeof QrStationIdleStateSchema>;
+export type QrStationPreparingState = z.infer<typeof QrStationPreparingStateSchema>;
+export type QrStationActiveState = z.infer<typeof QrStationActiveStateSchema>;
+export type QrStationErrorState = z.infer<typeof QrStationErrorStateSchema>;
 export type QrStationState = z.infer<typeof QrStationStateSchema>;
+
+export function qrStationAllowsAutoDismiss(
+  state: QrStationState,
+): state is QrStationActiveState | QrStationErrorState {
+  return state.status === 'active' || state.status === 'error';
+}
 
 export const GooglePhotosConfigSchema = z
   .object({
