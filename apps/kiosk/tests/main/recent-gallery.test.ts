@@ -1,33 +1,46 @@
-import { randomUUID } from 'node:crypto';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
-import type { ConfirmUploadResponse } from '@grace-booth/shared';
-import { describe, expect, it } from 'vitest';
+import {
+  GalleryItemSchema,
+  type ConfirmUploadResponse,
+  type PhotoAvailability,
+} from '@grace-booth/shared';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ReadyReceipt } from '../../src/main/cloud/ready-receipt.js';
-import { RecentGalleryService } from '../../src/main/gallery/recent-gallery-service.js';
-import type { ImageProcessor } from '../../src/main/image/image-worker-client.js';
+import { AppError } from '../../src/main/errors.js';
+import {
+  RecentGalleryService,
+  localDayWindow,
+} from '../../src/main/gallery/recent-gallery-service.js';
 import { createTestStore, type TestStore } from './helpers.js';
 
 const RETENTION_30_DAYS_MS = 30 * 24 * 60 * 60 * 1_000;
+const AVAILABILITY_TTL_MS = 5 * 60 * 1_000;
+const OFFLINE_COOLDOWN_MS = 15_000;
+const DAY_NOON = new Date(2026, 10, 28, 12, 0, 0, 0).getTime();
 
 function seedFinishedSession(
   store: TestStore,
   frameId: string,
   options: {
-    completedAt: number;
+    completedAt: number | null;
+    createdAt?: number;
+    updatedAt?: number;
     jobState?: string;
     delivery?: { origin: string };
   },
 ): string {
   const sessionId = randomUUID();
-  store.repository.createSession(sessionId, options.completedAt - 60_000);
+  const createdAt = options.createdAt ?? (options.completedAt ?? DAY_NOON) - 60_000;
+  const updatedAt = options.updatedAt ?? options.completedAt ?? createdAt + 60_000;
+  store.repository.createSession(sessionId, createdAt);
   store.database.raw
     .prepare(
       `UPDATE sessions SET state = 'final', capture_count = 3, selected_frame_id = ?,
         completed_at = ?, updated_at = ? WHERE id = ?`,
     )
-    .run(frameId, options.completedAt, options.completedAt, sessionId);
+    .run(frameId, options.completedAt, updatedAt, sessionId);
 
   for (let i = 1; i <= 3; i++) {
     const written = store.vault.write('pending', Buffer.from(`photo-${sessionId}-${i}`));
@@ -67,10 +80,11 @@ function seedFinishedSession(
   }
 
   if (options.delivery) {
+    const readyAnchor = options.completedAt ?? createdAt;
     const ready: ConfirmUploadResponse = {
       status: 'ready',
-      readyAt: new Date(options.completedAt).toISOString(),
-      expiresAt: new Date(options.completedAt + RETENTION_30_DAYS_MS).toISOString(),
+      readyAt: new Date(readyAnchor).toISOString(),
+      expiresAt: new Date(readyAnchor + RETENTION_30_DAYS_MS).toISOString(),
       publicPageOrigin: options.delivery.origin,
       publicPath: '/photo',
     };
@@ -88,42 +102,79 @@ function seedFinishedSession(
   return sessionId;
 }
 
+describe('localDayWindow', () => {
+  it('computes half-open local calendar day boundaries across rollovers and DST dates', () => {
+    for (const sampleMs of [
+      DAY_NOON,
+      new Date(2026, 10, 30, 23, 59, 59, 999).getTime(),
+      new Date(2026, 11, 31, 12, 0, 0, 0).getTime(),
+      new Date(2026, 2, 8, 12, 0, 0, 0).getTime(),
+      new Date(2026, 10, 1, 12, 0, 0, 0).getTime(),
+      new Date(2024, 1, 29, 18, 30, 0, 0).getTime(),
+    ]) {
+      const sample = new Date(sampleMs);
+      const expectedStart = new Date(
+        sample.getFullYear(),
+        sample.getMonth(),
+        sample.getDate(),
+        0,
+        0,
+        0,
+        0,
+      ).getTime();
+      const expectedEnd = new Date(
+        sample.getFullYear(),
+        sample.getMonth(),
+        sample.getDate() + 1,
+        0,
+        0,
+        0,
+        0,
+      ).getTime();
+      const window = localDayWindow(sampleMs);
+      expect(window).toEqual({ startMs: expectedStart, endMs: expectedEnd });
+      expect(window.startMs).toBeLessThanOrEqual(sampleMs);
+      expect(sampleMs).toBeLessThan(window.endMs);
+    }
+
+    for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 9e15]) {
+      let caught: unknown;
+      try {
+        localDayWindow(invalid);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(AppError);
+      expect(caught).toMatchObject({ code: 'invalid_day_window' });
+    }
+  });
+});
+
 describe('recent gallery service', () => {
-  it('lists finished sessions newest-first with previews, per-item QR data, and statuses', async () => {
+  it('lists today sessions newest-first with media URLs, per-item QR data, and statuses', async () => {
     const store = createTestStore();
     try {
       const frameId = randomUUID();
       seedFrame(store, frameId);
       seedFrameSlots(store, frameId);
 
+      const cloudCompletedAt = DAY_NOON + 10_000;
       const cloudUploaded = seedFinishedSession(store, frameId, {
-        completedAt: 2_000_000,
+        completedAt: cloudCompletedAt,
         jobState: 'succeeded',
         delivery: { origin: 'https://bejgkclvsfbkpkflftxu.supabase.co' },
       });
       const lanReceipt = seedFinishedSession(store, frameId, {
-        completedAt: 3_000_000,
+        completedAt: DAY_NOON + 20_000,
         jobState: 'succeeded',
         delivery: { origin: 'http://192.168.1.20:4310' },
       });
       const failedUpload = seedFinishedSession(store, frameId, {
-        completedAt: 4_000_000,
+        completedAt: DAY_NOON + 30_000,
         jobState: 'failed',
       });
 
       const renderedQrs: ReadyReceipt[] = [];
-      const imageProcessor: ImageProcessor = {
-        process: () => Promise.reject(new Error('process should not be called')),
-        validateSourceJpeg: () => Promise.reject(new Error('not used')),
-        normalizeFramePng: () => Promise.reject(new Error('not used')),
-        createThumbnail: (bytes) =>
-          Promise.resolve({
-            bytes: Buffer.from(`preview:${bytes.length}`),
-            width: 360,
-            height: 1080,
-          }),
-        close: () => Promise.resolve(),
-      };
       const qrService = {
         render: (receipt: ReadyReceipt) => {
           renderedQrs.push(receipt);
@@ -141,26 +192,27 @@ describe('recent gallery service', () => {
           readDeliverySecret: (reference: string) => readSecret(store, reference),
         },
         qrService,
-        imageProcessor,
         delivery: {
           checkPhotoAvailability: () => Promise.resolve('available'),
         },
+        now: () => DAY_NOON + 60_000,
       });
 
-      const items = await service.getRecent(20);
+      const items = await service.getRecent();
 
       expect(items.map((item) => item.sessionId)).toEqual([
         failedUpload,
         lanReceipt,
         cloudUploaded,
       ]);
-      // Each item carries a small thumbnailed preview of the stored collage.
       for (const item of items) {
-        expect(item.previewDataUrl.startsWith('data:image/jpeg;base64,')).toBe(true);
+        GalleryItemSchema.parse(item);
+        const collageId = store.repository.requireSession(item.sessionId).collageAssetId!;
+        expect(item.previewUrl).toBe(`grace-booth-media://thumb/${collageId}`);
+        expect(item.detailUrl).toBe(`grace-booth-media://asset/${collageId}`);
         expect(item.metadata.photoCount).toBe(3);
         expect(item.metadata.frameName).toBe('Test Frame');
       }
-      // QR receipts resolve each item's own token at its LAN/cloud origin.
       expect(renderedQrs).toHaveLength(2);
       const newestItem = items[0]!;
       expect(newestItem.metadata.uploadStatus).toBe('failed');
@@ -177,7 +229,116 @@ describe('recent gallery service', () => {
 
       const cloudItem = items.find((item) => item.sessionId === cloudUploaded)!;
       expect(cloudItem.metadata.uploadStatus).toBe('uploaded');
-      expect(cloudItem.metadata.cloudExpiresAt).toBe(2_000_000 + RETENTION_30_DAYS_MS);
+      expect(cloudItem.metadata.cloudExpiresAt).toBe(cloudCompletedAt + RETENTION_30_DAYS_MS);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('returns all sessions captured within the current local day without a 20-item cap', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+
+      const expectedIds: string[] = [];
+      for (let index = 0; index < 28; index += 1) {
+        const createdAt = DAY_NOON - 3_600_000 + index * 60_000;
+        const sessionId = seedFinishedSession(store, frameId, {
+          createdAt,
+          completedAt: createdAt + 10_000,
+          jobState: 'succeeded',
+          delivery: { origin: 'http://192.168.1.20:4310' },
+        });
+        expectedIds.push(sessionId);
+      }
+      expectedIds.reverse();
+
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: {
+          render: () =>
+            Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+        },
+        delivery: {
+          checkPhotoAvailability: () => Promise.resolve('available'),
+        },
+        now: () => DAY_NOON + 3_600_000,
+      });
+
+      const items = await service.getRecent();
+      expect(items).toHaveLength(28);
+      expect(items.map((item) => item.sessionId)).toEqual(expectedIds);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('enforces local-day created_at boundaries and includes dual-display sessions with null completed_at', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+
+      const { startMs, endMs } = localDayWindow(DAY_NOON);
+      const beforeDay = seedFinishedSession(store, frameId, {
+        createdAt: startMs - 1,
+        completedAt: DAY_NOON + 10_000,
+        updatedAt: DAY_NOON + 10_000,
+        jobState: 'failed',
+      });
+      const atStart = seedFinishedSession(store, frameId, {
+        createdAt: startMs,
+        completedAt: startMs,
+        jobState: 'failed',
+      });
+      const dualDisplayOpen = seedFinishedSession(store, frameId, {
+        createdAt: startMs + 30_000,
+        completedAt: null,
+        updatedAt: startMs + 35_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'http://192.168.1.20:4310' },
+      });
+      const beforeEnd = seedFinishedSession(store, frameId, {
+        createdAt: endMs - 1,
+        completedAt: endMs - 1,
+        jobState: 'failed',
+      });
+      const atEnd = seedFinishedSession(store, frameId, {
+        createdAt: endMs,
+        completedAt: endMs,
+        jobState: 'failed',
+      });
+
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: {
+          render: () =>
+            Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+        },
+        delivery: {
+          checkPhotoAvailability: () => Promise.resolve('available'),
+        },
+        now: () => DAY_NOON,
+      });
+
+      const items = await service.getRecent();
+      expect(items.map((item) => item.sessionId)).toEqual([beforeEnd, dualDisplayOpen, atStart]);
+      expect(items.some((item) => item.sessionId === beforeDay)).toBe(false);
+      expect(items.some((item) => item.sessionId === atEnd)).toBe(false);
+      expect(items.find((item) => item.sessionId === dualDisplayOpen)?.metadata.uploadStatus).toBe(
+        'local-receipt',
+      );
     } finally {
       store.close();
     }
@@ -190,12 +351,12 @@ describe('recent gallery service', () => {
       seedFrame(store, frameId);
       seedFrameSlots(store, frameId);
       const unavailable = seedFinishedSession(store, frameId, {
-        completedAt: 2_000_000,
+        completedAt: DAY_NOON + 10_000,
         jobState: 'succeeded',
         delivery: { origin: 'https://photos.example.test' },
       });
       const transient = seedFinishedSession(store, frameId, {
-        completedAt: 3_000_000,
+        completedAt: DAY_NOON + 20_000,
         jobState: 'succeeded',
         delivery: { origin: 'https://photos.example.test' },
       });
@@ -219,21 +380,14 @@ describe('recent gallery service', () => {
               expiresAt: '',
             }),
         },
-        imageProcessor: {
-          process: () => Promise.reject(new Error('not used')),
-          validateSourceJpeg: () => Promise.reject(new Error('not used')),
-          normalizeFramePng: () => Promise.reject(new Error('not used')),
-          createThumbnail: (bytes) =>
-            Promise.resolve({ bytes: Buffer.from(bytes), width: 360, height: 1080 }),
-          close: () => Promise.resolve(),
-        },
         delivery: {
           checkPhotoAvailability: (token) =>
             Promise.resolve(statusByToken.get(token) ?? 'verification-failed'),
         },
+        now: () => DAY_NOON + 30_000,
       });
 
-      const items = await service.getRecent(20);
+      const items = await service.getRecent();
       expect(items.find((item) => item.sessionId === unavailable)).toMatchObject({
         qrDataUrl: null,
         metadata: { uploadStatus: 'unavailable' },
@@ -256,7 +410,8 @@ describe('recent gallery service', () => {
       seedFrameSlots(store, frameId);
       for (let index = 0; index < 9; index += 1) {
         seedFinishedSession(store, frameId, {
-          completedAt: 2_000_000 + index,
+          createdAt: DAY_NOON + index * 1_000,
+          completedAt: DAY_NOON + index * 1_000 + 500,
           jobState: 'succeeded',
           delivery: { origin: 'https://photos.example.test' },
         });
@@ -274,14 +429,6 @@ describe('recent gallery service', () => {
           render: () =>
             Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
         },
-        imageProcessor: {
-          process: () => Promise.reject(new Error('not used')),
-          validateSourceJpeg: () => Promise.reject(new Error('not used')),
-          normalizeFramePng: () => Promise.reject(new Error('not used')),
-          createThumbnail: (bytes) =>
-            Promise.resolve({ bytes: Buffer.from(bytes), width: 360, height: 1080 }),
-          close: () => Promise.resolve(),
-        },
         delivery: {
           checkPhotoAvailability: async () => {
             active += 1;
@@ -291,9 +438,10 @@ describe('recent gallery service', () => {
             return 'available';
           },
         },
+        now: () => DAY_NOON + 60_000,
       });
 
-      const items = await service.getRecent(20);
+      const items = await service.getRecent();
       expect(items).toHaveLength(9);
       expect(maximumActive).toBe(4);
     } finally {
@@ -301,14 +449,238 @@ describe('recent gallery service', () => {
     }
   });
 
-  it('repairs a missing cloud copy from the verified encrypted local collage', async () => {
+  it('caches available checks within TTL, bypasses on refresh, never caches missing items, and invalidates on rollover', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+
+      const { endMs } = localDayWindow(DAY_NOON);
+      const cloudSession = seedFinishedSession(store, frameId, {
+        createdAt: DAY_NOON,
+        completedAt: DAY_NOON + 5_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'https://photos.example.test' },
+      });
+      const lanSession = seedFinishedSession(store, frameId, {
+        createdAt: DAY_NOON + 1_000,
+        completedAt: DAY_NOON + 6_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'http://192.168.1.20:4310' },
+      });
+      const nextDaySession = seedFinishedSession(store, frameId, {
+        createdAt: endMs + 1_000,
+        completedAt: endMs + 2_000,
+        jobState: 'succeeded',
+        delivery: { origin: 'https://photos.example.test' },
+      });
+
+      let currentNowMs = DAY_NOON + 10_000;
+      let nextAvailability: PhotoAvailability = 'available';
+      const checkPhotoAvailability = vi.fn(() => Promise.resolve(nextAvailability));
+      const qrRender = vi.fn((receipt: ReadyReceipt) =>
+        Promise.resolve({
+          imageDataUrl: `data:image/png;base64,qr-${receipt.publicPageOrigin}`,
+          expiresAt: receipt.expiresAt,
+        }),
+      );
+
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: { render: qrRender },
+        delivery: { checkPhotoAvailability },
+        now: () => currentNowMs,
+      });
+
+      const initial = await service.getRecent();
+      expect(initial.map((item) => item.sessionId)).toEqual([lanSession, cloudSession]);
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(1);
+      expect(qrRender).toHaveBeenCalledTimes(2);
+
+      currentNowMs += AVAILABILITY_TTL_MS - 1;
+      const withinTtl = await service.getRecent();
+      expect(withinTtl.find((item) => item.sessionId === cloudSession)?.metadata.uploadStatus).toBe(
+        'uploaded',
+      );
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(1);
+      expect(qrRender).toHaveBeenCalledTimes(2);
+
+      currentNowMs += 1;
+      await service.getRecent();
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(2);
+
+      currentNowMs -= 10_000;
+      await service.getRecent();
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(3);
+
+      currentNowMs += 20_000;
+      nextAvailability = 'unavailable';
+      const refreshedUnavailable = await service.getRecent({ refresh: true });
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(4);
+      expect(refreshedUnavailable.find((item) => item.sessionId === cloudSession)).toMatchObject({
+        qrDataUrl: null,
+        metadata: { uploadStatus: 'unavailable' },
+      });
+
+      nextAvailability = 'available';
+      const recheckedAfterUnavailable = await service.getRecent();
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(5);
+      expect(
+        recheckedAfterUnavailable.find((item) => item.sessionId === cloudSession)?.metadata
+          .uploadStatus,
+      ).toBe('uploaded');
+      expect(qrRender).toHaveBeenCalledTimes(3);
+
+      currentNowMs = endMs + 5_000;
+      const rolledOver = await service.getRecent();
+      expect(rolledOver.map((item) => item.sessionId)).toEqual([nextDaySession]);
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(6);
+      expect(qrRender).toHaveBeenCalledTimes(4);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('trips offline circuit breaker after four consecutive verification failures and resets on refresh or midnight rollover', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+
+      const { endMs } = localDayWindow(DAY_NOON);
+      for (let index = 0; index < 12; index += 1) {
+        seedFinishedSession(store, frameId, {
+          createdAt: endMs - 60_000 + index * 1_000,
+          completedAt: endMs - 55_000 + index * 1_000,
+          jobState: 'succeeded',
+          delivery: { origin: 'https://photos.example.test' },
+        });
+      }
+      const nextDaySession = seedFinishedSession(store, frameId, {
+        createdAt: endMs + 1_000,
+        completedAt: endMs + 1_500,
+        jobState: 'succeeded',
+        delivery: { origin: 'https://photos.example.test' },
+      });
+
+      let currentNowMs = endMs - 30_000;
+      let mode: 'fail' | 'throw' | 'available' = 'fail';
+      const checkPhotoAvailability = vi.fn(() => {
+        if (mode === 'throw') return Promise.reject(new Error('network down'));
+        if (mode === 'fail') return Promise.resolve('verification-failed' as const);
+        return Promise.resolve('available' as const);
+      });
+
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: {
+          render: () =>
+            Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+        },
+        delivery: { checkPhotoAvailability },
+        now: () => currentNowMs,
+      });
+
+      const trippedItems = await service.getRecent();
+      expect(trippedItems).toHaveLength(12);
+      for (const item of trippedItems) {
+        expect(item.qrDataUrl).toBeNull();
+        expect(item.metadata.uploadStatus).toBe('verification-failed');
+      }
+      expect(checkPhotoAvailability.mock.calls.length).toBeGreaterThanOrEqual(4);
+      expect(checkPhotoAvailability.mock.calls.length).toBeLessThanOrEqual(7);
+
+      const callsAfterTrip = checkPhotoAvailability.mock.calls.length;
+      currentNowMs += 2_000;
+      const cooledDownItems = await service.getRecent();
+      expect(cooledDownItems).toHaveLength(12);
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(callsAfterTrip);
+
+      currentNowMs += OFFLINE_COOLDOWN_MS;
+      mode = 'throw';
+      await service.getRecent();
+      expect(checkPhotoAvailability.mock.calls.length).toBeGreaterThanOrEqual(callsAfterTrip + 4);
+      expect(checkPhotoAvailability.mock.calls.length).toBeLessThanOrEqual(callsAfterTrip + 7);
+
+      const callsBeforeRollover = checkPhotoAvailability.mock.calls.length;
+      mode = 'available';
+      currentNowMs = endMs + 2_000;
+      const rolledOver = await service.getRecent();
+      expect(rolledOver.map((item) => item.sessionId)).toEqual([nextDaySession]);
+      expect(rolledOver[0]?.metadata.uploadStatus).toBe('uploaded');
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(callsBeforeRollover + 1);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('bypasses circuit breaker cooldown when refresh is true', async () => {
+    const store = createTestStore();
+    try {
+      const frameId = randomUUID();
+      seedFrame(store, frameId);
+      seedFrameSlots(store, frameId);
+
+      for (let index = 0; index < 10; index += 1) {
+        seedFinishedSession(store, frameId, {
+          createdAt: DAY_NOON + index * 1_000,
+          completedAt: DAY_NOON + index * 1_000 + 500,
+          jobState: 'succeeded',
+          delivery: { origin: 'https://photos.example.test' },
+        });
+      }
+
+      let currentNowMs = DAY_NOON + 20_000;
+      let status: PhotoAvailability = 'verification-failed';
+      const checkPhotoAvailability = vi.fn(() => Promise.resolve(status));
+
+      const service = new RecentGalleryService({
+        repository: store.repository,
+        vault: store.vault,
+        uploadQueue: {
+          readDeliverySecret: (reference: string) => readSecret(store, reference),
+        },
+        qrService: {
+          render: () =>
+            Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+        },
+        delivery: { checkPhotoAvailability },
+        now: () => currentNowMs,
+      });
+
+      await service.getRecent();
+      const afterTrip = checkPhotoAvailability.mock.calls.length;
+      expect(afterTrip).toBeLessThan(10);
+
+      currentNowMs += 3_000;
+      status = 'available';
+      const refreshed = await service.getRecent({ refresh: true });
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(afterTrip + 10);
+      expect(refreshed.every((item) => item.metadata.uploadStatus === 'uploaded')).toBe(true);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('repairs a missing cloud copy and invalidates that session caches', async () => {
     const store = createTestStore();
     try {
       const frameId = randomUUID();
       seedFrame(store, frameId);
       seedFrameSlots(store, frameId);
       const sessionId = seedFinishedSession(store, frameId, {
-        completedAt: 4_000_000,
+        createdAt: DAY_NOON,
+        completedAt: DAY_NOON + 10_000,
         jobState: 'succeeded',
         delivery: { origin: 'https://photos.example.test' },
       });
@@ -321,22 +693,19 @@ describe('recent gallery service', () => {
         .run(bytes.byteLength, sha256, collage.id);
 
       const calls: string[] = [];
+      const checkPhotoAvailability = vi.fn(() => Promise.resolve('available' as const));
+      const qrRender = vi.fn(() =>
+        Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
+      );
       const service = new RecentGalleryService({
         repository: store.repository,
         vault: store.vault,
         uploadQueue: {
           readDeliverySecret: (reference: string) => readSecret(store, reference),
         },
-        qrService: { render: () => Promise.reject(new Error('not used')) },
-        imageProcessor: {
-          process: () => Promise.reject(new Error('not used')),
-          validateSourceJpeg: () => Promise.reject(new Error('not used')),
-          normalizeFramePng: () => Promise.reject(new Error('not used')),
-          createThumbnail: () => Promise.reject(new Error('not used')),
-          close: () => Promise.resolve(),
-        },
+        qrService: { render: qrRender },
         delivery: {
-          checkPhotoAvailability: () => Promise.resolve('unavailable'),
+          checkPhotoAvailability,
           authorizePhotoRepair: (request) => {
             calls.push(`authorize:${request.metadata.sha256}`);
             return Promise.resolve({
@@ -367,7 +736,12 @@ describe('recent gallery service', () => {
             });
           },
         },
+        now: () => DAY_NOON + 20_000,
       });
+
+      await service.getRecent();
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(1);
+      expect(qrRender).toHaveBeenCalledTimes(1);
 
       await expect(service.repairCloudPhoto(sessionId)).resolves.toMatchObject({
         status: 'repaired',
@@ -377,6 +751,11 @@ describe('recent gallery service', () => {
         'upload',
         'confirm:dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       ]);
+
+      await service.getRecent();
+      expect(checkPhotoAvailability).toHaveBeenCalledTimes(2);
+      expect(qrRender).toHaveBeenCalledTimes(2);
+
       await expect(service.repairCloudPhoto(randomUUID())).resolves.toEqual({
         status: 'original-booth-required',
         message: 'Recovery requires the original booth.',
@@ -401,16 +780,16 @@ describe('recent gallery service', () => {
       }
 
       const sessionId = randomUUID();
-      store.repository.createSession(sessionId, 5_000_000, frameId, 4, {
+      store.repository.createSession(sessionId, DAY_NOON, frameId, 4, {
         countdownSeconds: 8,
         reviewMode: 'per_shot',
       });
       store.database.raw
         .prepare(
           `UPDATE sessions SET state = 'final', capture_round = 1, capture_count = 4,
-            completed_at = 5_060_000, updated_at = 5_060_000 WHERE id = ?`,
+            completed_at = ?, updated_at = ? WHERE id = ?`,
         )
-        .run(sessionId);
+        .run(DAY_NOON + 60_000, DAY_NOON + 60_000, sessionId);
 
       const insertCapture = store.database.raw.prepare(
         `INSERT INTO session_assets
@@ -460,18 +839,11 @@ describe('recent gallery service', () => {
           render: () =>
             Promise.resolve({ imageDataUrl: 'data:image/png;base64,qr', expiresAt: '' }),
         },
-        imageProcessor: {
-          process: () => Promise.reject(new Error('not used')),
-          validateSourceJpeg: () => Promise.reject(new Error('not used')),
-          normalizeFramePng: () => Promise.reject(new Error('not used')),
-          createThumbnail: (bytes) =>
-            Promise.resolve({ bytes: Buffer.from(bytes), width: 600, height: 400 }),
-          close: () => Promise.resolve(),
-        },
         delivery: { checkPhotoAvailability: () => Promise.resolve('available') },
+        now: () => DAY_NOON + 120_000,
       });
 
-      const items = await service.getRecent(20);
+      const items = await service.getRecent();
       expect(items).toHaveLength(1);
       expect(items[0]!.metadata.photoCount).toBe(4);
       expect(items[0]!.metadata.printable).toBe(true);
