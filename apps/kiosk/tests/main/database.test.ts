@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { openBoothDatabase } from '../../src/main/database/database.js';
 import { LocalRepository } from '../../src/main/database/repositories.js';
 import { settings } from '../../src/main/database/schema.js';
+import { AppError } from '../../src/main/errors.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createTestStore, type TestStore } from './helpers.js';
@@ -407,5 +408,179 @@ describe('checked-in local migration', () => {
       shot1Second.assetId,
       shot2.assetId,
     ]);
+  });
+
+  it('creates sessions_collage_created_idx and uses it for day-window collage queries', () => {
+    store = createTestStore();
+    const indexRow = store.database.raw
+      .prepare<
+        [],
+        { name: string; sql: string }
+      >("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND name = 'sessions_collage_created_idx'")
+      .get();
+    expect(indexRow?.name).toBe('sessions_collage_created_idx');
+    expect(indexRow?.sql).toContain('created_at DESC, id DESC');
+
+    const startMs = 1_764_316_800_000;
+    const endMs = startMs + 86_400_000;
+    const plan = store.database.raw
+      .prepare(
+        `EXPLAIN QUERY PLAN
+        SELECT * FROM sessions
+        WHERE collage_asset_id IS NOT NULL
+          AND cleanup_state = 'active'
+          AND created_at >= ?
+          AND created_at < ?
+        ORDER BY created_at DESC, id DESC`,
+      )
+      .all(startMs, endMs);
+
+    const details = plan.map((row) =>
+      typeof row === 'object' && row !== null && 'detail' in row ? String(row.detail) : '',
+    );
+    expect(details.some((detail) => detail.includes('sessions_collage_created_idx'))).toBe(true);
+    expect(details.some((detail) => detail.includes('TEMP B-TREE'))).toBe(false);
+  });
+
+  it('lists all active sessions with collages in [startMs, endMs) ordered by created_at DESC, id DESC', () => {
+    store = createTestStore();
+    const startMs = 1_764_316_800_000;
+    const endMs = startMs + 86_400_000;
+
+    const insertSession = store.database.raw.prepare(
+      `INSERT INTO sessions (
+        id, state, capture_round, capture_count, required_shot_count,
+        collage_asset_id, created_at, updated_at, completed_at, cleanup_state
+      ) VALUES (?, ?, 0, 3, 3, ?, ?, ?, ?, ?)`,
+    );
+
+    const lowerBoundId = '00000000-0000-4000-8000-000000000001';
+    insertSession.run(
+      lowerBoundId,
+      'final',
+      randomUUID(),
+      startMs,
+      startMs + 100,
+      startMs + 100,
+      'active',
+    );
+
+    const tieLowId = '00000000-0000-4000-8000-00000000000a';
+    const tieHighId = '00000000-0000-4000-8000-00000000000b';
+    insertSession.run(
+      tieLowId,
+      'final',
+      randomUUID(),
+      startMs + 5_000,
+      startMs + 5_100,
+      startMs + 5_100,
+      'active',
+    );
+    insertSession.run(
+      tieHighId,
+      'final',
+      randomUUID(),
+      startMs + 5_000,
+      startMs + 5_200,
+      startMs + 5_200,
+      'active',
+    );
+
+    const dualDisplayId = '00000000-0000-4000-8000-00000000000c';
+    insertSession.run(
+      dualDisplayId,
+      'ready',
+      randomUUID(),
+      startMs + 6_000,
+      startMs + 6_100,
+      null,
+      'active',
+    );
+
+    const laterIds: string[] = [];
+    for (let index = 0; index < 21; index += 1) {
+      const id = `00000000-0000-4000-8000-${String(100 + index).padStart(12, '0')}`;
+      const createdAt = startMs + 10_000 + index * 1_000;
+      insertSession.run(
+        id,
+        'final',
+        randomUUID(),
+        createdAt,
+        createdAt + 50,
+        createdAt + 50,
+        'active',
+      );
+      laterIds.push(id);
+    }
+
+    const beforeWindowId = randomUUID();
+    insertSession.run(
+      beforeWindowId,
+      'final',
+      randomUUID(),
+      startMs - 1,
+      startMs + 50_000,
+      startMs + 50_000,
+      'active',
+    );
+    const atEndBoundaryId = randomUUID();
+    insertSession.run(atEndBoundaryId, 'final', randomUUID(), endMs, endMs, endMs, 'active');
+    const tombstoningId = randomUUID();
+    insertSession.run(
+      tombstoningId,
+      'final',
+      randomUUID(),
+      startMs + 2_000,
+      startMs + 2_000,
+      startMs + 2_000,
+      'tombstoning',
+    );
+    const noCollageId = randomUUID();
+    insertSession.run(
+      noCollageId,
+      'review',
+      null,
+      startMs + 3_000,
+      startMs + 3_000,
+      null,
+      'active',
+    );
+
+    const expectedIds = [
+      ...[...laterIds].reverse(),
+      dualDisplayId,
+      tieHighId,
+      tieLowId,
+      lowerBoundId,
+    ];
+
+    const results = store.repository.listSessionsWithCollageBetween(startMs, endMs);
+    expect(results).toHaveLength(25);
+    expect(results.map((session) => session.id)).toEqual(expectedIds);
+    expect(results.find((session) => session.id === dualDisplayId)?.completedAt).toBeNull();
+    expect(results.some((session) => session.id === beforeWindowId)).toBe(false);
+    expect(results.some((session) => session.id === atEndBoundaryId)).toBe(false);
+    expect(results.some((session) => session.id === tombstoningId)).toBe(false);
+    expect(results.some((session) => session.id === noCollageId)).toBe(false);
+
+    expect(store.repository.listSessionsWithCollageBetween(startMs, startMs)).toEqual([]);
+
+    for (const [badStart, badEnd] of [
+      [endMs, startMs],
+      [startMs, startMs - 1],
+      [Number.NaN, endMs],
+      [startMs, Number.NaN],
+      [Number.NEGATIVE_INFINITY, endMs],
+      [startMs, Number.POSITIVE_INFINITY],
+    ] as const) {
+      let caught: unknown;
+      try {
+        store.repository.listSessionsWithCollageBetween(badStart, badEnd);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(AppError);
+      expect(caught).toMatchObject({ code: 'invalid_day_window' });
+    }
   });
 });
