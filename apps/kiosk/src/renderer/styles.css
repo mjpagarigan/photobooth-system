@@ -3093,6 +3093,8 @@ body,
   border: 0;
   background: transparent;
   box-shadow: none;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
 }
 
 .gallery-tile:hover {

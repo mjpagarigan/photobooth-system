@@ -102,7 +102,8 @@ describe('guest screen components', () => {
   it('shows cloud repair only to operators for confirmed-unavailable photos', async () => {
     const item: GalleryItem = {
       sessionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      previewDataUrl: 'data:image/jpeg;base64,AA==',
+      previewUrl: 'data:image/jpeg;base64,AA==',
+      detailUrl: 'data:image/jpeg;base64,AA==',
       qrDataUrl: null,
       metadata: {
         capturedAt: 1,
@@ -138,7 +139,8 @@ describe('guest screen components', () => {
   it('hides operator metadata from guests and forwards tone to both dialogs', async () => {
     const item: GalleryItem = {
       sessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      previewDataUrl: 'data:image/jpeg;base64,AA==',
+      previewUrl: 'data:image/jpeg;base64,AA==',
+      detailUrl: 'data:image/jpeg;base64,AA==',
       qrDataUrl: 'data:image/png;base64,AA==',
       metadata: {
         capturedAt: 1,
@@ -172,6 +174,158 @@ describe('guest screen components', () => {
 
     await user.keyboard('{Escape}');
     expect(tile).toHaveFocus();
+  });
+
+  it('renders more than 20 items, distinguishes previewUrl from detailUrl, and sets loading attributes by URL scheme', async () => {
+    const items: GalleryItem[] = Array.from({ length: 25 }, (_, index) => {
+      const mediaItem = index < 24;
+      return {
+        sessionId: `${String(index + 1).padStart(8, '0')}-0000-4000-8000-000000000000`,
+        previewUrl: mediaItem
+          ? `grace-booth-media://asset/preview-${index + 1}`
+          : 'data:image/jpeg;base64,AA==',
+        detailUrl: mediaItem
+          ? `grace-booth-media://asset/detail-${index + 1}`
+          : 'data:image/jpeg;base64,BB==',
+        qrDataUrl: mediaItem
+          ? `grace-booth-media://asset/qr-${index + 1}`
+          : 'data:image/png;base64,CC==',
+        metadata: {
+          capturedAt: 1_700_000_000_000 - index * 60_000,
+          photoCount: 3,
+          frameName: 'Test',
+          uploadStatus: 'uploaded',
+          cloudExpiresAt: 1_800_000_000_000,
+          printable: false,
+        },
+      };
+    });
+
+    const user = userEvent.setup();
+    render(<RecentGallery items={items} onClose={() => undefined} operator />);
+
+    expect(screen.getAllByTestId(/^gallery-item-/)).toHaveLength(25);
+    expect(screen.getByTestId('gallery-item-25')).toBeInTheDocument();
+
+    const firstPreview = screen
+      .getByTestId('gallery-item-1')
+      .querySelector<HTMLImageElement>('.gallery-tile__preview');
+    const firstQr = screen
+      .getByTestId('gallery-item-1')
+      .querySelector<HTMLImageElement>('.gallery-tile__qr');
+    expect(firstPreview).toHaveAttribute('src', 'grace-booth-media://asset/preview-1');
+    expect(firstPreview).toHaveAttribute('loading', 'lazy');
+    expect(firstPreview).toHaveAttribute('decoding', 'async');
+    expect(firstQr).toHaveAttribute('loading', 'lazy');
+    expect(firstQr).toHaveAttribute('decoding', 'async');
+
+    const dataPreview = screen
+      .getByTestId('gallery-item-25')
+      .querySelector<HTMLImageElement>('.gallery-tile__preview');
+    const dataQr = screen
+      .getByTestId('gallery-item-25')
+      .querySelector<HTMLImageElement>('.gallery-tile__qr');
+    expect(dataPreview).toHaveAttribute('loading', 'eager');
+    expect(dataPreview).toHaveAttribute('decoding', 'async');
+    expect(dataQr).toHaveAttribute('loading', 'eager');
+    expect(dataQr).toHaveAttribute('decoding', 'async');
+
+    await user.click(screen.getByTestId('gallery-item-1').querySelector('.gallery-tile__open')!);
+    const detailImage = document.querySelector<HTMLImageElement>('.recent-detail-modal__image');
+    expect(detailImage).toHaveAttribute('src', 'grace-booth-media://asset/detail-1');
+    expect(detailImage).toHaveAttribute('decoding', 'async');
+  });
+
+  it('keeps detail modal synchronized when items refresh and shows today empty state and conditional skeleton', async () => {
+    const sessionId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const unavailableItem: GalleryItem = {
+      sessionId,
+      previewUrl: 'grace-booth-media://asset/preview-unavail',
+      detailUrl: 'grace-booth-media://asset/detail-unavail',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: 1_700_000_000_000,
+        photoCount: 3,
+        frameName: 'Test',
+        uploadStatus: 'unavailable',
+        cloudExpiresAt: null,
+        printable: false,
+      },
+    };
+    const repairedItem: GalleryItem = {
+      ...unavailableItem,
+      detailUrl: 'grace-booth-media://asset/detail-repaired',
+      qrDataUrl: 'data:image/png;base64,cmVwYWlyZWQ=',
+      metadata: {
+        ...unavailableItem.metadata,
+        uploadStatus: 'uploaded',
+        cloudExpiresAt: 1_800_000_000_000,
+      },
+    };
+
+    const user = userEvent.setup();
+    const repair = vi.fn();
+    const { rerender } = render(
+      <RecentGallery busy items={[]} onClose={() => undefined} operator />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(/loading recent photos/i);
+    expect(screen.queryByText('No photos today yet.')).not.toBeInTheDocument();
+
+    rerender(<RecentGallery busy={false} items={[]} onClose={() => undefined} operator />);
+    expect(screen.getByText('No photos today yet.')).toBeVisible();
+    expect(
+      screen.getByText('Finished photos captured today on this booth appear here.'),
+    ).toBeVisible();
+
+    rerender(
+      <RecentGallery
+        busy
+        items={[unavailableItem]}
+        onClose={() => undefined}
+        onRepairCloudPhoto={repair}
+        operator
+      />,
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /view photo captured at/i }));
+    const modal = screen.getByRole('dialog');
+    expect(modal).toBeVisible();
+    expect(modal.querySelector('button[aria-label="Close photo details"]')).toBeInTheDocument();
+    expect(
+      Array.from(modal.querySelectorAll('button')).some((button) =>
+        /repair cloud copy/i.test(button.textContent),
+      ),
+    ).toBe(true);
+    expect(screen.queryByAltText('Guest download QR code')).not.toBeInTheDocument();
+
+    rerender(
+      <RecentGallery
+        busy={false}
+        items={[repairedItem]}
+        onClose={() => undefined}
+        onRepairCloudPhoto={repair}
+        operator
+      />,
+    );
+
+    const updatedModal = screen.getByRole('dialog');
+    expect(updatedModal).toBeVisible();
+    expect(screen.getByAltText('Guest download QR code')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,cmVwYWlyZWQ=',
+    );
+    expect(
+      updatedModal.querySelector<HTMLImageElement>('.recent-detail-modal__image'),
+    ).toHaveAttribute('src', 'grace-booth-media://asset/detail-repaired');
+    expect(
+      Array.from(updatedModal.querySelectorAll('button')).some((button) =>
+        /repair cloud copy/i.test(button.textContent),
+      ),
+    ).toBe(false);
+
+    rerender(<RecentGallery busy={false} items={[]} onClose={() => undefined} operator />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('renders the locked countdown progress and current pose', () => {
@@ -533,11 +687,7 @@ describe('guest screen components', () => {
 
   it('switches FinalQrScreen copy between cloud retention and local Wi-Fi delivery', () => {
     const { rerender } = render(
-      <FinalQrScreen
-        collageUrl="/collage.jpg"
-        onDone={() => undefined}
-        qrImageUrl="/qr.png"
-      />,
+      <FinalQrScreen collageUrl="/collage.jpg" onDone={() => undefined} qrImageUrl="/qr.png" />,
     );
     expect(screen.getByText('Ready to download')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Available for 30 days' })).toBeVisible();
@@ -603,9 +753,7 @@ describe('guest screen components', () => {
     expect(screen.getByText('Taking photo…')).toBeVisible();
 
     cleanup();
-    render(
-      <AttractScreen canStart onOpenAdmin={() => undefined} onStart={() => undefined} />,
-    );
+    render(<AttractScreen canStart onOpenAdmin={() => undefined} onStart={() => undefined} />);
     const heading = screen.getByRole('heading', { name: 'Hello, smile.' });
     expect(heading).not.toHaveAttribute('data-screen-heading');
     expect(screen.getByRole('button', { name: 'Start photo session' })).toHaveFocus();

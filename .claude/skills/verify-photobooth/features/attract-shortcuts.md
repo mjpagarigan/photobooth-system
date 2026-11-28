@@ -1,6 +1,6 @@
 # Attract shortcuts
 
-From the attract screen, anyone can open the Recent Photos gallery of the last 20 collages, and an operator can open Camera Setup to choose the camera and resolution.
+From the attract screen, anyone can open the Recent Photos gallery of all photos captured today, and an operator can open Camera Setup to choose the camera and resolution.
 
 ## Sub-features
 

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -182,14 +183,31 @@ async function startApplication(): Promise<void> {
     vault,
     uploadQueue,
     qrService,
-    imageProcessor,
     delivery,
+    now,
   });
   const prints = new PrintRepository(database);
   const printerAdapter = config.e2e.enabled
     ? new MockPrinterAdapter({ outputDirectory: join(paths.root, 'e2e-prints') })
     : new WindowsSpoolerAdapter(join(resourceRoot, 'print', 'print-helper.ps1'));
   if (printerAdapter instanceof MockPrinterAdapter) {
+    let cachedSeedAssets: { captureBytes: Buffer; collageBytes: Buffer } | null = null;
+    const ensureSeedAssets = async () => {
+      if (cachedSeedAssets) return cachedSeedAssets;
+      const captureBytes = await sharp({
+        create: { width: 400, height: 300, channels: 3, background: { r: 64, g: 128, b: 192 } },
+      })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+      const collageBytes = await sharp({
+        create: { width: 1200, height: 3600, channels: 3, background: { r: 42, g: 92, b: 148 } },
+      })
+        .jpeg({ quality: 82 })
+        .toBuffer();
+      cachedSeedAssets = { captureBytes, collageBytes };
+      return cachedSeedAssets;
+    };
+
     // Test-only handles so Playwright can unplug the fake printer, run it out of paper, and add
     // a landscape 4R Frame (every shipped Frame is 1:3). Never present in packaged builds.
     (globalThis as { __graceBoothE2e?: unknown }).__graceBoothE2e = {
@@ -210,6 +228,75 @@ async function startApplication(): Promise<void> {
           .png()
           .toBuffer();
         return (await frameService.importFrame('Landscape 4R', png)).id;
+      },
+      seedCollageSession: async (createdAt: number): Promise<string> => {
+        const assets = await ensureSeedAssets();
+        const frameId = repository.getActiveFrame()?.id ?? null;
+        const sessionId = randomUUID();
+        repository.createSession(sessionId, createdAt, frameId, 3, {
+          countdownSeconds: 8,
+          reviewMode: 'continuous',
+        });
+        for (let shotNumber = 1; shotNumber <= 3; shotNumber += 1) {
+          repository.transitionSession(sessionId, ['countdown'], 'capturing', {}, createdAt);
+          const captureFile = vault.write('pending', assets.captureBytes);
+          repository.addCapture(
+            {
+              id: randomUUID(),
+              sessionId,
+              kind: 'capture',
+              retakeRound: 0,
+              shotNumber,
+              encryptedPath: captureFile.relativePath,
+              width: 400,
+              height: 300,
+              byteSize: captureFile.byteSize,
+              sha256: captureFile.sha256,
+              createdAt: createdAt + shotNumber,
+            },
+            createdAt + shotNumber,
+          );
+        }
+        repository.transitionSession(
+          sessionId,
+          ['review'],
+          'processing',
+          { selectedOption: 1 },
+          createdAt + 10,
+        );
+        const jobId = randomUUID();
+        const collageFile = vault.write('completed', assets.collageBytes);
+        repository.saveCollageAndQueue(
+          {
+            id: randomUUID(),
+            sessionId,
+            kind: 'collage',
+            retakeRound: 0,
+            shotNumber: null,
+            encryptedPath: collageFile.relativePath,
+            width: 1200,
+            height: 3600,
+            byteSize: collageFile.byteSize,
+            sha256: collageFile.sha256,
+            createdAt: createdAt + 20,
+          },
+          jobId,
+          createdAt + 20,
+        );
+        repository.updateUploadJob(
+          jobId,
+          'cancelled',
+          { leaseOwner: null, leaseUntil: null },
+          createdAt + 30,
+        );
+        repository.transitionSession(
+          sessionId,
+          ['pending_upload'],
+          'final',
+          { completedAt: createdAt + 30 },
+          createdAt + 30,
+        );
+        return sessionId;
       },
     };
     const printerSettings = prints.getPrinterSettings();
@@ -255,7 +342,7 @@ async function startApplication(): Promise<void> {
     now,
     () => printService.getHealth(),
   );
-  const media = new MediaService(repository, vault);
+  const media = new MediaService(repository, vault, imageProcessor);
   installProtocolHandlers(join(appPath, 'out', 'renderer'), media);
 
   let serverManager: AdminServerManager | null = null;

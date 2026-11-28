@@ -16,6 +16,7 @@ import type {
   GalleryItem,
   GraceBoothBridge,
   RpcResult,
+  UploadJobSummary,
 } from '@grace-booth/shared';
 
 import { App } from '../../src/renderer/App';
@@ -752,7 +753,8 @@ describe('App guest flow', () => {
 describe('recent gallery', () => {
   const galleryItem = (sessionId: string): GalleryItem => ({
     sessionId,
-    previewDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+    previewUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+    detailUrl: 'data:image/jpeg;base64,cHJldmlldw==',
     qrDataUrl: 'data:image/png;base64,cXI=',
     metadata: {
       capturedAt: 1_700_000_000_000,
@@ -801,6 +803,7 @@ describe('recent gallery', () => {
 
     await user.click(screen.getByRole('button', { name: /recent/i }));
     expect(await screen.findByTestId('recent-gallery')).toBeVisible();
+    expect(harness.getRecentMock.mock.calls).toEqual([[]]);
     expect(screen.getByTestId('gallery-item-1')).toBeVisible();
     expect(screen.getByTestId('gallery-item-2')).toBeVisible();
     expect(harness.startMock).not.toHaveBeenCalled();
@@ -808,6 +811,69 @@ describe('recent gallery', () => {
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByTestId('recent-gallery')).not.toBeInTheDocument());
     expect(harness.startMock).not.toHaveBeenCalled();
+  });
+
+  it('clears stale items on reopen and refreshes at local midnight while open', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 10, 28, 23, 59, 55, 0));
+      const yesterday = galleryItem(SESSION_ID);
+      const today: GalleryItem = {
+        ...galleryItem('22222222-3333-4333-8333-333333333333'),
+        previewUrl: 'grace-booth-media://asset/today-preview',
+        detailUrl: 'grace-booth-media://asset/today-detail',
+      };
+      let resolveReopen!: (value: RpcResult<GalleryItem[]>) => void;
+
+      const harness = createBridge();
+      harness.getRecentMock
+        .mockResolvedValueOnce(ok([yesterday]))
+        .mockResolvedValueOnce(ok([today]))
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveReopen = resolve;
+            }),
+        );
+      window.graceBooth = harness.bridge;
+      render(<App />);
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /recent photos/i }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByTestId('gallery-item-1')).toBeVisible();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_250);
+        await Promise.resolve();
+      });
+      expect(harness.getRecentMock).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByTestId('gallery-item-1').querySelector('.gallery-tile__preview'),
+      ).toHaveAttribute('src', today.previewUrl);
+
+      fireEvent.click(screen.getByRole('button', { name: /close recent photos/i }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000 + 1_000);
+      });
+      expect(harness.getRecentMock).toHaveBeenCalledTimes(2);
+
+      fireEvent.click(screen.getByRole('button', { name: /recent photos/i }));
+      expect(screen.getByRole('status')).toHaveTextContent(/loading recent photos/i);
+      expect(screen.queryByTestId('gallery-item-1')).not.toBeInTheDocument();
+
+      resolveReopen(ok([today]));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByTestId('gallery-item-1')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -1362,7 +1428,11 @@ describe('countdown calculation and per-shot review flow', () => {
       sessionSnapshot({ screen: 'countdown', state: 'countdown' }),
       sessionSnapshot({ screen: 'review', state: 'review' }),
       sessionSnapshot({ screen: 'processing', state: 'processing' }),
-      sessionSnapshot({ screen: 'recovery', state: 'camera_error', errorCode: 'camera_unavailable' }),
+      sessionSnapshot({
+        screen: 'recovery',
+        state: 'camera_error',
+        errorCode: 'camera_unavailable',
+      }),
     ]) {
       act(() => harness.emit(darkSnapshot));
       await user.keyboard('{Control>}{Shift>}a{/Shift}{/Control}');
@@ -1481,7 +1551,8 @@ describe('countdown calculation and per-shot review flow', () => {
   it('wires repairCloudPhoto in the operator gallery and refreshes items', async () => {
     const unavailableItem: GalleryItem = {
       sessionId: SESSION_ID,
-      previewDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+      previewUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+      detailUrl: 'data:image/jpeg;base64,cHJldmlldw==',
       qrDataUrl: null,
       metadata: {
         capturedAt: 1_700_000_000_000,
@@ -1525,7 +1596,102 @@ describe('countdown calculation and per-shot review flow', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /repair cloud copy/i })).not.toBeInTheDocument(),
     );
-    expect(harness.getRecentMock).toHaveBeenCalledTimes(2);
+    expect(harness.getRecentMock.mock.calls).toEqual([[], [{ refresh: true }]]);
+  });
+
+  it('paginates operator upload jobs and bypasses availability cache on Refresh', async () => {
+    const failedSessionId = '33333333-3333-4333-8333-333333333333';
+    const failedJobId = '44444444-4444-4444-8444-444444444444';
+    const failedItem: GalleryItem = {
+      sessionId: failedSessionId,
+      previewUrl: 'grace-booth-media://thumb/collage-failed',
+      detailUrl: 'grace-booth-media://asset/collage-failed',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: 1_700_000_000_000,
+        photoCount: 3,
+        frameName: 'Test Frame',
+        uploadStatus: 'failed',
+        cloudExpiresAt: null,
+        printable: false,
+      },
+    };
+    const refreshedItem: GalleryItem = {
+      ...failedItem,
+      qrDataUrl: 'data:image/png;base64,cXI=',
+      metadata: { ...failedItem.metadata, uploadStatus: 'uploaded' },
+    };
+    const page1Jobs: UploadJobSummary[] = Array.from({ length: 100 }, (_, index) => ({
+      id: `${String(index + 1).padStart(8, '0')}-0000-4000-8000-000000000000`,
+      sessionId: `${String(index + 1).padStart(8, '0')}-1111-4111-8111-000000000000`,
+      state: 'succeeded',
+      attemptCount: 1,
+      automaticRetryIndex: 0,
+      nextAttemptAt: null,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    }));
+    const failedJob: UploadJobSummary = {
+      id: failedJobId,
+      sessionId: failedSessionId,
+      state: 'failed',
+      attemptCount: 3,
+      automaticRetryIndex: 3,
+      nextAttemptAt: null,
+      lastErrorCode: 'upload_failed',
+      lastErrorMessage: 'Upload failed.',
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    };
+
+    const harness = createBridge();
+    harness.getAuthStatusMock.mockResolvedValue(
+      ok({ configured: true, authenticated: true, expiresAt: Date.now() + 60_000 }),
+    );
+    const listJobsMock = vi
+      .fn<GraceBoothBridge['admin']['listUploadJobs']>()
+      .mockImplementation((input) =>
+        Promise.resolve(
+          input?.cursor === 'cursor-2'
+            ? ok({ items: [failedJob], nextCursor: null })
+            : ok({ items: page1Jobs, nextCursor: 'cursor-2' }),
+        ),
+      );
+    const retryUploadMock = vi
+      .fn<GraceBoothBridge['admin']['retryUpload']>()
+      .mockResolvedValue(ok({ ...failedJob, state: 'queued' }));
+    harness.bridge.admin.listUploadJobs = listJobsMock;
+    harness.bridge.admin.retryUpload = retryUploadMock;
+    harness.getRecentMock
+      .mockResolvedValueOnce(ok([failedItem]))
+      .mockResolvedValueOnce(ok([refreshedItem]));
+
+    window.graceBooth = harness.bridge;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('attract-screen');
+
+    await user.click(screen.getByRole('button', { name: 'Admin' }));
+    await screen.findByTestId('frame-editor');
+    await user.click(screen.getByRole('button', { name: 'Recent photos' }));
+
+    expect(await screen.findByTestId('gallery-item-1')).toBeVisible();
+    await waitFor(() =>
+      expect(listJobsMock).toHaveBeenCalledWith({ limit: 100, cursor: 'cursor-2' }),
+    );
+
+    const retryButton = await screen.findByRole('button', { name: /retry upload/i });
+    await user.click(retryButton);
+    expect(retryUploadMock).toHaveBeenCalledWith(failedJobId);
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(harness.getRecentMock).toHaveBeenLastCalledWith({ refresh: true }));
+    expect(harness.getRecentMock.mock.calls).toEqual([[], [{ refresh: true }]]);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /retry upload/i })).not.toBeInTheDocument(),
+    );
   });
 
   it('displays live session print status across processing, final, and upload recovery screens', async () => {

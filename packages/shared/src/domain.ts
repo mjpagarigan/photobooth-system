@@ -395,7 +395,8 @@ export type GalleryItemMetadata = z.infer<typeof GalleryItemMetadataSchema>;
 export const GalleryItemSchema = z
   .object({
     sessionId: OpaqueIdSchema,
-    previewDataUrl: z.string().min(1).max(2_000_000),
+    previewUrl: z.string().min(1).max(2_000_000),
+    detailUrl: z.string().min(1).max(2_000_000),
     qrDataUrl: z.string().min(1).max(100_000).nullable(),
     metadata: GalleryItemMetadataSchema,
   })

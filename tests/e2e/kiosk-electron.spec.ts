@@ -469,6 +469,7 @@ type E2ePrintHandle = {
     pendingDocumentKeys(): string[];
   };
   addLandscape4rFrame(): Promise<string>;
+  seedCollageSession(createdAt: number): Promise<string>;
 };
 
 async function printHandle<T>(
@@ -631,6 +632,120 @@ test('operator cancels a queued copy and reprints from Recent photos', async () 
       })
       .toBe(1);
     await expect(queue.getByText('Nothing is waiting to print.')).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await closeKiosk(kiosk?.app);
+    await removeUserDataDirectory(userData);
+  }
+});
+
+test('Recent photos displays all captures from today beyond 20 and excludes prior days', async () => {
+  const userData = await createUserDataDirectory();
+  let kiosk: RunningKiosk | null = null;
+  const yesterdayNoon = new Date(2026, 10, 27, 12, 0, 0, 0).getTime();
+  const todayStartMs = new Date(2026, 10, 28, 0, 0, 0, 0).getTime();
+  const todayNoon = new Date(2026, 10, 28, 12, 0, 0, 0).getTime();
+
+  try {
+    kiosk = await launchKiosk(userData, {
+      GRACE_BOOTH_E2E_NOW_MS: yesterdayNoon,
+      GRACE_BOOTH_E2E_CAMERA_DELAY_MS: 0,
+      GRACE_BOOTH_E2E_REVIEW_MODE: 'continuous',
+    });
+    await bootstrap(kiosk.page);
+    await startAndWaitForReview(kiosk.page);
+    await kiosk.page.getByRole('button', { name: 'Use these photos' }).click();
+    await expect(kiosk.page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await kiosk.page.getByRole('button', { name: 'Done' }).click();
+    await closeKiosk(kiosk.app);
+    kiosk = null;
+
+    kiosk = await launchKiosk(userData, {
+      GRACE_BOOTH_E2E_NOW_MS: todayNoon,
+      GRACE_BOOTH_E2E_CAMERA_DELAY_MS: 0,
+      GRACE_BOOTH_E2E_REVIEW_MODE: 'continuous',
+    });
+    const { page, app } = kiosk;
+    await expect(page.getByTestId('attract-screen')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: 'Recent Photos' }).click();
+    await expect(page.getByTestId('recent-gallery')).toBeVisible();
+    await expect(page.getByText('No photos today yet.')).toBeVisible();
+    await expect(page.locator('[data-testid^="gallery-item-"]')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('recent-gallery')).toHaveCount(0);
+
+    for (let index = 0; index < 24; index += 1) {
+      await printHandle(
+        app,
+        (handle, timestamp) => handle.seedCollageSession(Number(timestamp)),
+        String(todayStartMs + (index + 1) * 60_000),
+      );
+    }
+
+    await startAndWaitForReview(page);
+    await page.getByRole('button', { name: 'Use these photos' }).click();
+    await expect(page.getByTestId('final-screen')).toBeVisible({ timeout: 45_000 });
+    await page.getByRole('button', { name: 'Done' }).click();
+
+    await page.getByRole('button', { name: 'Recent Photos' }).click();
+    await expect(page.getByTestId('recent-gallery')).toBeVisible();
+    await expect(page.locator('[data-testid^="gallery-item-"]')).toHaveCount(25, {
+      timeout: 15_000,
+    });
+
+    const firstPreview = page.getByTestId('gallery-item-1').locator('.gallery-tile__preview');
+    const lastTile = page.getByTestId('gallery-item-25');
+    await lastTile.scrollIntoViewIfNeeded();
+    const lastPreview = lastTile.locator('.gallery-tile__preview');
+
+    await expect
+      .poll(async () => {
+        const firstSrc = await firstPreview.getAttribute('src');
+        const lastSrc = await lastPreview.getAttribute('src');
+        const firstLoaded = await firstPreview.evaluate(
+          (element) =>
+            element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0,
+        );
+        const lastLoaded = await lastPreview.evaluate(
+          (element) =>
+            element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0,
+        );
+        return { firstSrc, lastSrc, firstLoaded, lastLoaded };
+      })
+      .toMatchObject({
+        firstSrc: expect.stringMatching(/^grace-booth-media:\/\/thumb\//),
+        lastSrc: expect.stringMatching(/^grace-booth-media:\/\/thumb\//),
+        firstLoaded: true,
+        lastLoaded: true,
+      });
+
+    await page.getByTestId('gallery-item-1').locator('.gallery-tile__open').click();
+    const detailImage = page.locator('.recent-detail-modal__image');
+    await expect(detailImage).toBeVisible();
+    await expect
+      .poll(() =>
+        detailImage.evaluate((element) =>
+          element instanceof HTMLImageElement && element.complete
+            ? { src: element.src, naturalWidth: element.naturalWidth }
+            : null,
+        ),
+      )
+      .toMatchObject({
+        src: expect.stringMatching(/^grace-booth-media:\/\/asset\//),
+        naturalWidth: 1200,
+      });
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('recent-gallery')).toHaveCount(0);
+
+    await unlockAdmin(page);
+    await page.getByRole('button', { name: 'Recent photos' }).click();
+    await expect(page.locator('[data-testid^="gallery-item-"]')).toHaveCount(25, {
+      timeout: 15_000,
+    });
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await expect(page.locator('[data-testid^="gallery-item-"]')).toHaveCount(25);
   } finally {
     await closeKiosk(kiosk?.app);
     await removeUserDataDirectory(userData);

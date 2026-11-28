@@ -194,9 +194,10 @@ export const IpcContracts = {
   'gallery:get-recent': {
     request: z
       .object({
-        limit: z.number().int().min(1).max(50).default(20),
+        refresh: z.boolean().default(false),
       })
-      .strict(),
+      .strict()
+      .default({ refresh: false }),
     response: rpcResultSchema(z.array(GalleryItemSchema)),
   },
   'gallery:repair-cloud-photo': {
@@ -556,7 +557,7 @@ export type GraceBoothBridge = {
     subscribe(listener: (state: QrStationState) => void): () => void;
   };
   gallery: {
-    getRecent(limit?: number): Promise<RpcResult<GalleryItem[]>>;
+    getRecent(options?: { refresh?: boolean }): Promise<RpcResult<GalleryItem[]>>;
     repairCloudPhoto(sessionId: string): Promise<RpcResult<GalleryCloudRepairResult>>;
   };
   print: {

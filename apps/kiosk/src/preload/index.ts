@@ -93,7 +93,7 @@ const bridge: GraceBoothBridge = {
     },
   },
   gallery: {
-    getRecent: (limit = 20) => invoke('gallery:get-recent', { limit }),
+    getRecent: (options) => invoke('gallery:get-recent', options ?? {}),
     repairCloudPhoto: (sessionId) => invoke('gallery:repair-cloud-photo', { sessionId }),
   },
   print: {

@@ -373,9 +373,7 @@ export function registerIpcHandlers(dependencies: IpcDependencies): () => void {
     return {};
   });
 
-  register('gallery:get-recent', (_event, input) =>
-    dependencies.recentGallery.getRecent(input.limit),
-  );
+  register('gallery:get-recent', (_event, input) => dependencies.recentGallery.getRecent(input));
 
   register('admin:get-auth-status', (event) => ({
     configured: dependencies.passcodes.isConfigured(),

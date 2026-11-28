@@ -6,14 +6,14 @@ import {
   type GalleryCloudRepairResult,
   type GalleryItem,
   type GalleryUploadStatus,
+  type PhotoAvailability,
 } from '@grace-booth/shared';
 
-import { validateReadyReceipt } from '../cloud/ready-receipt.js';
+import { validateReadyReceipt, type ReadyReceipt } from '../cloud/ready-receipt.js';
 import type { QrService } from '../cloud/qr-service.js';
 import type { UploadQueue } from '../cloud/upload-queue.js';
 import type { DeliveryClient } from '../cloud/delivery-client.js';
-import type { LocalRepository, StoredSession } from '../database/repositories.js';
-import type { ImageProcessor } from '../image/image-worker-client.js';
+import type { LocalRepository, StoredFrame, StoredSession } from '../database/repositories.js';
 import type { PhotoVault } from '../storage/photo-vault.js';
 import { AppError } from '../errors.js';
 
@@ -22,12 +22,16 @@ export type RecentGalleryDependencies = {
   vault: PhotoVault;
   uploadQueue: Pick<UploadQueue, 'readDeliverySecret'>;
   qrService: QrService;
-  imageProcessor: ImageProcessor;
   delivery: Pick<DeliveryClient, 'checkPhotoAvailability'> &
     Partial<Pick<DeliveryClient, 'authorizePhotoRepair' | 'uploadSigned' | 'confirmPhotoRepair'>>;
+  now?: () => number;
 };
 
-const PREVIEW_LONG_EDGE = 3600;
+const MAX_CACHED_QRS = 300;
+const MAX_AVAILABILITY_CACHE = 500;
+const AVAILABILITY_TTL_MS = 5 * 60 * 1_000;
+const OFFLINE_COOLDOWN_MS = 15_000;
+const OFFLINE_BREAKER_THRESHOLD = 4;
 
 type SessionDelivery = {
   qrDataUrl: string | null;
@@ -36,18 +40,71 @@ type SessionDelivery = {
   availability: 'uploaded' | 'unavailable' | 'verification-failed';
 };
 
-/**
- * Builds the guest/operator "Recent" gallery. Previews are read from immutable stored collage
- * assets and thumbnailed off the main thread by the shared image worker.
- */
+type ProbeState = {
+  consecutiveFailures: number;
+  breakerTripped: boolean;
+};
+
+export function localDayWindow(nowMs: number): { startMs: number; endMs: number } {
+  if (!Number.isFinite(nowMs)) {
+    throw new AppError('invalid_day_window', 'The requested date window is invalid.');
+  }
+  const date = new Date(nowMs);
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  if (!Number.isFinite(year)) {
+    throw new AppError('invalid_day_window', 'The requested date window is invalid.');
+  }
+  const start = new Date(0);
+  start.setFullYear(year, month, day);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(0);
+  end.setFullYear(year, month, day + 1);
+  end.setHours(0, 0, 0, 0);
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    throw new AppError('invalid_day_window', 'The requested date window is invalid.');
+  }
+  return { startMs, endMs };
+}
+
 export class RecentGalleryService {
   private readonly repairsInFlight = new Set<string>();
+  private readonly now: () => number;
+  private readonly qrCache = new BoundedLruMap<string>(MAX_CACHED_QRS);
+  private readonly availabilityCache = new BoundedLruMap<{ checkedAt: number }>(
+    MAX_AVAILABILITY_CACHE,
+  );
+  private cachedDayStartMs: number | null = null;
+  private offlineUntilMs = 0;
 
-  constructor(private readonly dependencies: RecentGalleryDependencies) {}
+  constructor(private readonly dependencies: RecentGalleryDependencies) {
+    this.now = dependencies.now ?? (() => Date.now());
+  }
 
-  async getRecent(limit = 20): Promise<GalleryItem[]> {
-    const sessions = this.dependencies.repository.listRecentSessionsWithCollage(limit);
-    const items = await mapConcurrent(sessions, 4, (session) => this.buildItem(session));
+  async getRecent(options: { refresh?: boolean | undefined } = {}): Promise<GalleryItem[]> {
+    const refresh = options.refresh === true;
+    const { startMs, endMs } = localDayWindow(this.now());
+    if (this.cachedDayStartMs !== startMs) {
+      this.cachedDayStartMs = startMs;
+      this.qrCache.clear();
+      this.availabilityCache.clear();
+      this.offlineUntilMs = 0;
+    }
+    if (refresh) {
+      this.offlineUntilMs = 0;
+    }
+
+    const sessions = this.dependencies.repository.listSessionsWithCollageBetween(startMs, endMs);
+    if (sessions.length === 0) return [];
+
+    const frameCache = new Map<string, StoredFrame | null>();
+    const probeState: ProbeState = { consecutiveFailures: 0, breakerTripped: false };
+    const items = await mapConcurrent(sessions, 4, (session) =>
+      this.buildItem(session, frameCache, probeState, refresh, startMs),
+    );
     return items.filter((item): item is GalleryItem => item !== null);
   }
 
@@ -139,6 +196,8 @@ export class RecentGalleryService {
         repairBatchId: authorization.repairBatchId,
         metadata,
       });
+      this.invalidateSessionCaches(sessionId);
+      this.offlineUntilMs = 0;
       return {
         status: 'repaired',
         message: 'Cloud copy repaired. Recent Photos has been refreshed.',
@@ -148,7 +207,19 @@ export class RecentGalleryService {
     }
   }
 
-  private async buildItem(session: StoredSession): Promise<GalleryItem | null> {
+  private invalidateSessionCaches(sessionId: string): void {
+    const prefix = `${sessionId}:`;
+    this.availabilityCache.deleteByPrefix(prefix);
+    this.qrCache.deleteByPrefix(prefix);
+  }
+
+  private async buildItem(
+    session: StoredSession,
+    frameCache: Map<string, StoredFrame | null>,
+    probeState: ProbeState,
+    refresh: boolean,
+    dayStartMs: number,
+  ): Promise<GalleryItem | null> {
     try {
       if (!session.collageAssetId) return null;
       const repository = this.dependencies.repository;
@@ -156,18 +227,12 @@ export class RecentGalleryService {
       const collageAsset = assets.find((asset) => asset.id === session.collageAssetId);
       if (!collageAsset) return null;
 
-      const collageBytes = this.dependencies.vault.read(collageAsset.encryptedPath);
-      const thumbnail = await this.dependencies.imageProcessor.createThumbnail(
-        collageBytes,
-        PREVIEW_LONG_EDGE,
-      );
-
-      const frame = session.selectedFrameId ? repository.getFrame(session.selectedFrameId) : null;
+      const frame = resolveFrame(repository, session.selectedFrameId, frameCache);
       const captures = assets.filter((asset) => asset.kind === 'capture');
       const job = repository.getUploadJobForSession(session.id);
       let delivery: SessionDelivery | null = null;
       try {
-        delivery = await this.resolveDelivery(session);
+        delivery = await this.resolveDelivery(session, probeState, refresh, dayStartMs);
       } catch {
         delivery = session.publicSecretRef
           ? {
@@ -181,7 +246,8 @@ export class RecentGalleryService {
 
       return {
         sessionId: session.id,
-        previewDataUrl: `data:image/jpeg;base64,${thumbnail.bytes.toString('base64')}`,
+        previewUrl: `grace-booth-media://thumb/${collageAsset.id}`,
+        detailUrl: `grace-booth-media://asset/${collageAsset.id}`,
         qrDataUrl: delivery?.qrDataUrl ?? null,
         metadata: {
           capturedAt: session.createdAt,
@@ -203,7 +269,12 @@ export class RecentGalleryService {
     }
   }
 
-  private async resolveDelivery(session: StoredSession): Promise<SessionDelivery> {
+  private async resolveDelivery(
+    session: StoredSession,
+    probeState: ProbeState,
+    refresh: boolean,
+    dayStartMs: number,
+  ): Promise<SessionDelivery> {
     const empty: SessionDelivery = {
       qrDataUrl: null,
       cloudExpiresAt: null,
@@ -215,30 +286,163 @@ export class RecentGalleryService {
     if (!secret.ready) return empty;
     const receipt = validateReadyReceipt(secret.photoSessionId, secret.publicToken, secret.ready);
     const expiresAtMs = Date.parse(receipt.expiresAt);
+    const cloudExpiresAt = Number.isFinite(expiresAtMs) ? expiresAtMs : null;
+    // Offline receipts point at the LAN listener (http://), cloud receipts at HTTPS origins.
     const lanReceiptOnly = receipt.publicPageOrigin.startsWith('http://');
     if (!lanReceiptOnly) {
-      const availability = await this.dependencies.delivery.checkPhotoAvailability(
-        receipt.publicToken,
-        receipt.publicPageOrigin,
+      const availabilityKey = `${session.id}:${session.publicSecretRef}`;
+      const availability = await this.resolveCloudAvailability(
+        session.id,
+        availabilityKey,
+        receipt,
+        probeState,
+        refresh,
+        dayStartMs,
       );
       if (availability !== 'available') {
         return {
           qrDataUrl: null,
-          cloudExpiresAt: Number.isFinite(expiresAtMs) ? expiresAtMs : null,
+          cloudExpiresAt,
           lanReceiptOnly: false,
-          availability: availability === 'unavailable' ? 'unavailable' : 'verification-failed',
+          availability,
         };
       }
     }
-    const rendered = await this.dependencies.qrService.render(receipt).catch(() => null);
+
+    const qrKey = `${session.id}:${session.publicSecretRef}:${receipt.publicPageOrigin}:${receipt.expiresAt}`;
+    let qrDataUrl = this.qrCache.get(qrKey) ?? null;
+    if (!qrDataUrl) {
+      const rendered = await this.dependencies.qrService.render(receipt).catch(() => null);
+      if (rendered) {
+        qrDataUrl = rendered.imageDataUrl;
+        if (this.cachedDayStartMs === dayStartMs) {
+          this.qrCache.set(qrKey, qrDataUrl);
+        }
+      }
+    }
     return {
-      qrDataUrl: rendered?.imageDataUrl ?? null,
-      cloudExpiresAt: Number.isFinite(expiresAtMs) ? expiresAtMs : null,
-      // Offline receipts point at the LAN listener (http://), cloud receipts at HTTPS origins.
+      qrDataUrl,
+      cloudExpiresAt,
       lanReceiptOnly,
-      availability: rendered ? 'uploaded' : 'verification-failed',
+      availability: qrDataUrl ? 'uploaded' : 'verification-failed',
     };
   }
+
+  private async resolveCloudAvailability(
+    sessionId: string,
+    availabilityKey: string,
+    receipt: ReadyReceipt,
+    probeState: ProbeState,
+    refresh: boolean,
+    dayStartMs: number,
+  ): Promise<PhotoAvailability> {
+    if (!refresh) {
+      const cached = this.availabilityCache.get(availabilityKey);
+      if (cached !== undefined) {
+        const ageMs = this.now() - cached.checkedAt;
+        if (ageMs >= 0 && ageMs < AVAILABILITY_TTL_MS) {
+          return 'available';
+        }
+        this.availabilityCache.delete(availabilityKey);
+      }
+      if (probeState.breakerTripped || this.now() < this.offlineUntilMs) {
+        return 'verification-failed';
+      }
+    }
+
+    let availability: PhotoAvailability;
+    try {
+      availability = await this.dependencies.delivery.checkPhotoAvailability(
+        receipt.publicToken,
+        receipt.publicPageOrigin,
+      );
+    } catch {
+      availability = 'verification-failed';
+    }
+
+    switch (availability) {
+      case 'available':
+        probeState.consecutiveFailures = 0;
+        if (this.cachedDayStartMs === dayStartMs) {
+          this.availabilityCache.set(availabilityKey, { checkedAt: this.now() });
+        }
+        return 'available';
+      case 'unavailable':
+        probeState.consecutiveFailures = 0;
+        this.availabilityCache.delete(availabilityKey);
+        this.qrCache.deleteByPrefix(`${sessionId}:`);
+        return 'unavailable';
+      case 'verification-failed':
+        this.availabilityCache.delete(availabilityKey);
+        probeState.consecutiveFailures += 1;
+        if (probeState.consecutiveFailures >= OFFLINE_BREAKER_THRESHOLD) {
+          probeState.breakerTripped = true;
+          if (this.cachedDayStartMs === dayStartMs) {
+            this.offlineUntilMs = this.now() + OFFLINE_COOLDOWN_MS;
+          }
+        }
+        return 'verification-failed';
+      default: {
+        const _exhaustive: never = availability;
+        return _exhaustive;
+      }
+    }
+  }
+}
+
+class BoundedLruMap<V> {
+  private readonly entries = new Map<string, V>();
+
+  constructor(private readonly maxEntries: number) {}
+
+  get(key: string): V | undefined {
+    const value = this.entries.get(key);
+    if (value === undefined) return undefined;
+    this.entries.delete(key);
+    this.entries.set(key, value);
+    return value;
+  }
+
+  set(key: string, value: V): void {
+    if (this.maxEntries <= 0) return;
+    this.entries.delete(key);
+    while (this.entries.size >= this.maxEntries) {
+      const oldestKey = this.entries.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.entries.delete(oldestKey);
+    }
+    this.entries.set(key, value);
+  }
+
+  delete(key: string): void {
+    this.entries.delete(key);
+  }
+
+  deleteByPrefix(prefix: string): void {
+    for (const key of this.entries.keys()) {
+      if (key.startsWith(prefix)) {
+        this.entries.delete(key);
+      }
+    }
+  }
+
+  clear(): void {
+    this.entries.clear();
+  }
+}
+
+function resolveFrame(
+  repository: LocalRepository,
+  frameId: string | null,
+  cache: Map<string, StoredFrame | null>,
+): StoredFrame | null {
+  if (!frameId) return null;
+  if (cache.has(frameId)) {
+    return cache.get(frameId) ?? null;
+  }
+  const frame = repository.getFrame(frameId);
+  cache.set(frameId, frame);
+  return frame;
 }
 
 function jobStatus(state: UploadQueueJobState): GalleryUploadStatus {

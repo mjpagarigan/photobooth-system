@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mocked } from 'vitest';
 
-import type { GraceBoothBridge, QrStationState } from '@grace-booth/shared';
+import type { GalleryItem, GraceBoothBridge, QrStationState } from '@grace-booth/shared';
 
 import { QrStationScreen } from '../../src/renderer/screens/QrStationScreen';
 
@@ -59,6 +59,7 @@ describe('QrStationScreen', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
     delete window.graceBooth;
   });
@@ -199,7 +200,7 @@ describe('QrStationScreen', () => {
 
     await user.click(screen.getByRole('button', { name: /recent photos/i }));
     expect(await screen.findByRole('dialog')).toHaveAttribute('data-tone', 'dark');
-    expect(mockBridge.gallery.getRecent.mock.calls).toEqual([[20]]);
+    expect(mockBridge.gallery.getRecent.mock.calls).toEqual([[]]);
     unmount();
 
     mockBridge.qrStation.getState.mockResolvedValue({
@@ -221,6 +222,127 @@ describe('QrStationScreen', () => {
     await screen.findByTestId('qr-station-active');
     await user.click(screen.getByRole('button', { name: /recent photos/i }));
     expect(await screen.findByRole('dialog')).toHaveAttribute('data-tone', 'dark');
+    expect(mockBridge.gallery.getRecent.mock.calls).toEqual([[], []]);
+  });
+
+  it('clears stale items while reopening and ignores responses after closing', async () => {
+    const user = userEvent.setup();
+    const oldItem: GalleryItem = {
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      previewUrl: 'grace-booth-media://asset/old-preview',
+      detailUrl: 'grace-booth-media://asset/old-detail',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: new Date(2026, 10, 28, 22, 0, 0).getTime(),
+        photoCount: 3,
+        frameName: 'Test',
+        uploadStatus: 'uploaded',
+        cloudExpiresAt: null,
+        printable: false,
+      },
+    };
+    let resolveSecond!: (
+      value: Awaited<ReturnType<GraceBoothBridge['gallery']['getRecent']>>,
+    ) => void;
+    mockBridge.gallery.getRecent
+      .mockResolvedValueOnce({ ok: true, data: [oldItem] })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
+
+    render(<QrStationScreen />);
+    await screen.findByTestId('qr-station-idle');
+
+    await user.click(screen.getByRole('button', { name: /recent photos/i }));
+    expect(await screen.findByTestId('gallery-item-1')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /close recent photos/i }));
+    await waitFor(() => expect(screen.queryByTestId('recent-gallery')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /recent photos/i }));
+    expect(screen.getByRole('status')).toHaveTextContent(/loading recent photos/i);
+    expect(screen.queryByTestId('gallery-item-1')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /close recent photos/i }));
+    resolveSecond({ ok: true, data: [oldItem] });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('recent-gallery')).not.toBeInTheDocument();
+  });
+
+  it('auto-refreshes open RecentGallery after local midnight and clears timer on close', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 28, 23, 59, 55, 0));
+
+    const yesterdayItem: GalleryItem = {
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      previewUrl: 'grace-booth-media://asset/yesterday-preview',
+      detailUrl: 'grace-booth-media://asset/yesterday-detail',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: new Date(2026, 10, 28, 23, 30, 0).getTime(),
+        photoCount: 3,
+        frameName: 'Test',
+        uploadStatus: 'uploaded',
+        cloudExpiresAt: null,
+        printable: false,
+      },
+    };
+    const todayItem: GalleryItem = {
+      sessionId: '22222222-2222-4222-8222-222222222222',
+      previewUrl: 'grace-booth-media://asset/today-preview',
+      detailUrl: 'grace-booth-media://asset/today-detail',
+      qrDataUrl: null,
+      metadata: {
+        capturedAt: new Date(2026, 10, 29, 0, 0, 0).getTime(),
+        photoCount: 3,
+        frameName: 'Test',
+        uploadStatus: 'uploaded',
+        cloudExpiresAt: null,
+        printable: false,
+      },
+    };
+    mockBridge.gallery.getRecent
+      .mockResolvedValueOnce({ ok: true, data: [yesterdayItem] })
+      .mockResolvedValueOnce({ ok: true, data: [todayItem] });
+
+    render(<QrStationScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /recent photos/i }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockBridge.gallery.getRecent).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByTestId('gallery-item-1').querySelector('.gallery-tile__preview'),
+    ).toHaveAttribute('src', yesterdayItem.previewUrl);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_249);
+    });
+    expect(mockBridge.gallery.getRecent).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      await Promise.resolve();
+    });
+    expect(mockBridge.gallery.getRecent).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByTestId('gallery-item-1').querySelector('.gallery-tile__preview'),
+    ).toHaveAttribute('src', todayItem.previewUrl);
+
+    fireEvent.click(screen.getByRole('button', { name: /close recent photos/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000 + 1_000);
+    });
+    expect(mockBridge.gallery.getRecent).toHaveBeenCalledTimes(2);
   });
 
   it('marks Done busy while dismiss is in flight and blocks duplicate requests', async () => {

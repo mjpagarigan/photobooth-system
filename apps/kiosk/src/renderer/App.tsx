@@ -22,12 +22,7 @@ import {
   isCancellableSessionState,
   isCaptureScreen,
 } from '@grace-booth/shared';
-import {
-  AnchoredToastProvider,
-  Button,
-  ToastProvider,
-  type DialogTone,
-} from '@grace-booth/ui';
+import { AnchoredToastProvider, Button, ToastProvider, type DialogTone } from '@grace-booth/ui';
 
 import { AdminSettings } from './admin/AdminSettings';
 import { AdminShell } from './admin/AdminShell';
@@ -40,6 +35,7 @@ import { PrinterIndicator, PrintQueuePanel } from './components/Printing';
 import { usePrinterHealth } from './hooks/usePrinterHealth';
 import { RecentGallery } from './components/RecentGallery';
 import { useCameraStream } from './hooks/useCameraStream';
+import { useMidnightRefresh } from './hooks/useMidnightRefresh';
 import { useNikonLivePreview } from './hooks/useNikonLivePreview';
 import { LOCAL_FIXTURES } from './local-fixtures';
 import { AttractScreen } from './screens/AttractScreen';
@@ -62,6 +58,39 @@ type DialogState = {
 };
 
 const CANCEL_ARM_WINDOW_MS = 2_000;
+const UPLOAD_JOBS_PAGE_LIMIT = 100;
+const UPLOAD_JOBS_MAX_PAGES = 10;
+
+async function loadAllUploadJobs(bridge: GraceBoothBridge): Promise<RpcResult<UploadJobSummary[]>> {
+  const allJobs: UploadJobSummary[] = [];
+  const seenJobIds = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: string | null = null;
+
+  for (let page = 0; page < UPLOAD_JOBS_MAX_PAGES; page += 1) {
+    const result = await bridge.admin.listUploadJobs({
+      limit: UPLOAD_JOBS_PAGE_LIMIT,
+      cursor,
+    });
+    if (!result.ok) {
+      return result;
+    }
+    for (const item of result.data.items) {
+      if (!seenJobIds.has(item.id)) {
+        seenJobIds.add(item.id);
+        allJobs.push(item);
+      }
+    }
+    const nextCursor = result.data.nextCursor;
+    if (nextCursor === null || seenCursors.has(nextCursor)) {
+      break;
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+
+  return { ok: true, data: allJobs };
+}
 
 const DARK_GUEST_SCREENS = new Set<GuestScreen>([
   'countdown',
@@ -187,6 +216,15 @@ export function App() {
   const lastStateRef = useRef(snapshot.state);
   const cancelArmedRef = useRef(false);
   const cancelDisarmTimerRef = useRef<number | null>(null);
+  const recentRequestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const countdownSeconds = useCountdown(
     snapshot.state === 'countdown' ? snapshot.countdownEndsAt : null,
@@ -483,7 +521,7 @@ export function App() {
       const [settingsResult, healthResult, jobsResult] = await Promise.all([
         bridge.admin.getSettings(),
         bridge.admin.getHealth(),
-        bridge.admin.listUploadJobs({ limit: 50 }),
+        loadAllUploadJobs(bridge),
       ]);
       const failed = [settingsResult, healthResult, jobsResult].find((result) => !result.ok);
       if (failed) {
@@ -493,7 +531,7 @@ export function App() {
       if (settingsResult.ok && healthResult.ok && jobsResult.ok) {
         setAdminSettings(settingsResult.data);
         setHealth(healthResult.data);
-        setJobs(jobsResult.data.items);
+        setJobs(jobsResult.data);
         return true;
       }
       return false;
@@ -679,11 +717,13 @@ export function App() {
   );
 
   const exitAdmin = useCallback(async () => {
+    recentRequestIdRef.current += 1;
     if (!visualSeed) {
       const bridge = getBridge();
       if (bridge) {
         await bridge.admin.logout().catch(() => undefined);
       }
+      setRecent({ open: false, busy: false, items: [], error: null });
     }
     setAdminOpen(false);
     setAdminError(null);
@@ -1042,9 +1082,13 @@ export function App() {
       });
       return;
     }
-    setRecent((current) => ({ open: true, busy: true, items: current.items, error: null }));
+    const requestId = ++recentRequestIdRef.current;
+    setRecent({ open: true, busy: true, items: [], error: null });
     try {
-      const result = await bridge.gallery.getRecent(20);
+      const result = await bridge.gallery.getRecent();
+      if (!mountedRef.current || recentRequestIdRef.current !== requestId) {
+        return;
+      }
       if (result.ok) {
         setRecent({ open: true, busy: false, items: result.data, error: null });
       } else {
@@ -1056,6 +1100,9 @@ export function App() {
         });
       }
     } catch {
+      if (!mountedRef.current || recentRequestIdRef.current !== requestId) {
+        return;
+      }
       setRecent({
         open: true,
         busy: false,
@@ -1065,45 +1112,78 @@ export function App() {
     }
   }, [visualSeed]);
 
-  const loadOperatorGallery = useCallback(async () => {
-    if (visualSeed) {
-      return;
-    }
-    const bridge = getBridge();
-    if (!bridge) {
-      setRecent((curr) => ({
-        ...curr,
-        busy: false,
-        items: [],
-        error: 'The booth controls are unavailable.',
-      }));
-      return;
-    }
-    setRecent((curr) => ({ ...curr, busy: true, error: null }));
-    try {
-      const result = await bridge.gallery.getRecent(20);
-      if (result.ok) {
-        setRecent((curr) => ({ ...curr, busy: false, items: result.data, error: null }));
-      } else {
+  const loadOperatorGallery = useCallback(
+    async (options?: { refresh?: boolean }) => {
+      if (visualSeed) {
+        return;
+      }
+      const refresh = options?.refresh === true;
+      const bridge = getBridge();
+      if (!bridge) {
         setRecent((curr) => ({
           ...curr,
           busy: false,
-          items: [],
-          error: safeGuestMessage(result.error.message, 'Recent photos could not be loaded.'),
+          items: refresh ? curr.items : [],
+          error: 'The booth controls are unavailable.',
         }));
+        return;
       }
-    } catch {
+      const requestId = ++recentRequestIdRef.current;
       setRecent((curr) => ({
         ...curr,
-        busy: false,
-        items: [],
-        error: 'Recent photos could not be loaded.',
+        busy: true,
+        items: refresh ? curr.items : [],
+        error: null,
       }));
-    }
-  }, [visualSeed]);
+      try {
+        const [galleryResult, jobsResult] = await Promise.allSettled([
+          refresh ? bridge.gallery.getRecent({ refresh: true }) : bridge.gallery.getRecent(),
+          loadAllUploadJobs(bridge),
+        ]);
+        if (!mountedRef.current || recentRequestIdRef.current !== requestId) {
+          return;
+        }
+        if (jobsResult.status === 'fulfilled' && jobsResult.value.ok) {
+          setJobs(jobsResult.value.data);
+        }
+        if (galleryResult.status !== 'fulfilled') {
+          setRecent((curr) => ({
+            ...curr,
+            busy: false,
+            items: refresh ? curr.items : [],
+            error: 'Recent photos could not be loaded.',
+          }));
+          return;
+        }
+        const result = galleryResult.value;
+        if (result.ok) {
+          setRecent((curr) => ({ ...curr, busy: false, items: result.data, error: null }));
+        } else {
+          setRecent((curr) => ({
+            ...curr,
+            busy: false,
+            items: refresh ? curr.items : [],
+            error: safeGuestMessage(result.error.message, 'Recent photos could not be loaded.'),
+          }));
+        }
+      } catch {
+        if (!mountedRef.current || recentRequestIdRef.current !== requestId) {
+          return;
+        }
+        setRecent((curr) => ({
+          ...curr,
+          busy: false,
+          items: refresh ? curr.items : [],
+          error: 'Recent photos could not be loaded.',
+        }));
+      }
+    },
+    [visualSeed],
+  );
 
   const closeRecentGallery = useCallback(() => {
-    setRecent((current) => ({ ...current, open: false }));
+    recentRequestIdRef.current += 1;
+    setRecent((current) => ({ ...current, open: false, busy: false }));
   }, []);
 
   const repairCloudPhoto = useCallback(
@@ -1127,7 +1207,7 @@ export function App() {
           setRecent((curr) => ({ ...curr, error: adminErrorMessage(result) }));
           return;
         }
-        await loadOperatorGallery();
+        await loadOperatorGallery({ refresh: true });
         if (result.data.status !== 'repaired') {
           setRecent((curr) => ({ ...curr, error: result.data.message }));
         }
@@ -1147,8 +1227,23 @@ export function App() {
   useEffect(() => {
     if (adminOpen && adminView === 'gallery') {
       void loadOperatorGallery();
+      return () => {
+        recentRequestIdRef.current += 1;
+      };
     }
+    return undefined;
   }, [adminOpen, adminView, loadOperatorGallery]);
+
+  const guestGalleryOpen = !visualSeed && recent.open && !adminOpen;
+  const operatorGalleryOpen = !visualSeed && adminOpen && adminView === 'gallery';
+
+  useMidnightRefresh(guestGalleryOpen || operatorGalleryOpen, () => {
+    if (operatorGalleryOpen) {
+      void loadOperatorGallery();
+    } else {
+      void openRecentGallery();
+    }
+  });
 
   const guestContent = useMemo(() => {
     if (loading) {
@@ -1356,13 +1451,13 @@ export function App() {
                       <h1 data-screen-heading tabIndex={-1}>
                         Recent photos
                       </h1>
-                      <p>Every finished collage with delivery status and metadata.</p>
+                      <p>Today's finished collages with delivery status and metadata.</p>
                     </div>
                     <div className="admin-page-header__actions">
                       <Button
                         icon={<ArrowClockwise aria-hidden="true" weight="bold" />}
                         loading={recent.busy}
-                        onClick={() => void loadOperatorGallery()}
+                        onClick={() => void loadOperatorGallery({ refresh: true })}
                         variant="secondary"
                       >
                         Refresh

@@ -689,13 +689,21 @@ export class LocalRepository {
       .map((row) => mapSession(row as Record<string, unknown>));
   }
 
-  listRecentSessionsWithCollage(limit = 20): StoredSession[] {
+  listSessionsWithCollageBetween(startMs: number, endMs: number): StoredSession[] {
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+      throw new AppError('invalid_day_window', 'The requested date window is invalid.');
+    }
+    if (endMs === startMs) return [];
     return this.database.raw
       .prepare(
-        `${SESSION_SELECT} WHERE collage_asset_id IS NOT NULL
-        ORDER BY COALESCE(completed_at, updated_at) DESC LIMIT ?`,
+        `${SESSION_SELECT}
+        WHERE collage_asset_id IS NOT NULL
+          AND cleanup_state = 'active'
+          AND created_at >= ?
+          AND created_at < ?
+        ORDER BY created_at DESC, id DESC`,
       )
-      .all(Math.max(1, Math.min(50, limit)))
+      .all(startMs, endMs)
       .map((row) => mapSession(row as Record<string, unknown>));
   }
 
